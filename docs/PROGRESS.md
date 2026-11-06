@@ -15,7 +15,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
 | Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
-| Payments, reminders, job closure | Naveen | Not started | | |
+| Payments, reminders, job closure | Naveen | In review | feature/naveen-invoices | T35 in-app GST invoicing (no Zoho, D-017): migration, GST 18% & paise rounding, Indian words, quote/report line matching with minimum charge, PDF/Word template, /invoices screens and payment recording |
 | Dashboard | Naveen | Not started | | |
 | WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
 | Financial reports from Zoho (X4) | Naveen | Not started | | Needs Zoho access |
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-06 18:38 – Naveen – Claude
+Task: T35 Generate Invoice inside the app (no Zoho, Decision D-017)
+Done: Built in-app GST invoicing migration (20261106040000_invoices_in_app.sql with invoice_counters, reshaped invoices, invoice_lines, payments, line/tax consistency on Issue, due_date from customer payment_terms_days, freezing after Issue, and overpayment protection), pure invoicing library (lib/invoices/ for 18% intra/inter-state GST, exact paise rounding & whole-rupee round-off, Indian amount in words, quotation+report line builder with minimum charge, and single PDF/Word .docx invoice template), and /invoices screens + routes (/invoices, /invoices/[id], /invoices/[id]/pdf, /invoices/[id]/docx, plus Generate invoice on approved reports and jobs). All 184 tests, lint, type check and production build pass.
+Files changed: supabase/migrations/20261106040000_invoices_in_app.sql, supabase/tests/schema.test.ts, lib/invoices/, app/(office)/invoices/, app/(office)/review/[reportId]/page.tsx, app/(office)/jobs/[id]/page.tsx, docs/PROGRESS.md
+Next: Merge PR into feature/naveen-integration; plug in BITA's exact SAC code, bank details and terms into DEFAULT_BITA_INVOICE_PROFILE when reference invoices arrive.
+Blockers / questions: none.
 
 ### 2026-11-06 11:54 – Naveen – Codex
 Task: T8a typed report fields and UT/MT/DPT paper templates
