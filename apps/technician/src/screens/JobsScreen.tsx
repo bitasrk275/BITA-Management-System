@@ -167,7 +167,7 @@ export function JobsScreen({
                 You have no upcoming or recent inspection assignments.
               </Text>
             </View>
-          ) : null
+          ) : undefined
         }
       />
     </SafeAreaView>
