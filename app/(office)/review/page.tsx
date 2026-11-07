@@ -99,12 +99,12 @@ export default async function ReviewQueue({
                 key={r.id}
                 tone={missing.length ? "wait" : "bad"}
                 title={
-                  <>
+                  <div className="flex flex-wrap items-center gap-2">
                     <Mono>{r.report_no}</Mono>
-                    <span className="ml-3 font-normal text-ink-2">
+                    <span className="font-normal text-ink-2">
                       {METHOD_LABEL[r.method]} · {r.jobs?.customers?.name}
                     </span>
-                  </>
+                  </div>
                 }
                 detail={
                   missing.length

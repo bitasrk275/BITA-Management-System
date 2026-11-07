@@ -302,7 +302,7 @@ export default async function ManagementHome() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-2.5 text-xs text-ink-3">From Zoho Books. Appears once invoicing is connected.</p>
+              <p className="mt-2.5 text-xs text-ink-3">From issued tax invoices.</p>
             </div>
           </section>
 

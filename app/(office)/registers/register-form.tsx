@@ -30,7 +30,7 @@ function PersonFields({ person }: { person?: Person }) {
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Initials"><Input name="initials" maxLength={20} defaultValue={person?.initials ?? ""} /></Field>
       <Field label="Position"><Input name="position" defaultValue={person?.position ?? ""} /></Field>
-      <Field label="Mobile / WhatsApp"><Input name="mobile" type="tel" defaultValue={person?.mobile ?? ""} /></Field>
+      <Field label="Mobile"><Input name="mobile" type="tel" defaultValue={person?.mobile ?? ""} /></Field>
       <Field label="Email"><Input name="email" type="email" defaultValue={person?.email ?? ""} /></Field>
     </div>
     <fieldset className="space-y-2 rounded-md border border-line p-3">

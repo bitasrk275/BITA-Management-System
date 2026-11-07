@@ -238,7 +238,7 @@ export default async function AssignTechnicianPage({
           </Card>
 
           <Card>
-            <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">Qualification matrix for this job (R20)</h2>
               <Link href="/registers" className="text-xs underline">
                 Open registers

@@ -180,7 +180,7 @@ export default async function InvoicesListPage({
                 }
                 detail={detailParts.join(" · ")}
                 action={
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2 text-right">
                     <div className="text-right text-[13px]">
                       <div className="font-semibold text-ink tabular-nums">{formatINR(Number(inv.total) || 0)}</div>
                       <div className="text-[11.5px] text-ink-3 tabular-nums">

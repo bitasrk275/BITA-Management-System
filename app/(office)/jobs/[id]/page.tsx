@@ -93,7 +93,7 @@ export default async function JobPage({
                 </p>
                 <ul className="mt-2 space-y-1 text-sm">
                   {contacts.data?.map((c) => (
-                    <li key={c.name}>
+                    <li key={c.name} className="break-words">
                       {c.name}
                       <span className="text-xs text-ink-3">
                         {" "}
@@ -165,7 +165,7 @@ export default async function JobPage({
           </Card>
 
           <Card>
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">Technicians and inspections</h2>
               <ButtonLink href={`/jobs/${job.id}/assign`} variant="secondary" size="sm">
                 Assign technician
@@ -224,7 +224,7 @@ export default async function JobPage({
           </Card>
 
           <Card>
-            <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">Invoices and payments</h2>
               <form action={generateInvoiceFromJob.bind(null, job.id)}>
                 <Button type="submit">Generate invoice</Button>

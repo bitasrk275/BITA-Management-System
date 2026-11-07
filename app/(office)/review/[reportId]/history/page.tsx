@@ -183,7 +183,7 @@ export default async function ReportHistoryPage({
                             <span className="text-ink-3">:</span>
                             {entry.action !== "insert" && (
                               <>
-                                <span className="line-through text-ink-3">
+                                <span className="line-through text-ink-3 break-all">
                                   {d.before.length > 100
                                     ? `${d.before.slice(0, 97)}...`
                                     : d.before}
@@ -191,7 +191,7 @@ export default async function ReportHistoryPage({
                                 <span className="text-ink-3">→</span>
                               </>
                             )}
-                            <span className="font-medium text-ink">
+                            <span className="font-medium text-ink break-all">
                               {d.after.length > 120 ? `${d.after.slice(0, 117)}...` : d.after}
                             </span>
                           </div>

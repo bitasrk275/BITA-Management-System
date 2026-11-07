@@ -10,7 +10,7 @@ export interface InvoiceRow {
   id: string;
   job_id: string;
   kind: "proforma" | "tax_invoice";
-  zoho_id: string | null;
+  zoho_id: string | null; // legacy mirror id (kept per D-017 / schema)
   number: string | null;
   invoice_no: string | null;
   report_id: string | null;
