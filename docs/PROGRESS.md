@@ -15,7 +15,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
 | Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
-| Payments, reminders, job closure | Naveen | In review | feature/naveen-email-reminders | T37 email-only payment reminders on in-app tax invoices (issued/partly_paid, balance > 0, reminders_paused false, due_date) + n8n workflow export (n8n/payment-reminders-email.json) |
+| Payments, reminders, job closure | Naveen | In review | feature/naveen-p3-price-list | Phase 2 P3: Price list module (`price_items`, `/price-list`, `/api/v1/price-items`), invoice line price-list dropdown + `+ Add new item` + editable rates |
 | Dashboard | Naveen | Not started | | |
 | WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
 | Financial reports from Zoho (X4) | Naveen | In review | feature/naveen-gst-export | T36 CA GST export (GSTR-1 B2B & B2C CSV + Excel XML workbook at /invoices/export) |
@@ -67,13 +67,19 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-07 17:32 – Naveen – Claude
+Task: P3 Price list module (`price_items`, `/price-list`, `/api/v1/price-items`) + invoice line price-list dropdown
+Done: Added migration `supabase/migrations/20261107030000_price_items.sql` creating `public.price_items` with RLS (hidden from technicians), soft delete, recycle bin restoration, audit logging, and default BITA NDT services (`UT service`, `MT service`, `DPT service`, `Conveyance`, `Hardness testing`, `Visual inspection`). Built `lib/modules/price-items/` (`schema.ts`, `service.ts`, `price-items.test.ts`), `/api/v1/price-items` (`GET`, `POST`, `PATCH`, `DELETE`, `restore`), and `/price-list` UI page (`app/(office)/price-list/`). Updated `InvoiceDraftEditor` and `app/(office)/invoices/` so invoice lines are chosen from the price list dropdown (with inline `+ Add new item` and editable rates per invoice) instead of pulling rates from the quotation.
+Files changed: supabase/migrations/20261107030000_price_items.sql, lib/db/types.ts, lib/modules/price-items/, lib/modules/recycle-bin/service.ts, app/api/v1/price-items/, app/(office)/price-list/, app/(office)/recycle-bin/page.tsx, app/(office)/invoices/, supabase/tests/phase2-foundation.test.ts, docs/PROGRESS.md
+Next: Cross-review/merge open PRs into `feature/naveen-integration` and start P4a (Invoice pending report status + several reports on one invoice).
+Blockers / questions: none.
+
 ### 2026-11-07 17:20 – Naveen – Antigravity
 Task: A1 Technician edits after submit + office report photo selection (Phase 2)
 Done: Replaced 409 lock on submitted field inspections with approval-based locking: technicians can edit and resubmit from the phone until technical reviewer approves the report. Every resubmission logs diff and old/new readings to `inspection_edits` and `audit_log`, and notifies the office via the dashboard "Report edits" attention item and dedicated diff view list. Added `include_in_report` boolean flag to `attachments` with migration `20261107000000_report_edits_and_photos.sql` and RLS; added photo inclusion review controls in `/review/[reportId]` so office can select/unselect which photos and drawings appear in the final report; updated Word (.docx) and PDF report generators to include only chosen photos. Updated Expo app `ReportScreen` to keep submitted reports editable until reviewer approval with clear status banners, and lock read-only upon approval. Verified unlinking phones remains accessible via register actions. 257 tests green, ESLint clean, tsc clean, and production build clean.
 Files changed: supabase/migrations/20261107000000_report_edits_and_photos.sql, lib/db/types.ts, lib/field/assignments.ts, lib/field/field.test.ts, lib/reports/docx.ts, lib/reports/review.ts, templates/reports/types.ts, app/(office)/dashboard/page.tsx, app/(office)/review/[reportId]/page.tsx, app/(office)/review/actions.ts, app/(office)/review/[reportId]/docx/route.ts, app/(office)/review/[reportId]/pdf/route.ts, apps/technician/src/screens/ReportScreen.tsx, apps/technician/src/types.ts, tests/field-api.test.ts, docs/PROGRESS.md
 Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
 Blockers / questions: none.
-
 ### 2026-11-07 17:20 – Naveen – Claude
 Task: P2 Customer PO on quotation accept + jobs.po_value + PO link & warning on invoices
 Done: Added migration `supabase/migrations/20261107020000_customer_po_value.sql` (`po_value numeric(14,2) check (po_value is null or po_value >= 0)` on `public.jobs`) and updated `lib/db/types.ts` and `app/(office)/invoices/db.ts`. Built `lib/modules/po/` (`schema.ts`, `service.ts`, `po.test.ts`) and `/api/v1/quotations/[id]/accept` and `/api/v1/jobs/[id]/po`. Updated `/quotations/[id]` so "Accepted by customer" allows recording PO number, PO date, PO value, PO file, and creating the linked job in one step (while keeping PO optional so work can start before the PO arrives). Updated `/jobs/[id]`, `JobForm`, `/invoices/[id]`, and `InvoiceDraftEditor` to display `po_value`, prefill the job PO on invoices (editable), and warn whenever invoices against one PO total more than its value.

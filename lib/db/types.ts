@@ -1263,6 +1263,56 @@ export type Database = {
           },
         ]
       }
+      price_items: {
+        Row: {
+          active: boolean
+          created_at: string
+          default_rate: number
+          deleted_at: string | null
+          deleted_by: string | null
+          description: string | null
+          id: string
+          name: string
+          sac: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          default_rate?: number
+          deleted_at?: string | null
+          deleted_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          sac?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          default_rate?: number
+          deleted_at?: string | null
+          deleted_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          sac?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_items_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings: {
         Row: {
           description: string | null
