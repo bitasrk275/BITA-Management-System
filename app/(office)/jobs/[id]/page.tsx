@@ -4,6 +4,7 @@ import { Badge, Button, ButtonLink, Card, ErrorNote, PageHeader, SavedNote, Stat
 import { requireStaff } from "@/lib/auth";
 import { formatIST } from "../../enquiries/labels";
 import { closeJob, updateJob } from "../actions";
+import { generateInvoiceFromJob } from "../../invoices/actions";
 import { isJobReadyToClose } from "../closure";
 import { JobForm } from "../job-form";
 import { formatINR, JOB_STATUS_LABEL, METHOD_LABEL } from "../labels";
@@ -221,13 +222,22 @@ export default async function JobPage({
           </Card>
 
           <Card>
-            <h2 className="mb-2 font-semibold">Invoices and payments</h2>
-            <p className="mb-2 text-xs text-ink-3">From Zoho Books.</p>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="font-semibold">Invoices and payments</h2>
+              <form action={generateInvoiceFromJob.bind(null, job.id)}>
+                <Button type="submit">Generate invoice</Button>
+              </form>
+            </div>
+            <p className="mb-2 text-xs text-ink-3">
+              Generated in-app from the approved report and accepted quotation (D-017).
+            </p>
             <ul className="space-y-1 text-sm">
               {invoices.data?.map((i) => (
                 <li key={i.id}>
-                  {i.kind === "proforma" ? "Proforma" : "GST invoice"} {i.number ?? ""} · {formatINR(i.total)} · balance{" "}
-                  {formatINR(i.balance)} · {i.status ?? ""}
+                  <Link href={`/invoices/${i.id}`} className="font-medium text-ink underline">
+                    {i.kind === "proforma" ? "Proforma" : "GST invoice"} {i.number ?? "Draft"}
+                  </Link>{" "}
+                  · {formatINR(i.total)} · balance {formatINR(i.balance)} · {i.status ?? ""}
                 </li>
               ))}
               {invoices.data?.length === 0 && <li className="text-ink-3">No invoices yet.</li>}
