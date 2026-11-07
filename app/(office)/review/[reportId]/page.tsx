@@ -257,7 +257,7 @@ export default async function ReportReviewPage({
                     )}
                   </Select>
                 </Field>
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   {!isReviewer && (
                     <span className="text-xs text-bad">
                       Reviewer role required to approve (AGENTS.md rule 6).
@@ -309,12 +309,12 @@ export default async function ReportReviewPage({
                   IST
                 </p>
                 {report.pdf_path && (
-                  <p>
+                  <p className="break-all">
                     Signed PDF path: <Mono>{report.pdf_path}</Mono>
                   </p>
                 )}
                 {report.sent_at && (
-                  <p>
+                  <p className="break-all">
                     Marked sent on{" "}
                     <strong className="text-ink">
                       {new Date(report.sent_at).toLocaleString("en-IN", {

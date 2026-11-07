@@ -67,13 +67,19 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-07 13:45 – Naveen – Antigravity
+Task: T39 Remove leftover Zoho / WhatsApp wording (D-017) and 375 px mobile audit across office screens
+Done: Cleaned leftover Zoho Books references and WhatsApp copy per D-017 while retaining enquiry intake source 'whatsapp' and database mirror columns. Audited all office screens at 375 px phone width (dashboard, office, enquiries, quotations, jobs, technician assignment, technical report review & history, in-app invoices, GSTR-1 export, registers, customer details, and users/logins). Fixed overflow, text wrapping, and tap target issues strictly without visual redesign (added break-words/break-all for emails, addresses and audit diffs, flex-wrap on header and row action containers, w-full on file inputs, and stacked metric grid on narrow viewports). 244 tests green, ESLint clean, tsc clean, and production build clean.
+Files changed: app/(office)/dashboard/page.tsx, app/(office)/jobs/labels.ts, app/(office)/invoices/db.ts, app/(office)/registers/register-form.tsx, app/(office)/enquiries/[id]/page.tsx, app/(office)/quotations/page.tsx, app/(office)/quotations/[id]/page.tsx, app/(office)/jobs/[id]/page.tsx, app/(office)/jobs/[id]/assign/page.tsx, app/(office)/review/page.tsx, app/(office)/review/[reportId]/page.tsx, app/(office)/review/[reportId]/history/page.tsx, app/(office)/invoices/page.tsx, app/(office)/invoices/[id]/page.tsx, app/(office)/invoices/[id]/invoice-draft-editor.tsx, app/(office)/customers/[id]/page.tsx, app/(office)/settings/users/page.tsx, docs/PROGRESS.md
+Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
+Blockers / questions: none.
+
 ### 2026-11-07 13:34 – Naveen – Claude
 Task: T40 End-to-end PGlite flow test plus demo in-app invoices
 Done: Added shared PGlite test harness (`supabase/tests/setup.ts`) and full end-to-end lifecycle test (`tests/e2e-flow.test.ts`) covering one fake job from customer enquiry -> uploaded quotation & items -> management approval & acceptance -> job creation -> qualification/equipment registers & technician assignment -> service-role device pairing -> field inspection submission (with mandatory reading guard) -> report drafting -> reviewer approval & freeze -> in-app GST invoice generation & issue (`BITA/YY-YY/INV-xxxx`) -> partial & full payments -> job closure, asserting status and role-based refusals at each step. Updated `supabase/seed/demo.sql` with idempotent in-app tax invoices (`draft`, `issued`, `partly_paid`, `paid`), lines, and payments.
 Files changed: supabase/tests/setup.ts, supabase/tests/schema.test.ts, tests/e2e-flow.test.ts, supabase/seed/demo.sql, docs/PROGRESS.md
 Next: Merge PR into `feature/naveen-integration`.
 Blockers / questions: none.
-
 ### 2026-11-07 11:18 – Naveen – Antigravity
 Task: T38 Retire technician web screens (APK only, D-016) + apps/technician fixes & README
 Done: Removed technician-only web routes (app/(field)/my-jobs and all subroutes) and retired technician menu in app-shell. Updated lib/roles.ts (homeFor sends technicians to /technician) and lib/auth.ts (requireStaff redirects technicians to /technician). Added /technician notice page directing technicians to the Android APK and office pairing code. Added lib/roles.test.ts. In apps/technician: fixed 3 lint warnings (unused Alert in PairScreen, unused err in ReportScreen), added HTTP 409 handling and read-only mode for already submitted reports, enabled viewing submitted reports from job details, updated README with EAS free-tier APK build steps and what BITA must provide (Expo account, Firebase project under BITA's Google account). cd apps/technician && npm run typecheck passes cleanly.

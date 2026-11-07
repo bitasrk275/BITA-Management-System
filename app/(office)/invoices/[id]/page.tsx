@@ -231,7 +231,7 @@ export default async function InvoiceDetailPage({
             <p className="text-[13px] text-ink-2">
               Issued on {invoice.issued_at ? formatIST(invoice.issued_at) : invoice.invoice_date ? shortDate(invoice.invoice_date) : "—"}. Content and tax totals are frozen; download the PDF or Word file to send to the customer.
             </p>
-            <dl className="grid grid-cols-3 gap-3 rounded-lg border border-line bg-surface-2/40 p-3 text-[12.5px]">
+            <dl className="grid grid-cols-1 gap-2 rounded-lg border border-line bg-surface-2/40 p-3 text-[12.5px] sm:grid-cols-3 sm:gap-3">
               <div>
                 <dt className="text-ink-3">Invoice Total</dt>
                 <dd className="font-semibold text-ink tabular-nums">{formatINR(Number(invoice.total) || 0)}</dd>
@@ -418,7 +418,7 @@ export default async function InvoiceDetailPage({
               Supplier GSTIN: <Mono>{spec.seller.gstin}</Mono> · State: {spec.seller.stateCode} - {spec.seller.stateName}
             </p>
           </div>
-          <div className="text-right text-[12.5px] space-y-1">
+          <div className="text-left sm:text-right text-[12.5px] space-y-1">
             <div>
               <span className="text-ink-3">Invoice No: </span>
               <strong className="text-ink">

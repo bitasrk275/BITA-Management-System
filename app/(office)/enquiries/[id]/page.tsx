@@ -61,10 +61,10 @@ export default async function EnquiryPage({
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="mb-2 font-semibold">Message</h2>
-          <p className="text-sm text-ink-2">
+          <p className="text-sm text-ink-2 break-words">
             From: {[enquiry.from_name, enquiry.from_address].filter(Boolean).join(" · ") || "not given"}
           </p>
-          <p className="mt-3 whitespace-pre-wrap text-sm">{enquiry.body || "No details."}</p>
+          <p className="mt-3 whitespace-pre-wrap text-sm break-words">{enquiry.body || "No details."}</p>
         </Card>
 
         <div className="space-y-6">

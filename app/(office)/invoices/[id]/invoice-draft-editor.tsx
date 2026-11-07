@@ -191,7 +191,7 @@ export function InvoiceDraftEditor({
                 key={line.key}
                 className="rounded-lg border border-line bg-surface-2/40 p-3.5 space-y-3"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[12px] font-medium text-ink-2">
                     Line #{index + 1}
                     {calc.minimum_charge_applied && (
