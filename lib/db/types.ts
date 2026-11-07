@@ -652,6 +652,7 @@ export type Database = {
         Row: {
           balance: number
           cgst: number
+          converted_from_id: string | null
           created_at: string
           customer_po_number: string | null
           due_date: string | null
@@ -680,6 +681,7 @@ export type Database = {
         Insert: {
           balance?: number
           cgst?: number
+          converted_from_id?: string | null
           created_at?: string
           customer_po_number?: string | null
           due_date?: string | null
@@ -708,6 +710,7 @@ export type Database = {
         Update: {
           balance?: number
           cgst?: number
+          converted_from_id?: string | null
           created_at?: string
           customer_po_number?: string | null
           due_date?: string | null

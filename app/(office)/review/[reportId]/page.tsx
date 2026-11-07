@@ -383,8 +383,15 @@ export default async function ReportReviewPage({
                       Open invoice {activeInvoiceLink.invoice_no}
                     </ButtonLink>
                   ) : (
-                    <form action={generateInvoiceFromReport.bind(null, report.id)}>
-                      <Button type="submit">Generate invoice</Button>
+                    <form
+                      action={generateInvoiceFromReport.bind(null, report.id)}
+                      className="flex flex-wrap items-center gap-2"
+                    >
+                      <Select name="kind" defaultValue="tax_invoice" className="w-52">
+                        <option value="tax_invoice">Tax invoice (INV-xxxx)</option>
+                        <option value="proforma">Proforma (PI-xxxx)</option>
+                      </Select>
+                      <Button type="submit">Prepare invoice</Button>
                     </form>
                   )}
                 </div>

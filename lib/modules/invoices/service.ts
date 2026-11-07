@@ -175,9 +175,11 @@ export async function loadActiveInvoiceReportMap(
       kind: Enums<"invoice_kind">;
     } | null;
     if (!inv || inv.status === "cancelled") continue;
+    const prev = map.get(row.report_id);
+    if (prev && prev.kind === "tax_invoice" && inv.kind === "proforma") continue;
     map.set(row.report_id, {
       invoice_id: inv.id,
-      invoice_no: inv.invoice_no ?? inv.number ?? "Draft",
+      invoice_no: inv.invoice_no ?? inv.number ?? (inv.kind === "proforma" ? "Draft Proforma" : "Draft"),
       status: inv.status,
       kind: inv.kind,
     });
@@ -185,10 +187,11 @@ export async function loadActiveInvoiceReportMap(
 
   for (const inv of directRows ?? []) {
     if (!inv.report_id || inv.status === "cancelled") continue;
-    if (!map.has(inv.report_id)) {
+    const prev = map.get(inv.report_id);
+    if (!prev || (prev.kind === "proforma" && inv.kind === "tax_invoice")) {
       map.set(inv.report_id, {
         invoice_id: inv.id,
-        invoice_no: inv.invoice_no ?? inv.number ?? "Draft",
+        invoice_no: inv.invoice_no ?? inv.number ?? (inv.kind === "proforma" ? "Draft Proforma" : "Draft"),
         status: inv.status,
         kind: inv.kind,
       });
@@ -472,4 +475,152 @@ export async function createDraftInvoiceFromReports(
     report_ids: orderedCandidates.map((r) => r.id),
     combined_po_number: group.combined_po_number,
   };
+}
+
+/**
+ * Converts a Proforma invoice (`kind = 'proforma'`) into a draft Tax Invoice (`kind = 'tax_invoice'`),
+ * copying all lines and linked reports (`invoice_reports`) and recording `converted_from_id`.
+ * If a non-cancelled tax invoice already exists for this proforma (or job), returns it idempotently.
+ */
+export async function convertProformaToTaxInvoice(
+  supabase: AppSupabase,
+  proformaId: string,
+): Promise<{ invoice_id: string; created: boolean }> {
+  const { data: proforma, error: pfErr } = await supabase
+    .from("invoices")
+    .select(
+      "id, job_id, kind, status, report_id, quotation_id, place_of_supply, customer_po_number, taxable_value, cgst, sgst, igst, round_off, total, notes, invoice_no, number, jobs(customers(payment_terms_days))",
+    )
+    .eq("id", proformaId)
+    .maybeSingle();
+
+  if (pfErr || !proforma) {
+    throw new Error(pfErr?.message ?? "Proforma invoice not found.");
+  }
+  if (proforma.kind !== "proforma") {
+    throw new Error("Only a proforma invoice can be converted to a tax invoice.");
+  }
+  if (proforma.status === "cancelled") {
+    throw new Error("Cannot convert a cancelled proforma invoice.");
+  }
+
+  // Check if a non-cancelled tax invoice was already converted from this proforma (or exists on the job)
+  const { data: existingConverted } = await supabase
+    .from("invoices")
+    .select("id")
+    .eq("converted_from_id", proforma.id)
+    .neq("status", "cancelled")
+    .maybeSingle();
+
+  if (existingConverted?.id) {
+    return { invoice_id: existingConverted.id, created: false };
+  }
+
+  const { data: existingJobTax } = await supabase
+    .from("invoices")
+    .select("id")
+    .eq("job_id", proforma.job_id)
+    .eq("kind", "tax_invoice")
+    .neq("status", "cancelled")
+    .maybeSingle();
+
+  if (existingJobTax?.id) {
+    return { invoice_id: existingJobTax.id, created: false };
+  }
+
+  const [linesRes, joinRes] = await Promise.all([
+    supabase
+      .from("invoice_lines")
+      .select("position, description, sac, qty, unit, rate, amount")
+      .eq("invoice_id", proforma.id)
+      .order("position", { ascending: true }),
+    supabase
+      .from("invoice_reports")
+      .select("report_id")
+      .eq("invoice_id", proforma.id),
+  ]);
+
+  const jobCustomer = (
+    proforma.jobs as unknown as { customers?: { payment_terms_days?: number } | null } | null
+  )?.customers;
+  const termsDays = jobCustomer?.payment_terms_days ?? 30;
+  const invoiceDate = todayIST();
+  const dueDate = todayIST(termsDays);
+  const proformaRef = proforma.invoice_no ?? proforma.number ?? proforma.id.slice(0, 8);
+  const convertedNotes = proforma.notes
+    ? `${proforma.notes} (Converted from Proforma ${proformaRef})`
+    : `Converted from Proforma ${proformaRef}.`;
+
+  const { data: created, error: createErr } = await supabase
+    .from("invoices")
+    .insert({
+      job_id: proforma.job_id,
+      kind: "tax_invoice",
+      converted_from_id: proforma.id,
+      report_id: proforma.report_id,
+      quotation_id: proforma.quotation_id,
+      place_of_supply: proforma.place_of_supply,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      customer_po_number: proforma.customer_po_number,
+      taxable_value: proforma.taxable_value,
+      cgst: proforma.cgst,
+      sgst: proforma.sgst,
+      igst: proforma.igst,
+      round_off: proforma.round_off,
+      total: proforma.total,
+      balance: proforma.total,
+      status: "draft",
+      notes: convertedNotes,
+    })
+    .select("id")
+    .single();
+
+  if (createErr || !created) {
+    throw new Error(createErr?.message ?? "Could not create tax invoice from proforma.");
+  }
+
+  const reportIds = Array.from(
+    new Set(
+      [
+        ...(joinRes.data ?? []).map((r) => r.report_id),
+        ...(proforma.report_id ? [proforma.report_id] : []),
+      ],
+    ),
+  );
+
+  if (reportIds.length > 0) {
+    const { error: joinError } = await supabase.from("invoice_reports").upsert(
+      reportIds.map((reportId) => ({
+        invoice_id: created.id,
+        report_id: reportId,
+      })),
+      { onConflict: "invoice_id,report_id" },
+    );
+    if (joinError) {
+      await supabase.from("invoices").delete().eq("id", created.id);
+      throw new Error(joinError.message);
+    }
+  }
+
+  const lines = linesRes.data ?? [];
+  if (lines.length > 0) {
+    const { error: lineError } = await supabase.from("invoice_lines").insert(
+      lines.map((l, idx) => ({
+        invoice_id: created.id,
+        position: l.position ?? idx + 1,
+        description: l.description,
+        sac: l.sac,
+        qty: l.qty,
+        unit: l.unit,
+        rate: l.rate,
+        amount: l.amount,
+      })),
+    );
+    if (lineError) {
+      throw new Error(lineError.message);
+    }
+  }
+
+  return { invoice_id: created.id, created: true };
 }

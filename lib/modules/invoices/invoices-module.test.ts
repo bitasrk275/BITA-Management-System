@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseCreateInvoiceFromReportsInput } from "./schema";
 import {
   collectDistinctPoNumbers,
   isReportInvoicePending,
@@ -103,5 +104,26 @@ describe("P4a: Invoice pending status & multi-report invoice validation", () => 
     expect(() => validateReportsShareCustomerGstin([r1, r2])).toThrow(
       /not approved yet/,
     );
+  });
+
+  it("parses proforma vs tax_invoice choice in parseCreateInvoiceFromReportsInput (P4b)", () => {
+    const proformaParsed = parseCreateInvoiceFromReportsInput({
+      report_ids: ["11111111-1111-4111-8111-111111111111"],
+      kind: "proforma",
+      notes: "Proforma for customer PO release",
+    });
+    expect(proformaParsed.ok).toBe(true);
+    if (proformaParsed.ok) {
+      expect(proformaParsed.value.kind).toBe("proforma");
+      expect(proformaParsed.value.notes).toBe("Proforma for customer PO release");
+    }
+
+    const defaultTaxParsed = parseCreateInvoiceFromReportsInput({
+      report_ids: ["11111111-1111-4111-8111-111111111111"],
+    });
+    expect(defaultTaxParsed.ok).toBe(true);
+    if (defaultTaxParsed.ok) {
+      expect(defaultTaxParsed.value.kind).toBe("tax_invoice");
+    }
   });
 });

@@ -15,7 +15,10 @@ import {
   buildDraftInvoiceLinesFromPriceList,
   listPriceItems,
 } from "@/lib/modules/price-items/service";
-import { createDraftInvoiceFromReports } from "@/lib/modules/invoices/service";
+import {
+  convertProformaToTaxInvoice,
+  createDraftInvoiceFromReports,
+} from "@/lib/modules/invoices/service";
 import { validUuid } from "@/lib/reports/review";
 import { homeFor } from "@/lib/roles";
 import {
@@ -161,19 +164,20 @@ async function createDraftInvoiceForJobAndReport(
   return { id: created.id };
 }
 
-export async function generateInvoiceFromReport(reportId: string) {
+export async function generateInvoiceFromReport(reportId: string, formData?: FormData) {
   if (!validUuid(reportId)) redirect("/review");
   const { supabase } = await requireBillingStaff();
 
+  const kindRaw = formData ? str(formData, "kind") : null;
+  const kind = kindRaw === "proforma" ? "proforma" : "tax_invoice";
+
+  let invoiceId: string;
   try {
     const res = await createDraftInvoiceFromReports(supabase, {
       report_ids: [reportId],
-      kind: "tax_invoice",
+      kind,
     });
-    revalidatePath("/invoices");
-    revalidatePath("/review");
-    revalidatePath(`/review/${reportId}`);
-    redirect(`/invoices/${res.invoice_id}?saved=1`);
+    invoiceId = res.invoice_id;
   } catch (err) {
     redirect(
       errUrl(
@@ -182,6 +186,35 @@ export async function generateInvoiceFromReport(reportId: string) {
       ),
     );
   }
+
+  revalidatePath("/invoices");
+  revalidatePath("/review");
+  revalidatePath(`/review/${reportId}`);
+  redirect(`/invoices/${invoiceId}?saved=1`);
+}
+
+export async function convertProformaAction(proformaId: string) {
+  if (!validUuid(proformaId)) redirect("/invoices");
+  const { supabase } = await requireBillingStaff();
+
+  let taxInvoiceId: string;
+  try {
+    const res = await convertProformaToTaxInvoice(supabase, proformaId);
+    taxInvoiceId = res.invoice_id;
+  } catch (err) {
+    redirect(
+      errUrl(
+        `/invoices/${proformaId}`,
+        err instanceof Error ? err.message : "Could not convert proforma to tax invoice.",
+      ),
+    );
+  }
+
+  revalidatePath("/invoices");
+  revalidatePath(`/invoices/${proformaId}`);
+  revalidatePath(`/invoices/${taxInvoiceId}`);
+  revalidatePath("/review");
+  redirect(`/invoices/${taxInvoiceId}?saved=1`);
 }
 
 export async function generateInvoiceFromSelectedReports(formData: FormData) {

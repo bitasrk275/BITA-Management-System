@@ -12,6 +12,7 @@ import {
   Mono,
   PageHeader,
   SectionTitle,
+  Select,
   Stats,
   Status,
   type Tone,
@@ -74,11 +75,13 @@ export default async function InvoicesListPage({
 
   const allInvoices = invoicesRes.data ?? [];
   const activeInvoices = allInvoices.filter((i) => i.status !== "cancelled");
+  const activeTaxInvoices = activeInvoices.filter((i) => i.kind !== "proforma");
+  const proformas = allInvoices.filter((i) => i.kind === "proforma");
   const drafts = allInvoices.filter((i) => i.status === "draft");
-  const issuedUnpaid = activeInvoices.filter((i) => i.status !== "draft" && Number(i.balance) > 0);
+  const issuedUnpaid = activeTaxInvoices.filter((i) => i.status !== "draft" && Number(i.balance) > 0);
   const overdue = issuedUnpaid.filter((i) => i.due_date && i.due_date < today);
 
-  const totalBilled = activeInvoices
+  const totalBilled = activeTaxInvoices
     .filter((i) => i.status !== "draft")
     .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
   const totalOutstanding = issuedUnpaid.reduce((sum, i) => sum + (Number(i.balance) || 0), 0);
@@ -86,8 +89,10 @@ export default async function InvoicesListPage({
 
   const filtered = allInvoices.filter((inv) => {
     if (!statusFilter || statusFilter === "all") return true;
+    if (statusFilter === "proforma") return inv.kind === "proforma";
     if (statusFilter === "overdue") {
       return (
+        inv.kind !== "proforma" &&
         inv.status !== "draft" &&
         inv.status !== "cancelled" &&
         Number(inv.balance) > 0 &&
@@ -101,6 +106,7 @@ export default async function InvoicesListPage({
   const filters = [
     { key: "all", label: `All (${allInvoices.length})` },
     { key: "draft", label: `Drafts (${drafts.length})` },
+    { key: "proforma", label: `Proforma (${proformas.length})` },
     { key: "issued", label: `Issued (${allInvoices.filter((i) => i.status === "issued").length})` },
     {
       key: "partly_paid",
@@ -219,9 +225,15 @@ export default async function InvoicesListPage({
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                 <span className="text-xs text-ink-3">
-                  Tick one or more reports with the same customer GSTIN and click Prepare invoice.
+                  Tick one or more reports with the same customer GSTIN, choose Tax invoice or Proforma, and click Prepare invoice.
                 </span>
-                <Button type="submit">Prepare invoice for selected reports</Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select name="kind" defaultValue="tax_invoice" className="w-56">
+                    <option value="tax_invoice">Tax invoice (BITA/YY-YY/INV-xxxx)</option>
+                    <option value="proforma">Proforma invoice (BITA/YY-YY/PI-xxxx)</option>
+                  </Select>
+                  <Button type="submit">Prepare invoice</Button>
+                </div>
               </div>
             </form>
           )}
@@ -287,6 +299,7 @@ export default async function InvoicesListPage({
                 title={
                   <span className="inline-flex flex-wrap items-center gap-2.5">
                     <Mono>{displayNo}</Mono>
+                    {inv.kind === "proforma" && <Badge>Proforma</Badge>}
                     <Status tone={st.tone}>{st.label}</Status>
                     <span className="font-normal text-ink-2">{customerName}</span>
                   </span>

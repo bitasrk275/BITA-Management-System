@@ -15,7 +15,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
 | Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
-| Payments, reminders, job closure | Naveen | In review | feature/naveen-p4a-multi-report-invoices | Phase 2 P4a: `Invoice pending` report status + `invoice_reports` join table + combining several approved reports of the same customer GSTIN onto one invoice |
+| Payments, reminders, job closure | Naveen | In review | feature/naveen-p4b-proforma-tax | Phase 2 P4b: Proforma vs Tax invoice choice (`BITA/YY-YY/PI-0001`), Convert to tax invoice (`converted_from_id`), and tax numbering from `invoice_numbering` setting |
 | Dashboard | Naveen | Not started | | |
 | WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
 | Financial reports from Zoho (X4) | Naveen | In review | feature/naveen-gst-export | T36 CA GST export (GSTR-1 B2B & B2C CSV + Excel XML workbook at /invoices/export) |
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 18:19 – Naveen – Claude
+Task: P4b Proforma vs Tax invoice choice, proforma series (`BITA/YY-YY/PI-0001`), Convert to tax invoice, and tax numbering from `invoice_numbering` setting
+Done: Added migration `supabase/migrations/20261107050000_proforma_and_tax_numbering.sql` adding `converted_from_id` on `public.invoices`, updating `private.next_invoice_no(p_kind)` to assign `BITA/YY-YY/PI-0001` for proforma invoices and `BITA/YY-YY/INV-0001` for tax invoices while honoring `next_tax_invoice_no` / `next_proforma_no` from `public.settings` (`key = 'invoice_numbering'`), and updating `private.check_invoice_report()` so converting a proforma to a tax invoice links the same approved reports cleanly. Added `convertProformaToTaxInvoice` in `lib/modules/invoices/service.ts` and `POST /api/v1/invoices/[id]/convert-to-tax`. Updated `/invoices`, `/review`, `/review/[reportId]`, and `/invoices/[id]` so the office can choose **Tax invoice** or **Proforma**, filter proforma invoices, and click **Convert to tax invoice**.
+Files changed: supabase/migrations/20261107050000_proforma_and_tax_numbering.sql, lib/db/types.ts, lib/modules/invoices/, app/api/v1/invoices/[id]/convert-to-tax/route.ts, app/(office)/invoices/, app/(office)/review/, supabase/tests/phase2-foundation.test.ts, docs/PROGRESS.md
+Next: Open PR for P4b, merge into `feature/naveen-integration`, and proceed to P4c (Credit notes + TDS on payments).
+Blockers / questions: none.
 
 ### 2026-11-07 18:03 – Naveen – Claude
 Task: P4a `Invoice pending` report status + several reports on one invoice (same GSTIN)

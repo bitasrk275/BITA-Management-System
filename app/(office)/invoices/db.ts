@@ -30,6 +30,7 @@ export interface InvoiceRow {
   pdf_path: string | null;
   notes: string | null;
   customer_po_number: string | null;
+  converted_from_id?: string | null;
   reminders_paused: boolean;
   created_at: string;
 }

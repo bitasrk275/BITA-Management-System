@@ -226,9 +226,15 @@ export default async function ReviewQueue({
                 {canBill && (
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                     <span className="text-xs text-ink-3">
-                      Select one or more reports of the same customer (same GSTIN) and click Prepare invoice.
+                      Select one or more reports of the same customer (same GSTIN), choose Tax invoice or Proforma, and click Prepare invoice.
                     </span>
-                    <Button type="submit">Prepare invoice for selected reports</Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Select name="kind" defaultValue="tax_invoice" className="w-56">
+                        <option value="tax_invoice">Tax invoice (BITA/YY-YY/INV-xxxx)</option>
+                        <option value="proforma">Proforma invoice (BITA/YY-YY/PI-xxxx)</option>
+                      </Select>
+                      <Button type="submit">Prepare invoice</Button>
+                    </div>
                   </div>
                 )}
               </form>

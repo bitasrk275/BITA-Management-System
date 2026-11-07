@@ -489,4 +489,95 @@ describe("Phase 2 Foundation (P1): soft delete, recycle bin, settings, and permi
       [inv2Id, rep2Id],
     );
   });
+
+  it("issues Proforma invoices on PI-0001 series, honors next_tax_invoice_no setting, and converts Proforma to Tax invoice (P4b)", async () => {
+    const custRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.customers (name, code, gstin)
+       values ('Proforma Aerospace Castings', 'PACL', '29AABCP8888F1Z4')
+       returning id`,
+    );
+    const custId = custRes.rows[0]!.id;
+
+    const jobRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.jobs (customer_id, po_number) values ($1, 'PO-PACL-2026-55') returning id`,
+      [custId],
+    );
+    const jobId = jobRes.rows[0]!.id;
+
+    const repRes = await ctx.as<{ id: string }>(
+      MGMT_USER,
+      `insert into public.reports (job_id, method, report_no, status, approved_by, approved_at)
+       values ($1, 'UT', 'BITA/UT/26-27/P4B-1', 'approved', $2, now())
+       returning id`,
+      [jobId, MGMT_PERSON],
+    );
+    const repId = repRes.rows[0]!.id;
+
+    // 1. Create and issue a Proforma invoice -> gets BITA/YY-YY/PI-0001
+    const pfDraftRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.invoices (job_id, kind, report_id, taxable_value, cgst, sgst, total)
+       values ($1, 'proforma', $2, 10000, 900, 900, 11800)
+       returning id`,
+      [jobId, repId],
+    );
+    const pfId = pfDraftRes.rows[0]!.id;
+
+    await ctx.as(
+      OFFICE_USER,
+      `insert into public.invoice_lines (invoice_id, position, description, sac, qty, unit, rate, amount)
+       values ($1, 1, 'UT service on turbine blades', '998346', 1, 'visit', 10000, 10000)`,
+      [pfId],
+    );
+
+    const pfIssued = await ctx.as<{ invoice_no: string; status: string }>(
+      OFFICE_USER,
+      `update public.invoices set status = 'issued' where id = $1 returning invoice_no, status`,
+      [pfId],
+    );
+    expect(pfIssued.rows[0]?.invoice_no).toMatch(/^BITA\/\d{2}-\d{2}\/PI-0001$/);
+    expect(pfIssued.rows[0]?.status).toBe("issued");
+
+    // 2. Management sets next_tax_invoice_no = 550 in public.settings ('invoice_numbering') to match last Zoho number
+    await ctx.as(
+      MGMT_USER,
+      `update public.settings
+       set value = jsonb_set(value, '{next_tax_invoice_no}', '550'::jsonb)
+       where key = 'invoice_numbering'`,
+    );
+
+    // 3. Convert the Proforma to a Tax invoice (converted_from_id = pfId) and link the same report in invoice_reports
+    const taxDraftRes = await ctx.as<{ id: string; converted_from_id: string }>(
+      OFFICE_USER,
+      `insert into public.invoices (job_id, kind, converted_from_id, report_id, taxable_value, cgst, sgst, total)
+       values ($1, 'tax_invoice', $2, $3, 10000, 900, 900, 11800)
+       returning id, converted_from_id`,
+      [jobId, pfId, repId],
+    );
+    const taxId = taxDraftRes.rows[0]!.id;
+    expect(taxDraftRes.rows[0]?.converted_from_id).toBe(pfId);
+
+    await ctx.as(
+      OFFICE_USER,
+      `insert into public.invoice_lines (invoice_id, position, description, sac, qty, unit, rate, amount)
+       values ($1, 1, 'UT service on turbine blades', '998346', 1, 'visit', 10000, 10000)`,
+      [taxId],
+    );
+
+    // 4. Issue the Tax invoice -> receives BITA/YY-YY/INV-0550 and bumps next_tax_invoice_no to 551
+    const taxIssued = await ctx.as<{ invoice_no: string }>(
+      OFFICE_USER,
+      `update public.invoices set status = 'issued' where id = $1 returning invoice_no`,
+      [taxId],
+    );
+    expect(taxIssued.rows[0]?.invoice_no).toMatch(/^BITA\/\d{2}-\d{2}\/INV-0550$/);
+
+    const settingAfter = await ctx.as<{ next_no: number }>(
+      OFFICE_USER,
+      `select (value->>'next_tax_invoice_no')::int as next_no from public.settings where key = 'invoice_numbering'`,
+    );
+    expect(settingAfter.rows[0]?.next_no).toBe(551);
+  });
 });

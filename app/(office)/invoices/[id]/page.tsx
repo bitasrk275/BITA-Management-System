@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
+  Badge,
   Button,
   ButtonLink,
   Card,
@@ -34,6 +35,7 @@ import { homeFor } from "@/lib/roles";
 import { formatINR } from "../../jobs/labels";
 import {
   cancelInvoice,
+  convertProformaAction,
   issueInvoice,
   recordPayment,
   toggleInvoiceReminders,
@@ -143,11 +145,43 @@ export default async function InvoiceDetailPage({
       ? linkedReports.map((r) => r.report_no).join(", ")
       : report?.report_no ?? null;
 
+  const isProforma = invoice.kind === "proforma";
   const isDraft = invoice.status === "draft";
   const isCancelled = invoice.status === "cancelled";
   const isIssued = ["issued", "partly_paid", "paid"].includes(invoice.status);
-  const displayNo = invoice.invoice_no ?? invoice.number ?? "Draft Invoice (Unissued)";
+  const displayNo =
+    invoice.invoice_no ??
+    invoice.number ??
+    (isProforma ? "Draft Proforma (Unissued)" : "Draft Invoice (Unissued)");
   const statusInfo = STATUS_META[invoice.status] ?? { label: invoice.status, tone: "none" as Tone };
+
+  const [convertedTaxRes, sourceProformaRes] = await Promise.all([
+    isProforma
+      ? invoicesTable(supabase)
+          .select("id, invoice_no, number, status")
+          .eq("converted_from_id", invoice.id)
+          .neq("status", "cancelled")
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    invoice.converted_from_id
+      ? invoicesTable(supabase)
+          .select("id, invoice_no, number, status")
+          .eq("id", invoice.converted_from_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const convertedTaxInvoice = convertedTaxRes.data as {
+    id: string;
+    invoice_no: string | null;
+    number: string | null;
+    status: string;
+  } | null;
+  const sourceProforma = sourceProformaRes.data as {
+    id: string;
+    invoice_no: string | null;
+    number: string | null;
+    status: string;
+  } | null;
 
   const poCheck = await checkPoUtilization(supabase, {
     jobId: invoice.job_id,
@@ -200,10 +234,13 @@ export default async function InvoiceDetailPage({
         title={displayNo}
         subtitle={
           <span className="inline-flex flex-wrap items-center gap-3">
+            {isProforma && <Badge>Proforma</Badge>}
             <Status tone={statusInfo.tone}>{statusInfo.label}</Status>
             <span>
               {customer?.name ?? "Customer"} · {job?.job_no ?? "Job"}
-              {report?.report_no ? ` · Report ${report.report_no}` : ""}
+              {combinedReportNos
+                ? ` · Report${linkedReports.length > 1 ? "s" : ""} ${combinedReportNos}`
+                : ""}
               {invoice.invoice_date ? ` · Dated ${shortDate(invoice.invoice_date)}` : ""}
             </span>
           </span>
@@ -247,11 +284,19 @@ export default async function InvoiceDetailPage({
       <div className="grid gap-5 lg:grid-cols-2">
         {isDraft && (
           <Card className="space-y-4">
-            <SectionTitle>1. Issue Tax Invoice</SectionTitle>
+            <SectionTitle>
+              1. Issue {isProforma ? "Proforma Invoice" : "Tax Invoice"}
+            </SectionTitle>
             <p className="text-[13px] text-ink-2">
               Review the lines, quantities, rates and GST breakdown below. Clicking{" "}
-              <strong className="font-medium text-ink">Issue invoice</strong> assigns the official{" "}
-              <Mono>BITA/YY-YY/INV-0001</Mono> number and freezes the invoice against further edits.
+              <strong className="font-medium text-ink">
+                Issue {isProforma ? "proforma" : "invoice"}
+              </strong>{" "}
+              assigns the official{" "}
+              <Mono>{isProforma ? "BITA/YY-YY/PI-0001" : "BITA/YY-YY/INV-0001"}</Mono> number and freezes the document against further edits.
+              {isProforma
+                ? " Proforma invoices are excluded from CA GST files and payment reminders, and can be converted to a Tax Invoice at any time."
+                : ""}
             </p>
             <dl className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-surface-2/40 p-3 text-[12.5px]">
               <div>
@@ -266,9 +311,19 @@ export default async function InvoiceDetailPage({
             <div className="flex flex-wrap gap-2.5">
               <form action={issueInvoice.bind(null, invoice.id)}>
                 <Button type="submit" disabled={lines.length === 0}>
-                  Issue invoice (assigns number & freezes)
+                  Issue {isProforma ? "proforma" : "invoice"} (assigns number & freezes)
                 </Button>
               </form>
+              {isProforma &&
+                (convertedTaxInvoice ? (
+                  <ButtonLink href={`/invoices/${convertedTaxInvoice.id}`} variant="secondary">
+                    Open tax invoice {convertedTaxInvoice.invoice_no ?? convertedTaxInvoice.number ?? "Draft"}
+                  </ButtonLink>
+                ) : (
+                  <form action={convertProformaAction.bind(null, invoice.id)}>
+                    <SecondaryButton type="submit">Convert to tax invoice</SecondaryButton>
+                  </form>
+                ))}
               <form action={cancelInvoice.bind(null, invoice.id)}>
                 <SecondaryButton type="submit">Cancel draft</SecondaryButton>
               </form>
@@ -278,9 +333,14 @@ export default async function InvoiceDetailPage({
 
         {isIssued && (
           <Card className="space-y-4">
-            <SectionTitle>1. Issued Tax Invoice (Frozen)</SectionTitle>
+            <SectionTitle>
+              1. Issued {isProforma ? "Proforma Invoice" : "Tax Invoice"} (Frozen)
+            </SectionTitle>
             <p className="text-[13px] text-ink-2">
               Issued on {invoice.issued_at ? formatIST(invoice.issued_at) : invoice.invoice_date ? shortDate(invoice.invoice_date) : "—"}. Content and tax totals are frozen; download the PDF or Word file to send to the customer.
+              {isProforma
+                ? " Proforma invoices are excluded from CA GST exports and payment reminders."
+                : ""}
             </p>
             <dl className="grid grid-cols-1 gap-2 rounded-lg border border-line bg-surface-2/40 p-3 text-[12.5px] sm:grid-cols-3 sm:gap-3">
               <div>
@@ -297,14 +357,28 @@ export default async function InvoiceDetailPage({
               </div>
             </dl>
             <div className="flex flex-wrap items-center gap-2.5">
-              <form action={toggleInvoiceReminders.bind(null, invoice.id, !invoice.reminders_paused)}>
-                <SecondaryButton type="submit">
-                  {invoice.reminders_paused ? "Resume payment reminders" : "Pause payment reminders"}
-                </SecondaryButton>
-              </form>
+              {isProforma ? (
+                convertedTaxInvoice ? (
+                  <ButtonLink href={`/invoices/${convertedTaxInvoice.id}`}>
+                    Open tax invoice {convertedTaxInvoice.invoice_no ?? convertedTaxInvoice.number ?? "Draft"}
+                  </ButtonLink>
+                ) : (
+                  <form action={convertProformaAction.bind(null, invoice.id)}>
+                    <Button type="submit">Convert to tax invoice</Button>
+                  </form>
+                )
+              ) : (
+                <form action={toggleInvoiceReminders.bind(null, invoice.id, !invoice.reminders_paused)}>
+                  <SecondaryButton type="submit">
+                    {invoice.reminders_paused ? "Resume payment reminders" : "Pause payment reminders"}
+                  </SecondaryButton>
+                </form>
+              )}
               {totalPaid === 0 && (
                 <form action={cancelInvoice.bind(null, invoice.id)}>
-                  <SecondaryButton type="submit">Cancel invoice</SecondaryButton>
+                  <SecondaryButton type="submit">
+                    Cancel {isProforma ? "proforma" : "invoice"}
+                  </SecondaryButton>
                 </form>
               )}
             </div>
@@ -546,6 +620,30 @@ export default async function InvoiceDetailPage({
                 <span>—</span>
               )}
             </div>
+            {sourceProforma && (
+              <div className="flex justify-between">
+                <span className="text-ink-3">Converted from Proforma</span>
+                <Link
+                  href={`/invoices/${sourceProforma.id}`}
+                  className="font-medium text-ink underline"
+                >
+                  <Mono>{sourceProforma.invoice_no ?? sourceProforma.number ?? "Proforma"}</Mono>
+                </Link>
+              </div>
+            )}
+            {convertedTaxInvoice && (
+              <div className="flex justify-between">
+                <span className="text-ink-3">Converted Tax Invoice</span>
+                <Link
+                  href={`/invoices/${convertedTaxInvoice.id}`}
+                  className="font-medium text-ink underline"
+                >
+                  <Mono>
+                    {convertedTaxInvoice.invoice_no ?? convertedTaxInvoice.number ?? "Draft Tax Invoice"}
+                  </Mono>
+                </Link>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-ink-3">Customer PO</span>
               <span className="font-medium text-ink">{spec.poDisplay}</span>
