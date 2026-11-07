@@ -274,6 +274,11 @@ export function buildGstExportReport(
 
 export function csvEscapeCell(value: string | number | null | undefined): string {
   const str = value === null || value === undefined ? "" : String(value);
+  // Spreadsheet formula injection: a text cell such as a customer name starting with = + - @ would run as a
+  // formula when the CA opens the file. Prefix it with an apostrophe; plain numbers are left as they are.
+  if (/^[=+\-@\t\r]/.test(str) && !/^-?\d+(\.\d+)?$/.test(str)) {
+    return csvEscapeCell(`'${str}`);
+  }
   if (/[",\r\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

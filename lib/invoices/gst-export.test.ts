@@ -238,3 +238,13 @@ describe("lib/invoices/gst-export", () => {
     expect(excelXml).toContain("BITA/26-27/INV-0001");
   });
 });
+
+describe("csvEscapeCell formula guard", () => {
+  it("neutralises text that a spreadsheet would run as a formula, but keeps numbers", async () => {
+    const { csvEscapeCell } = await import("./gst-export");
+    expect(csvEscapeCell("=HYPERLINK(\"x\")")).toBe("\"'=HYPERLINK(\"\"x\"\")\"");
+    expect(csvEscapeCell("@SUM(A1)")).toBe("'@SUM(A1)");
+    expect(csvEscapeCell("-12.50")).toBe("-12.50");
+    expect(csvEscapeCell("Test Customer Pvt Ltd")).toBe("Test Customer Pvt Ltd");
+  });
+});
