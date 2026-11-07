@@ -58,7 +58,7 @@ export async function GET(
     }
   }
 
-  const [inspectionRes, jobRes] = await Promise.all([
+  const [inspectionRes, jobRes, attachmentsRes] = await Promise.all([
     report.inspection_id
       ? supabase
           .from("inspections")
@@ -71,9 +71,16 @@ export async function GET(
       .select("job_no, customers(name)")
       .eq("id", report.job_id)
       .maybeSingle(),
+    supabase
+      .from("attachments")
+      .select("kind, caption, storage_path")
+      .eq("job_id", report.job_id)
+      .eq("include_in_report", true)
+      .order("uploaded_at", { ascending: true }),
   ]);
 
   const readings = extractReadings(report.content, inspectionRes.data?.readings);
+  const attachments = attachmentsRes.data ?? [];
   const assets = await loadReportApprovalAssets(supabase, {
     approved: isApproved,
     approvedAt: report.approved_at,
@@ -90,6 +97,11 @@ export async function GET(
     readings,
     letterhead: assets.letterhead,
     approval: assets.approval,
+    attachments: attachments.map((a) => ({
+      kind: a.kind,
+      caption: a.caption,
+      storagePath: a.storage_path,
+    })),
   });
 
   return new NextResponse(Buffer.from(pdfBytes), {

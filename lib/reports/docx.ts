@@ -580,6 +580,39 @@ export async function generateReportDocxBytes(
     }
   }
 
+  if (document.attachments && document.attachments.length > 0) {
+    sectionChildren.push(
+      new Paragraph({
+        spacing: { before: 140, after: 60 },
+        children: [
+          new TextRun({
+            text: "ATTACHED PHOTOS & DRAWINGS",
+            bold: true,
+            size: 20,
+            font: "Calibri",
+          }),
+        ],
+      })
+    );
+
+    for (let i = 0; i < document.attachments.length; i++) {
+      const att = document.attachments[i];
+      const captionText = att.caption ? ` — ${att.caption}` : "";
+      sectionChildren.push(
+        new Paragraph({
+          spacing: { before: 30, after: 30 },
+          children: [
+            new TextRun({
+              text: `${i + 1}. [${att.kind.replace("_", " ").toUpperCase()}] ${att.storagePath}${captionText}`,
+              size: 18,
+              font: "Calibri",
+            }),
+          ],
+        })
+      );
+    }
+  }
+
   for (const note of spec.footerNotes) {
     sectionChildren.push(
       new Paragraph({

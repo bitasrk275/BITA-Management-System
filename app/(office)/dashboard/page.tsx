@@ -45,6 +45,7 @@ export default async function ManagementHome() {
     leave,
     qualificationsAlert,
     equipmentAlert,
+    recentEdits,
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -80,6 +81,11 @@ export default async function ManagementHome() {
       .eq("active", true)
       .lte("calibration_due", monthAhead)
       .order("calibration_due", { ascending: true }),
+    supabase
+      .from("inspection_edits")
+      .select("id, edited_at, diff, old_observations, new_observations, edited_by, job_id, people!inspection_edits_edited_by_fkey(full_name), jobs(job_no, customers(name))")
+      .order("edited_at", { ascending: false })
+      .limit(5),
   ]);
 
   const openJobs = jobs.data ?? [];
@@ -195,6 +201,23 @@ export default async function ManagementHome() {
       href: `/enquiries/${e.id}`,
       label: "Open",
     })),
+    ...(recentEdits.data ?? []).map((edit) => {
+      const diffObj = (edit.diff ?? {}) as Record<string, { old: unknown; new: unknown }>;
+      const fieldNames = Object.keys(diffObj);
+      const changesSummary =
+        fieldNames.length > 0
+          ? fieldNames.slice(0, 3).map((f) => `${f}: ${String(diffObj[f]?.old ?? "—")} → ${String(diffObj[f]?.new ?? "—")}`).join(", ")
+          : "updated readings";
+
+      return {
+        key: "edit" + edit.id,
+        tone: "wait" as const,
+        title: `Report edit on ${edit.jobs?.job_no ?? "job"}: ${edit.people?.full_name ?? "Technician"}`,
+        detail: [edit.jobs?.customers?.name, changesSummary].filter(Boolean).join(" · "),
+        href: `/jobs/${edit.job_id}`,
+        label: "View diff",
+      };
+    }),
   ];
 
   return (
@@ -245,6 +268,45 @@ export default async function ManagementHome() {
               {attention.length === 0 && <EmptyRow>All clear: no reports, payments, quotations or jobs waiting for you.</EmptyRow>}
             </List>
           </section>
+
+          {recentEdits.data && recentEdits.data.length > 0 && (
+            <section>
+              <SectionTitle>Report edits (technician updated after submit)</SectionTitle>
+              <List>
+                {recentEdits.data.map((edit) => {
+                  const diffObj = (edit.diff ?? {}) as Record<string, { old: unknown; new: unknown }>;
+                  const fieldNames = Object.keys(diffObj);
+                  const changesDetail = fieldNames.map((f) => (
+                    <span key={f} className="block text-xs text-ink-2">
+                      <strong>{f}</strong>: {String(diffObj[f]?.old ?? "—")} →{" "}
+                      <span className="text-ink">{String(diffObj[f]?.new ?? "—")}</span>
+                    </span>
+                  ));
+
+                  return (
+                    <ListRow
+                      key={edit.id}
+                      tone="wait"
+                      title={
+                        <span>
+                          <Mono>{edit.jobs?.job_no}</Mono>
+                          <span className="ml-2 font-normal text-ink-2">
+                            {edit.people?.full_name} ({edit.jobs?.customers?.name})
+                          </span>
+                        </span>
+                      }
+                      detail={<div className="space-y-0.5">{changesDetail}</div>}
+                      action={
+                        <ButtonLink href={`/jobs/${edit.job_id}`} variant="secondary" size="sm">
+                          Job details
+                        </ButtonLink>
+                      }
+                    />
+                  );
+                })}
+              </List>
+            </section>
+          )}
 
           <section>
             <SectionTitle link={{ href: "/jobs", label: "View all" }}>Open jobs</SectionTitle>

@@ -23,10 +23,12 @@ import { createTestDb } from "../supabase/tests/setup";
 const OFFICE_USER = "00000000-0000-0000-0000-00000000020a";
 const TECH_A_USER = "00000000-0000-0000-0000-00000000020b";
 const TECH_B_USER = "00000000-0000-0000-0000-00000000020c";
+const REVIEWER_USER = "00000000-0000-0000-0000-00000000020d";
 
 const OFFICE_PERSON = "20000000-0000-0000-0000-00000000020a";
 const TECH_A_PERSON = "20000000-0000-0000-0000-00000000020b";
 const TECH_B_PERSON = "20000000-0000-0000-0000-00000000020c";
+const REVIEWER_PERSON = "20000000-0000-0000-0000-00000000020d";
 
 const CUSTOMER_ID = "30000000-0000-0000-0000-000000000201";
 const JOB_ID = "40000000-0000-0000-0000-000000000201";
@@ -240,12 +242,14 @@ beforeAll(async () => {
     insert into auth.users (id) values
       ('${OFFICE_USER}'),
       ('${TECH_A_USER}'),
-      ('${TECH_B_USER}');
+      ('${TECH_B_USER}'),
+      ('${REVIEWER_USER}');
 
     insert into people (id, full_name, initials, mobile, email, user_id, roles) values
       ('${OFFICE_PERSON}', 'Anitha Coordinator', 'ACO', '+91 99000 11111', 'anitha@bita.example', '${OFFICE_USER}', '{office}'),
       ('${TECH_A_PERSON}', 'Ramesh Technician', 'RMT', '+91 98000 22222', 'ramesh@bita.example', '${TECH_A_USER}', '{technician}'),
-      ('${TECH_B_PERSON}', 'Suresh Technician', 'SRT', '+91 97000 33333', 'suresh@bita.example', '${TECH_B_USER}', '{technician}');
+      ('${TECH_B_PERSON}', 'Suresh Technician', 'SRT', '+91 97000 33333', 'suresh@bita.example', '${TECH_B_USER}', '{technician}'),
+      ('${REVIEWER_PERSON}', 'Dr. Radhakrishnan Reviewer', 'SRK', '+91 99000 44444', 'srk@bita.example', '${REVIEWER_USER}', '{reviewer,management}');
 
     insert into customers (id, name, code, payment_terms_days) values
       ('${CUSTOMER_ID}', 'Apex Forgings Pvt Ltd', 'AFPL', 30);
@@ -527,18 +531,48 @@ describe("Field API tests on PGlite (T42)", () => {
     const dbJob2 = await db.query<{ status: string }>("select status from jobs where id = $1", [JOB_ID]);
     expect(dbJob2.rows[0].status).toBe("inspection_done");
 
-    // 4d. Re-submitting an already submitted report returns HTTP 409
+    // 4d. Re-submitting before approval succeeds and logs a diff to inspection_edits (Phase 2 / A1)
+    const updatedReadings = {
+      ...completeReadings,
+      couplant: "Special Ultrasonic Gel Batch #4",
+    };
     const resubmitRes = await submitInspectionReport(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
       method: "UT",
-      readings: completeReadings,
+      readings: updatedReadings,
+      observations: "Updated scan with higher viscosity couplant.",
       draft: false,
     });
-    expect("error" in resubmitRes && resubmitRes.status).toBe(409);
-    if ("error" in resubmitRes) {
-      expect(resubmitRes.error).toMatch(/already submitted/i);
+    expect("ok" in resubmitRes && resubmitRes.ok).toBe(true);
+
+    // Verify inspection_edits in real DB
+    const edits = await db.query<{
+      edited_by: string;
+      diff: Record<string, { old: unknown; new: unknown }>;
+    }>("select edited_by, diff from inspection_edits where assignment_id = $1", [ASSIGNMENT_B_ID]);
+    expect(edits.rows.length).toBeGreaterThan(0);
+    expect(edits.rows[0].edited_by).toBe(TECH_B_PERSON);
+    expect(edits.rows[0].diff.couplant).toBeDefined();
+    expect(edits.rows[0].diff.couplant.old).toBe("Servo Machine Oil");
+    expect(edits.rows[0].diff.couplant.new).toBe("Special Ultrasonic Gel Batch #4");
+
+    // 4d-2. Once technical reviewer approves report, phone editing is locked (409)
+    await db.query(
+      `insert into reports (job_id, inspection_id, method, report_no, status, approved_at, approved_by)
+       values ($1, $2, 'UT', 'BITA/26-27/UT-0099', 'approved', now(), $3)`,
+      [JOB_ID, dbInsp2.rows[0].submitted_at ? (await db.query<{ id: string }>("select id from inspections where assignment_id = $1", [ASSIGNMENT_B_ID])).rows[0].id : null, REVIEWER_PERSON],
+    );
+
+    const lockedRes = await submitInspectionReport(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
+      method: "UT",
+      readings: updatedReadings,
+      draft: false,
+    });
+    expect("error" in lockedRes && lockedRes.status).toBe(409);
+    if ("error" in lockedRes) {
+      expect(lockedRes.error).toMatch(/locked|approved/i);
     }
 
-    // 4e. Successful photo upload by Technician B on their own assignment
+    // 4e. Successful photo upload by Technician B on their own assignment (includes include_in_report default true)
     const uploadB = await uploadFieldAttachment(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
       fileBuffer: Buffer.from("fake-photo-data"),
       fileName: "shaft_scan.jpg",
@@ -549,11 +583,12 @@ describe("Field API tests on PGlite (T42)", () => {
     expect("ok" in uploadB && uploadB.ok).toBe(true);
     if ("ok" in uploadB) {
       expect(uploadB.storagePath).toMatch(/^jobs\//);
-      const attRow = await db.query<{ caption: string; storage_path: string }>(
-        "select caption, storage_path from attachments where id = $1",
+      const attRow = await db.query<{ caption: string; storage_path: string; include_in_report: boolean }>(
+        "select caption, storage_path, include_in_report from attachments where id = $1",
         [uploadB.attachmentId],
       );
       expect(attRow.rows[0].caption).toBe("Shaft ultrasonic scan A-scan display");
+      expect(attRow.rows[0].include_in_report).toBe(true);
     }
 
     // 4f. File exceeding 6 MB is rejected with 400

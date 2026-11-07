@@ -190,6 +190,11 @@ export function generateReportPdfBytes(input: {
   readings: ReportReadings;
   letterhead?: ReportLetterhead;
   approval: ReportApproval;
+  attachments?: ReadonlyArray<{
+    kind: string;
+    caption?: string | null;
+    storagePath: string;
+  }>;
 }): Uint8Array {
   const lh = input.letterhead ?? DEFAULT_DEV_LETTERHEAD;
   const r = input.readings;
@@ -246,6 +251,15 @@ export function generateReportPdfBytes(input: {
         `  Item ${idx + 1} (Qty: ${item.quantity ?? "-"}): ${String(item.description ?? "-").replace(/\s+/g, " ")}`
       );
       lines.push(`    Observations: ${String(item.observations ?? "-").replace(/\s+/g, " ")}`);
+    });
+  }
+
+  if (input.attachments && input.attachments.length > 0) {
+    lines.push("--------------------------------------------------------------------------------");
+    lines.push("ATTACHED INSPECTION PHOTOS & DRAWINGS:");
+    input.attachments.forEach((att, idx) => {
+      const cap = att.caption ? ` (${att.caption})` : "";
+      lines.push(`  ${idx + 1}. [${att.kind.toUpperCase()}] ${att.storagePath}${cap}`);
     });
   }
 

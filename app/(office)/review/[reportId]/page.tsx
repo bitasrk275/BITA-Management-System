@@ -43,6 +43,7 @@ import {
   refreshReportFromInspection,
   returnReportToTechnician,
   sendReportForReview,
+  toggleAttachmentInclude,
   updateReportContent,
 } from "../actions";
 import { generateInvoiceFromReport } from "../../invoices/actions";
@@ -82,7 +83,7 @@ export default async function ReportReviewPage({
 
   if (!report) notFound();
 
-  const [inspectionRes, jobRes, signatoriesRes, approverRes] = await Promise.all([
+  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes] = await Promise.all([
     report.inspection_id
       ? supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -100,12 +101,18 @@ export default async function ReportReviewPage({
     report.approved_by
       ? supabase.from("people").select("full_name").eq("id", report.approved_by).maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase
+      .from("attachments")
+      .select("id, kind, caption, storage_path, include_in_report, uploaded_at")
+      .eq("job_id", report.job_id)
+      .order("uploaded_at", { ascending: true }),
   ]);
 
   const inspection = inspectionRes.data;
   const job = jobRes.data;
   const signatories = signatoriesRes.data ?? [];
   const approverName = approverRes.data?.full_name ?? null;
+  const attachments = attachmentsRes.data ?? [];
 
   const readings = extractReadings(report.content, inspection?.readings);
   const readiness = checkReportReadiness(report.method, inspection, readings);
@@ -369,6 +376,53 @@ export default async function ReportReviewPage({
             action={updateReportContent.bind(null, report.id)}
           />
         )}
+
+        {/* Photos & Attachments Selection (Phase 2 / A1) */}
+        <Card className="space-y-4">
+          <SectionTitle>Report photos & attachments (A1)</SectionTitle>
+          <p className="text-[13px] text-ink-2">
+            Tick which inspection photos and drawing attachments to include in the final report PDF and Word download.
+          </p>
+          {attachments.length === 0 ? (
+            <p className="text-sm text-ink-3">No photos or drawings uploaded for this job yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {attachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface p-3"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold uppercase text-ink-3">
+                        {att.kind.replace("_", " ")}
+                      </span>
+                      <span className="text-xs">
+                        <Mono>{att.storage_path.split("/").pop()}</Mono>
+                      </span>
+                    </div>
+                    {att.caption && <p className="text-xs text-ink-2">{att.caption}</p>}
+                  </div>
+                  <form
+                    action={toggleAttachmentInclude.bind(
+                      null,
+                      report.id,
+                      att.id,
+                      !att.include_in_report
+                    )}
+                  >
+                    <SecondaryButton
+                      type="submit"
+                      className={att.include_in_report ? "border-ok/30 bg-ok/10 text-ok" : ""}
+                    >
+                      {att.include_in_report ? "✓ Included in report" : "Excluded (click to include)"}
+                    </SecondaryButton>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
 
         <SectionTitle>
           BITA paper report preview ({isApproved ? "Approved with signature & seal" : "Draft — signature & seal withheld"})

@@ -47,6 +47,15 @@ export function ReportScreen({
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoCount, setPhotoCount] = useState(0);
   const [submittedLocally, setSubmittedLocally] = useState(false);
+  const [lockedLocally, setLockedLocally] = useState(false);
+
+  // Per Phase 2 / A1: Report is locked ONLY when approved by office.
+  // Submitted reports remain editable until approval.
+  const isApproved = Boolean(
+    job.inspection?.isApproved ||
+    job.inspection?.status === "approved" ||
+    lockedLocally
+  );
 
   const isSubmitted = Boolean(
     job.inspection?.submittedAt ||
@@ -91,13 +100,13 @@ export function ReportScreen({
   }, [job, method]);
 
   function handleFieldChange(key: string, value: string) {
-    if (isSubmitted) return;
+    if (isApproved) return;
     setReadings((prev) => ({ ...prev, [key]: value }));
     setMissingFields((prev) => prev.filter((k) => k !== key));
   }
 
   async function handleSaveDraft() {
-    if (isSubmitted) return;
+    if (isApproved) return;
     setSubmitting(true);
     try {
       await saveDraftReport(job.id, readings);
@@ -111,8 +120,8 @@ export function ReportScreen({
       Alert.alert("Draft saved", "Your inspection draft has been saved locally and on the server.");
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setSubmittedLocally(true);
-        Alert.alert("Report Already Submitted", err.message);
+        setLockedLocally(true);
+        Alert.alert("Report Approved & Locked", err.message);
         return;
       }
       const msg = err instanceof ApiError ? err.message : "Failed to save draft";
@@ -123,7 +132,7 @@ export function ReportScreen({
   }
 
   async function handleSubmitFinal() {
-    if (isSubmitted) return;
+    if (isApproved) return;
     setSubmitting(true);
     try {
       const res = await submitReport(job.id, {
@@ -144,14 +153,16 @@ export function ReportScreen({
 
       setSubmittedLocally(true);
       Alert.alert(
-        "Report Submitted",
-        "Your report has been submitted to the office for technical review.",
+        isSubmitted ? "Corrections Submitted" : "Report Submitted",
+        isSubmitted
+          ? "Your updated inspection corrections have been submitted. The office has been notified."
+          : "Your report has been submitted to the office for technical review.",
         [{ text: "OK", onPress: onSubmitted }],
       );
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setSubmittedLocally(true);
-        Alert.alert("Report Already Submitted", err.message);
+        setLockedLocally(true);
+        Alert.alert("Report Approved & Locked", err.message);
         return;
       }
       const msg = err instanceof ApiError ? err.message : "Failed to submit report";
@@ -162,7 +173,7 @@ export function ReportScreen({
   }
 
   async function handleAddPhoto() {
-    if (isSubmitted) return;
+    if (isApproved) return;
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
@@ -213,10 +224,10 @@ export function ReportScreen({
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>{isSubmitted ? "← Back" : "← Cancel"}</Text>
+          <Text style={styles.backText}>{isApproved || isSubmitted ? "← Back" : "← Cancel"}</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{method} Report Form</Text>
-        {!isSubmitted ? (
+        {!isApproved ? (
           <TouchableOpacity onPress={handleSaveDraft} disabled={submitting}>
             <Text style={styles.saveDraftText}>Save draft</Text>
           </TouchableOpacity>
@@ -226,14 +237,21 @@ export function ReportScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {isSubmitted && (
-          <View style={styles.submittedBanner}>
-            <Text style={styles.submittedBannerTitle}>✓ Report Submitted for Office Review</Text>
-            <Text style={styles.submittedBannerText}>
-              This report has been submitted to the office and is now read-only. Contact the office to make any changes.
+        {isApproved ? (
+          <View style={styles.lockedBanner}>
+            <Text style={styles.lockedBannerTitle}>✓ Approved · Report Locked</Text>
+            <Text style={styles.lockedBannerText}>
+              This report has been approved by the office technical reviewer and is locked. Contact the office if further changes are required.
             </Text>
           </View>
-        )}
+        ) : isSubmitted ? (
+          <View style={styles.submittedBanner}>
+            <Text style={styles.submittedBannerTitle}>✓ Submitted for Office Review (Editable)</Text>
+            <Text style={styles.submittedBannerText}>
+              Your report is waiting for technical review. You can make corrections and update readings until it is approved. Changes will be logged and notified to the office.
+            </Text>
+          </View>
+        ) : null}
 
         <Card>
           <Text style={styles.jobBadge}>{job.jobNo} · {job.customerName}</Text>
@@ -257,16 +275,16 @@ export function ReportScreen({
                     styles.textInput,
                     f.input === "textarea" && styles.textarea,
                     isMissing && styles.missingInput,
-                    isSubmitted && styles.readOnlyInput,
+                    isApproved && styles.readOnlyInput,
                   ]}
                   value={val}
-                  placeholder={isSubmitted ? "Not specified" : `Enter ${f.label.toLowerCase()}`}
+                  placeholder={isApproved ? "Not specified" : `Enter ${f.label.toLowerCase()}`}
                   placeholderTextColor={colors.ink3}
                   multiline={f.input === "textarea"}
                   numberOfLines={f.input === "textarea" ? 3 : 1}
                   keyboardType={f.input === "number" ? "numeric" : "default"}
                   onChangeText={(text) => handleFieldChange(f.key, text)}
-                  editable={!isSubmitted}
+                  editable={!isApproved}
                 />
               </View>
             );
@@ -280,15 +298,15 @@ export function ReportScreen({
             style={[
               styles.textInput,
               styles.textarea,
-              isSubmitted && styles.readOnlyInput,
+              isApproved && styles.readOnlyInput,
             ]}
-            placeholder={isSubmitted ? "No observations recorded." : "Record any general test remarks, discontinuities observed, or component surface notes..."}
+            placeholder={isApproved ? "No observations recorded." : "Record any general test remarks, discontinuities observed, or component surface notes..."}
             placeholderTextColor={colors.ink3}
             multiline
             numberOfLines={4}
             value={observations}
             onChangeText={setObservations}
-            editable={!isSubmitted}
+            editable={!isApproved}
           />
         </Card>
 
@@ -298,12 +316,12 @@ export function ReportScreen({
             <Text style={styles.sectionTitle}>Photos ({photoCount} attached)</Text>
           </View>
           <Text style={styles.photoHint}>
-            {isSubmitted
+            {isApproved
               ? "Inspection photos and drawings attached to this job."
               : "Take site photos, weld defect images or drawing snapshots (max 6 MB per file)."}
           </Text>
 
-          {!isSubmitted && (
+          {!isApproved && (
             <Button
               title={photoUploading ? "Uploading photo..." : "📷 Take photo with camera"}
               variant="secondary"
@@ -316,7 +334,7 @@ export function ReportScreen({
 
         {/* Action Buttons */}
         <View style={styles.buttonStack}>
-          {isSubmitted ? (
+          {isApproved ? (
             <Button
               title="← Return to job details"
               variant="secondary"
@@ -325,7 +343,7 @@ export function ReportScreen({
           ) : (
             <>
               <Button
-                title="Submit final report to office"
+                title={isSubmitted ? "Resubmit corrections to office" : "Submit final report to office"}
                 onPress={handleSubmitFinal}
                 loading={submitting}
               />
@@ -457,6 +475,25 @@ const styles = StyleSheet.create({
   submittedBannerText: {
     fontSize: 13,
     color: colors.ink,
+    lineHeight: 18,
+  },
+  lockedBanner: {
+    backgroundColor: colors.ink + "10",
+    borderWidth: 1,
+    borderColor: colors.ink3,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  lockedBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  lockedBannerText: {
+    fontSize: 13,
+    color: colors.ink2,
     lineHeight: 18,
   },
   cardHeader: {

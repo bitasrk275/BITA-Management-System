@@ -23,4 +23,9 @@ export type ReportDocument = {
   readings: ReportReadings;
   approval: ReportApproval;
   footerNotes?: readonly string[];
+  attachments?: ReadonlyArray<{
+    kind: string;
+    caption?: string | null;
+    storagePath: string;
+  }>;
 };

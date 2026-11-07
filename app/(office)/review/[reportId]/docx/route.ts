@@ -35,17 +35,26 @@ export async function GET(
     });
   }
 
-  const inspectionRes = report.inspection_id
-    ? await supabase
-        .from("inspections")
-        .select("readings")
-        .eq("id", report.inspection_id)
-        .maybeSingle()
-    : { data: null };
+  const [inspectionRes, attachmentsRes] = await Promise.all([
+    report.inspection_id
+      ? supabase
+          .from("inspections")
+          .select("readings")
+          .eq("id", report.inspection_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("attachments")
+      .select("kind, caption, storage_path")
+      .eq("job_id", report.job_id)
+      .eq("include_in_report", true)
+      .order("uploaded_at", { ascending: true }),
+  ]);
 
   const isApproved =
     (report.status === "approved" || report.status === "sent") && !!report.approved_at;
   const readings = extractReadings(report.content, inspectionRes.data?.readings);
+  const attachments = attachmentsRes.data ?? [];
 
   const assets = await loadReportApprovalAssets(supabase, {
     approved: isApproved,
@@ -60,6 +69,11 @@ export async function GET(
     letterhead: assets.letterhead,
     readings,
     approval: assets.approval,
+    attachments: attachments.map((a) => ({
+      kind: a.kind,
+      caption: a.caption,
+      storagePath: a.storage_path,
+    })),
   };
 
   const docxBytes = await generateReportDocxBytes(report.method, doc);

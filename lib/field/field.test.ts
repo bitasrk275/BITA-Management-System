@@ -644,6 +644,17 @@ describe("Field App: assignment operations & authorization checks", () => {
             }),
           };
         }
+        if (table === "reports") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: null,
+                }),
+              }),
+            }),
+          };
+        }
         if (table === "jobs") {
           return {
             update: jobUpdateSpy,
@@ -923,6 +934,15 @@ describe("Field App: assignment operations & authorization checks", () => {
                     submitted_at: null,
                   },
                 ],
+              }),
+            }),
+          };
+        }
+        if (table === "reports") {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
               }),
             }),
           };
