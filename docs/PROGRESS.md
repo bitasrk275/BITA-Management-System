@@ -15,7 +15,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
 | Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
-| Payments, reminders, job closure | Naveen | In review | feature/naveen-invoices | T35 in-app GST invoicing (no Zoho, D-017): migration, GST 18% & paise rounding, Indian words, quote/report line matching with minimum charge, PDF/Word template, /invoices screens and payment recording |
+| Payments, reminders, job closure | Naveen | In review | feature/naveen-email-reminders | T37 email-only payment reminders on in-app tax invoices (issued/partly_paid, balance > 0, reminders_paused false, due_date) + n8n workflow export (n8n/payment-reminders-email.json) |
 | Dashboard | Naveen | Not started | | |
 | WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
 | Financial reports from Zoho (X4) | Naveen | In review | feature/naveen-gst-export | T36 CA GST export (GSTR-1 B2B & B2C CSV + Excel XML workbook at /invoices/export) |
@@ -72,6 +72,13 @@ Task: T38 Retire technician web screens (APK only, D-016) + apps/technician fixe
 Done: Removed technician-only web routes (app/(field)/my-jobs and all subroutes) and retired technician menu in app-shell. Updated lib/roles.ts (homeFor sends technicians to /technician) and lib/auth.ts (requireStaff redirects technicians to /technician). Added /technician notice page directing technicians to the Android APK and office pairing code. Added lib/roles.test.ts. In apps/technician: fixed 3 lint warnings (unused Alert in PairScreen, unused err in ReportScreen), added HTTP 409 handling and read-only mode for already submitted reports, enabled viewing submitted reports from job details, updated README with EAS free-tier APK build steps and what BITA must provide (Expo account, Firebase project under BITA's Google account). cd apps/technician && npm run typecheck passes cleanly.
 Files changed: app/(field)/, lib/roles.ts, lib/roles.test.ts, lib/auth.ts, components/app-shell.tsx, apps/technician/, docs/FIELD_APP.md, docs/PROGRESS.md
 Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
+Blockers / questions: none.
+
+### 2026-11-07 11:25 – Naveen – Claude
+Task: T37 Email-only payment reminders on in-app invoices + n8n workflow export
+Done: Adapted payment reminder planning (`lib/reminders/` and `/api/reminders/plan`) to in-app tax invoices (`kind = 'tax_invoice'`, `status in ('issued', 'partly_paid')`, `balance > 0`, `reminders_paused = false`, `due_date` set), added email-only subject/body composition (`buildReminderEmailContent`) and `PATCH /api/reminders/plan` to mark `sent_at`, surfaced email reminder history on `/invoices/[id]`, and added the importable n8n workflow export (`n8n/payment-reminders-email.json` + `n8n/README.md`) with zero WhatsApp nodes.
+Files changed: lib/reminders/schedule.ts, lib/reminders/sender.ts, lib/reminders/plan.ts, lib/reminders/reminders.test.ts, app/api/reminders/plan/route.ts, app/api/reminders/plan/route.test.ts, app/(office)/invoices/db.ts, app/(office)/invoices/[id]/page.tsx, n8n/payment-reminders-email.json, n8n/README.md, docs/PROGRESS.md
+Next: Import `n8n/payment-reminders-email.json` into n8n once BITA's SMTP credentials arrive.
 Blockers / questions: none.
 
 ### 2026-11-07 11:12 – Naveen – Claude

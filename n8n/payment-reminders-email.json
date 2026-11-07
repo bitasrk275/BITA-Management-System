@@ -1,0 +1,231 @@
+{
+  "name": "BITA – In-App Invoice Payment Reminders (Email Only)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "e1a10001-0001-4000-8000-000000000001",
+      "name": "Daily 09:30 IST Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BITA_APP_URL }}/api/reminders/plan",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-reminders-cron-secret",
+              "value": "={{ $env.REMINDERS_CRON_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "e1a10001-0002-4000-8000-000000000002",
+      "name": "Plan Due Invoice Reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "emails",
+        "options": {}
+      },
+      "id": "e1a10001-0003-4000-8000-000000000003",
+      "name": "Split Out Planned Reminder Emails",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-invoice-recipients",
+              "leftValue": "={{ Array.isArray($json.sent_to) ? $json.sent_to.length : 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e1a10001-0004-4000-8000-000000000004",
+      "name": "Has Invoice Contacts (receives_invoices = true)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from_mailbox || $env.BITA_DEFAULT_INVOICE_MAILBOX }}",
+        "toEmail": "={{ $json.sent_to.join(', ') }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "e1a10001-0005-4000-8000-000000000005",
+      "name": "Send Payment Reminder Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.BITA_APP_URL }}/api/reminders/plan",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-reminders-cron-secret",
+              "value": "={{ $env.REMINDERS_CRON_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ reminder_id: $('Has Invoice Contacts (receives_invoices = true)?').item.json.reminder_id, invoice_id: $('Has Invoice Contacts (receives_invoices = true)?').item.json.invoice_id, scheduled_for: $('Has Invoice Contacts (receives_invoices = true)?').item.json.scheduled_for }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "e1a10001-0006-4000-8000-000000000006",
+      "name": "Mark Reminder Sent in BITA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1460,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 09:30 IST Schedule": {
+      "main": [
+        [
+          {
+            "node": "Plan Due Invoice Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Due Invoice Reminders": {
+      "main": [
+        [
+          {
+            "node": "Split Out Planned Reminder Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Planned Reminder Emails": {
+      "main": [
+        [
+          {
+            "node": "Has Invoice Contacts (receives_invoices = true)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Invoice Contacts (receives_invoices = true)?": {
+      "main": [
+        [
+          {
+            "node": "Send Payment Reminder Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send Payment Reminder Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Mark Reminder Sent in BITA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "bita"
+    },
+    {
+      "name": "invoices"
+    },
+    {
+      "name": "email-reminders"
+    }
+  ]
+}

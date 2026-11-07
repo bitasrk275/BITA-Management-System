@@ -1,15 +1,20 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   getReminderKindForInvoice,
+  isInvoiceStatusEligibleForReminders,
   type InvoiceReminderCandidate,
 } from "./schedule";
 import {
+  buildReminderEmailContent,
   resolveReminderMailbox,
   resolveReminderRecipients,
   type ReminderContact,
   type ReminderCustomer,
 } from "./sender";
 import {
+  buildPlannedReminderEmails,
   normalizeInvoiceForPlanning,
   planPaymentReminders,
 } from "./plan";
@@ -19,6 +24,8 @@ describe("Payment Reminders Schedule (lib/reminders/schedule.ts)", () => {
     due_date: "2026-11-10",
     balance: 50000,
     reminders_paused: false,
+    status: "issued",
+    kind: "tax_invoice",
   };
 
   it("returns null for dates more than 2 days before the due date", () => {
@@ -50,6 +57,31 @@ describe("Payment Reminders Schedule (lib/reminders/schedule.ts)", () => {
     expect(getReminderKindForInvoice(baseInvoice, "2026-11-16")).toBe("overdue"); // Day +6
     expect(getReminderKindForInvoice(baseInvoice, "2026-11-20")).toBe("overdue"); // Day +10
     expect(getReminderKindForInvoice(baseInvoice, "2026-12-10")).toBe("overdue"); // Day +30
+  });
+
+  it("allows 'issued' and 'partly_paid' tax invoices and rejects 'draft', 'paid', 'cancelled', and 'proforma'", () => {
+    expect(isInvoiceStatusEligibleForReminders("issued", "tax_invoice")).toBe(true);
+    expect(isInvoiceStatusEligibleForReminders("partly_paid", "tax_invoice")).toBe(true);
+    expect(isInvoiceStatusEligibleForReminders("draft", "tax_invoice")).toBe(false);
+    expect(isInvoiceStatusEligibleForReminders("paid", "tax_invoice")).toBe(false);
+    expect(isInvoiceStatusEligibleForReminders("cancelled", "tax_invoice")).toBe(false);
+    expect(isInvoiceStatusEligibleForReminders("issued", "proforma")).toBe(false);
+
+    expect(
+      getReminderKindForInvoice({ ...baseInvoice, status: "partly_paid" }, "2026-11-10"),
+    ).toBe("on_due");
+    expect(
+      getReminderKindForInvoice({ ...baseInvoice, status: "draft" }, "2026-11-10"),
+    ).toBeNull();
+    expect(
+      getReminderKindForInvoice({ ...baseInvoice, status: "paid" }, "2026-11-10"),
+    ).toBeNull();
+    expect(
+      getReminderKindForInvoice({ ...baseInvoice, status: "cancelled" }, "2026-11-10"),
+    ).toBeNull();
+    expect(
+      getReminderKindForInvoice({ ...baseInvoice, kind: "proforma" }, "2026-11-10"),
+    ).toBeNull();
   });
 
   it("returns null if the balance is 0 or negative (paid in full)", () => {
@@ -127,6 +159,42 @@ describe("Payment Reminders Sender (lib/reminders/sender.ts)", () => {
     expect(resolveReminderRecipients(null)).toEqual([]);
     expect(resolveReminderRecipients(undefined)).toEqual([]);
   });
+
+  it("builds email-only subject and body for before_due, on_due, and overdue reminders", () => {
+    const beforeDue = buildReminderEmailContent({
+      invoice_no: "BITA/INV/26-27/0012",
+      invoice_date: "2026-10-12",
+      due_date: "2026-11-12",
+      scheduled_for: "2026-11-10",
+      kind: "before_due",
+      total: 118000,
+      balance: 50000,
+      customer_name: "Peenya Forge Pvt Ltd",
+      job_no: "BITA/26-27/0045",
+    });
+
+    expect(beforeDue.subject).toContain("Upcoming Payment Reminder: Invoice BITA/INV/26-27/0012");
+    expect(beforeDue.subject).toContain("Job BITA/26-27/0045");
+    expect(beforeDue.body).toContain("Dear Peenya Forge Pvt Ltd,");
+    expect(beforeDue.body).toContain("in 2 days");
+    expect(beforeDue.body).toContain("₹50,000.00");
+
+    const overdue = buildReminderEmailContent({
+      invoice_no: "BITA/INV/26-27/0008",
+      invoice_date: "2026-10-01",
+      due_date: "2026-11-01",
+      scheduled_for: "2026-11-08",
+      kind: "overdue",
+      total: 59000,
+      balance: 59000,
+      customer_name: "Kaveri Heavy Engg",
+      job_no: "BITA/26-27/0019",
+    });
+
+    expect(overdue.subject).toContain("Overdue Payment Reminder (7 days past due)");
+    expect(overdue.body).toContain("by 7 days");
+    expect(overdue.body).toContain("BITA/INV/26-27/0008");
+  });
 });
 
 describe("Payment Reminders Plan (lib/reminders/plan.ts)", () => {
@@ -135,36 +203,79 @@ describe("Payment Reminders Plan (lib/reminders/plan.ts)", () => {
   const sampleInvoices = [
     {
       id: "inv-before-due",
+      status: "issued",
+      kind: "tax_invoice",
+      invoice_no: "BITA/INV/26-27/0001",
       due_date: "2026-11-12", // 2 days after targetDate -> targetDate is 2 days before
+      total: 11800,
       balance: 10000,
       reminders_paused: false,
-      customer: { mailbox: "client-a@bita.example" },
+      job_no: "BITA/26-27/0001",
+      customer: { name: "Client A", mailbox: "client-a@bita.example" },
       contacts: [{ email: "pay@client-a.com", receives_invoices: true }],
     },
     {
       id: "inv-on-due",
+      status: "partly_paid",
+      kind: "tax_invoice",
+      invoice_no: "BITA/INV/26-27/0002",
       due_date: "2026-11-10", // Exactly on targetDate
+      total: 50000,
       balance: 25000,
       reminders_paused: false,
-      customer: { mailbox: "tdps-desk@bita.example" },
+      job_no: "BITA/26-27/0002",
+      customer: { name: "TDPS Fake", mailbox: "tdps-desk@bita.example" },
       contacts: [{ email: "finance@tdps.example", receives_invoices: true }],
     },
     {
       id: "inv-overdue",
+      status: "issued",
+      kind: "tax_invoice",
+      invoice_no: "BITA/INV/26-27/0003",
       due_date: "2026-11-05", // 5 days before targetDate -> overdue
+      total: 40000,
       balance: 40000,
       reminders_paused: false,
-      customer: { mailbox: null },
+      job_no: "BITA/26-27/0003",
+      customer: { name: "Client C", mailbox: null },
       contacts: [{ email: "billing@client-c.com", receives_invoices: true }],
     },
     {
+      id: "inv-draft-ignored",
+      status: "draft",
+      kind: "tax_invoice",
+      due_date: "2026-11-10",
+      balance: 20000,
+      reminders_paused: false,
+    },
+    {
+      id: "inv-cancelled-ignored",
+      status: "cancelled",
+      kind: "tax_invoice",
+      due_date: "2026-11-10",
+      balance: 20000,
+      reminders_paused: false,
+    },
+    {
+      id: "inv-proforma-ignored",
+      status: "issued",
+      kind: "proforma",
+      due_date: "2026-11-10",
+      balance: 20000,
+      reminders_paused: false,
+    },
+    {
       id: "inv-quiet-buffer",
+      status: "issued",
+      kind: "tax_invoice",
       due_date: "2026-11-08", // 2 days overdue -> quiet buffer, no reminder
       balance: 15000,
       reminders_paused: false,
     },
     {
       id: "inv-already-planned",
+      status: "issued",
+      kind: "tax_invoice",
       due_date: "2026-11-10",
       balance: 30000,
       reminders_paused: false,
@@ -173,19 +284,23 @@ describe("Payment Reminders Plan (lib/reminders/plan.ts)", () => {
     },
     {
       id: "inv-paid",
+      status: "paid",
+      kind: "tax_invoice",
       due_date: "2026-11-10",
       balance: 0,
       reminders_paused: false,
     },
     {
       id: "inv-paused",
+      status: "issued",
+      kind: "tax_invoice",
       due_date: "2026-11-10",
       balance: 50000,
       reminders_paused: true,
     },
   ];
 
-  it("plans reminders for eligible invoices and skips ineligible or existing rows", () => {
+  it("plans reminders for eligible issued/partly_paid tax invoices and skips drafts, proformas, or existing rows", () => {
     const existing = [
       { invoice_id: "inv-already-planned", scheduled_for: targetDate },
     ];
@@ -221,18 +336,43 @@ describe("Payment Reminders Plan (lib/reminders/plan.ts)", () => {
       sent_to: ["billing@client-c.com"],
     });
 
-    // 4. inv-already-planned was skipped
+    // 4. Draft, cancelled, proforma, and already-planned were skipped
+    expect(planned.find((p) => p.invoice_id === "inv-draft-ignored")).toBeUndefined();
+    expect(planned.find((p) => p.invoice_id === "inv-cancelled-ignored")).toBeUndefined();
+    expect(planned.find((p) => p.invoice_id === "inv-proforma-ignored")).toBeUndefined();
     expect(planned.find((p) => p.invoice_id === "inv-already-planned")).toBeUndefined();
+  });
+
+  it("builds complete email payloads for n8n from planned reminders", () => {
+    const planned = planPaymentReminders(sampleInvoices, [], targetDate);
+    const idMap = new Map([["inv-on-due", "rem-uuid-2"]]);
+    const emails = buildPlannedReminderEmails(sampleInvoices, planned, idMap);
+
+    const onDueEmail = emails.find((e) => e.invoice_id === "inv-on-due");
+    expect(onDueEmail).toBeDefined();
+    expect(onDueEmail?.reminder_id).toBe("rem-uuid-2");
+    expect(onDueEmail?.invoice_no).toBe("BITA/INV/26-27/0002");
+    expect(onDueEmail?.customer_name).toBe("TDPS Fake");
+    expect(onDueEmail?.from_mailbox).toBe("tdps-desk@bita.example");
+    expect(onDueEmail?.sent_to).toEqual(["finance@tdps.example"]);
+    expect(onDueEmail?.subject).toContain("Payment Due Today: Invoice BITA/INV/26-27/0002");
+    expect(onDueEmail?.body).toContain("₹25,000.00");
   });
 
   it("normalizes joined database rows correctly", () => {
     const rawJoin = {
       id: "raw-inv-1",
+      status: "issued",
+      kind: "tax_invoice",
+      invoice_no: "BITA/INV/26-27/0099",
       due_date: "2026-11-10",
+      total: "14750.00",
       balance: "12500.50",
       reminders_paused: false,
       jobs: {
+        job_no: "BITA/26-27/0099",
         customer: {
+          name: "Test Customer Ltd",
           mailbox: "accounts-mailbox@bita.example",
           customer_contacts: [
             { email: "c1@test.com", receives_invoices: true },
@@ -244,8 +384,30 @@ describe("Payment Reminders Plan (lib/reminders/plan.ts)", () => {
 
     const normalized = normalizeInvoiceForPlanning(rawJoin);
     expect(normalized.id).toBe("raw-inv-1");
+    expect(normalized.status).toBe("issued");
+    expect(normalized.kind).toBe("tax_invoice");
+    expect(normalized.invoice_no).toBe("BITA/INV/26-27/0099");
+    expect(normalized.job_no).toBe("BITA/26-27/0099");
     expect(normalized.balance).toBe(12500.5);
+    expect(normalized.customer?.name).toBe("Test Customer Ltd");
     expect(normalized.customer?.mailbox).toBe("accounts-mailbox@bita.example");
     expect(normalized.contacts).toHaveLength(2);
+  });
+
+  it("exports a valid email-only n8n workflow in n8n/payment-reminders-email.json with no WhatsApp nodes", () => {
+    const workflowPath = resolve(process.cwd(), "n8n/payment-reminders-email.json");
+    const rawJson = readFileSync(workflowPath, "utf8");
+    const workflow = JSON.parse(rawJson) as {
+      name: string;
+      nodes: Array<{ name: string; type: string; parameters: Record<string, unknown> }>;
+    };
+
+    expect(workflow.name).toContain("Email Only");
+    expect(Array.isArray(workflow.nodes)).toBe(true);
+    expect(workflow.nodes.some((n) => n.type === "n8n-nodes-base.emailSend")).toBe(true);
+    expect(
+      workflow.nodes.some((n) => n.type.toLowerCase().includes("whatsapp")),
+    ).toBe(false);
+    expect(rawJson.toLowerCase()).not.toContain("whatsapp");
   });
 });
