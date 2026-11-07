@@ -25,7 +25,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Test data | Krishna | Not started | | |
 | Client inputs tracker | Krishna | Not started | | See `docs/CLIENT_INPUTS.md` |
 | Excel import | Naveen | Not started | | Needs BITA lists |
-| Smoke tests | Naveen | In review | feature/naveen-e2e-flow | T40 PGlite end-to-end job lifecycle test (tests/e2e-flow.test.ts) + idempotent demo in-app invoices (draft, issued, partly_paid, paid) in supabase/seed/demo.sql |
+| Smoke tests | Naveen | In review | feature/naveen-field-db-tests | T42 Field API PGlite tests (tests/field-api.test.ts); T40 e2e flow |
 | User guide | Krishna | Not started | | |
 
 Status values: Not started · In progress · In review · Done · Blocked
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 16:45 – Naveen – Antigravity
+Task: T42 Field API tests against real database rules (PGlite) and RLS
+Done: Added tests/field-api.test.ts running against real PostgreSQL (PGlite) via createTestDb(). Tested production field API operations against real database constraints and schema without mocks: 1) pairing code generation, redemption, single-use enforcement, double-redeem failure, and expiry check; 2) authenticateDevice secret check, 401 on wrong secret, 401 on revoked device; 3) technician assignment isolation (technician A cannot acknowledge, start, report, or upload photo on technician B's assignment -> 404); 4) inspection report draft vs. completion, mandatory fields validation, automatic transition of job to inspection_done, assignment completed_at timestamp, 409 conflict on re-submitting already completed report, valid photo attachment and rejection of photos > 6 MB; 5) technician delay messages and validation; 6) RLS enforcement verifying authenticated staff role cannot insert into pairing_codes directly (RLS refusal) while service role succeeds and staff can read per 77cdf95. Verified apps/technician with Expo SDK 58 (typecheck clean). Full test suite (27 test files, 252 tests), lint, typecheck, and next build pass cleanly.
+Files changed: tests/field-api.test.ts, docs/PROGRESS.md
+Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
+Blockers / questions: none.
 
 ### 2026-11-07 13:45 – Naveen – Antigravity
 Task: T39 Remove leftover Zoho / WhatsApp wording (D-017) and 375 px mobile audit across office screens
