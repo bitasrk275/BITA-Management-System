@@ -1,0 +1,31 @@
+{
+  "name": "bita-field-app",
+  "version": "1.0.0",
+  "description": "BITA Field Technician Mobile App (Android)",
+  "private": true,
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "build:apk": "eas build --platform android --profile preview",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "expo": "~51.0.38",
+    "expo-constants": "~16.0.2",
+    "expo-device": "~6.0.2",
+    "expo-image-picker": "~15.0.7",
+    "expo-notifications": "~0.28.19",
+    "expo-secure-store": "~13.0.2",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-native": "0.74.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/react": "~18.2.79",
+    "typescript": "~5.3.3"
+  }
+}

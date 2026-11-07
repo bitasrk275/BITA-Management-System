@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "BITA Field",
+    "slug": "bita-field",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "in.bita.field",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to photos for inspection site and defect documentation.",
+          "cameraPermission": "The app needs camera access to photograph inspection components and defects."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0a0a0a"
+        }
+      ]
+    ]
+  }
+}
