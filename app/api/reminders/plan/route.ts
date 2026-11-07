@@ -1,5 +1,6 @@
 import { todayIST } from "../../../../lib/dates";
 import type { Database } from "../../../../lib/db/types";
+import { checkRemindersEnv, getMissingEnvVars, REQUIRED_ADMIN_ENV_VARS } from "../../../../lib/env";
 import { planAndInsertReminders } from "../../../../lib/reminders/plan";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -8,7 +9,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 export const runtime = "nodejs";
 
 function authenticateCronRequest(req: Request): NextResponse | null {
-  const expectedSecret = process.env.REMINDERS_CRON_SECRET;
+  const { cronSecret: expectedSecret } = checkRemindersEnv();
   if (!expectedSecret) {
     return NextResponse.json(
       { error: "REMINDERS_CRON_SECRET is not configured on the server" },
@@ -32,28 +33,37 @@ function authenticateCronRequest(req: Request): NextResponse | null {
 }
 
 function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) {
-    return null;
+  const missing = getMissingEnvVars(REQUIRED_ADMIN_ENV_VARS);
+  if (missing.length > 0) {
+    return { client: null, missing };
   }
 
-  return createClient<Database>(url, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
+  const { url, serviceRoleKey } = checkRemindersEnv();
+  if (!url || !serviceRoleKey) {
+    return { client: null, missing: [...REQUIRED_ADMIN_ENV_VARS] };
+  }
+
+  return {
+    client: createClient<Database>(url, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    }),
+    missing: [] as string[],
+  };
 }
 
 export async function POST(req: Request) {
   const authError = authenticateCronRequest(req);
   if (authError) return authError;
 
-  const supabaseAdmin = getSupabaseAdmin();
+  const { client: supabaseAdmin, missing } = getSupabaseAdmin();
   if (!supabaseAdmin) {
     return NextResponse.json(
-      { error: "Supabase service role credentials not configured" },
+      {
+        error: `Supabase service role credentials not configured (missing: ${missing.join(", ")})`,
+      },
       { status: 500 },
     );
   }
@@ -112,10 +122,12 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const supabaseAdmin = getSupabaseAdmin();
+  const { client: supabaseAdmin, missing } = getSupabaseAdmin();
   if (!supabaseAdmin) {
     return NextResponse.json(
-      { error: "Supabase service role credentials not configured" },
+      {
+        error: `Supabase service role credentials not configured (missing: ${missing.join(", ")})`,
+      },
       { status: 500 },
     );
   }

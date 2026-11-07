@@ -7,7 +7,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 
 | Area | Owner | Status | Branch / PR | Notes |
 | --- | --- | --- | --- | --- |
-| Repo, schema, roles, security | Naveen | In review | feature/naveen-setup | App skeleton + first schema with RLS and correction log; Supabase project not created yet |
+| Repo, schema, roles, security | Naveen | In review | feature/naveen-deploy-ready | App skeleton + first schema with RLS and correction log; T41 deployment readiness (.env.example, lib/env.ts, docs/DEPLOY.md, .github/workflows/reminders.yml) |
 | Email intake + AI extraction | Naveen | Not started | | |
 | Customer and enquiry screens | Naveen | In review | feature/naveen-login-customers-enquiries | Login, customers with contacts, enquiries with customer link |
 | Jobs, quotations, POs, scheduling | Naveen | Not started | | |
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 16:37 – Naveen – Claude
+Task: T41 Deployment readiness for either host (.env.example, lib/env.ts, docs/DEPLOY.md, .github/workflows/reminders.yml)
+Done: Updated `.env.example` with every environment variable read across the codebase (names only, one-line comments, marking `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` required, plus `REMINDERS_CRON_SECRET` and `EXPO_PUBLIC_API_URL`). Added `lib/env.ts` and unit tests (`lib/env.test.ts`) for server-side required variable checks and wired them into `lib/field/service.ts`, `app/api/reminders/plan/route.ts`, and `lib/ai/extract-enquiry.ts`. Added `docs/DEPLOY.md` covering Netlify Free, Vercel Hobby (noting non-commercial terms), Supabase production checklist, daily payment reminders via n8n or free cron, and building the technician APK against the live URL. Added `.github/workflows/reminders.yml` (`workflow_dispatch` by default with commented daily cron).
+Files changed: .env.example, lib/env.ts, lib/env.test.ts, lib/field/service.ts, app/api/reminders/plan/route.ts, lib/ai/extract-enquiry.ts, docs/DEPLOY.md, .github/workflows/reminders.yml, docs/PROGRESS.md
+Next: Merge PR into `feature/naveen-integration`.
+Blockers / questions: none.
 
 ### 2026-11-07 13:45 – Naveen – Antigravity
 Task: T39 Remove leftover Zoho / WhatsApp wording (D-017) and 375 px mobile audit across office screens

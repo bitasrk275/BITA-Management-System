@@ -4,6 +4,7 @@ import {
   type ExtractedEnquiry,
   type RawEnquiryInput,
 } from "./types";
+import { checkAiEnv } from "../env";
 
 export interface ExtractEnquiryOptions {
   apiKey?: string;
@@ -73,12 +74,13 @@ export async function extractEnquiry(
     return null;
   }
 
-  const apiKey = options?.apiKey || process.env.ANTHROPIC_API_KEY;
+  const aiEnv = checkAiEnv();
+  const apiKey = options?.apiKey || aiEnv.apiKey;
   if (!apiKey) {
     return null;
   }
 
-  const model = options?.model || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const model = options?.model || aiEnv.model || DEFAULT_MODEL;
   const customFetch = options?.fetchFn || fetch;
 
   const userContent = [

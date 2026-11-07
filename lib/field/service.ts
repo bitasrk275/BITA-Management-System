@@ -1,20 +1,17 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../db/types";
+import { requireSupabaseAdminEnv } from "../env";
 
 /**
  * Returns a Supabase client with admin / service privileges.
- * Technicians have no login, so all server-side field routes run with the service role.
+ * Technicians have no login, so all server-side field routes and "Link a phone"
+ * run with the service role (SUPABASE_SERVICE_ROLE_KEY is required).
  */
 export function getSupabaseAdmin(): SupabaseClient<Database> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   // No fallback to the anon key: it would hit RLS and fail with a misleading error.
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url, serviceRoleKey } = requireSupabaseAdminEnv();
 
-  if (!url || !serviceKey) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env.local.");
-  }
-
-  return createClient<Database>(url, serviceKey, {
+  return createClient<Database>(url, serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

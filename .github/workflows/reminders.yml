@@ -1,0 +1,31 @@
+name: BITA Payment Reminders Cron
+
+# Disabled on a schedule by default so it only runs when triggered manually (`workflow_dispatch`).
+# To turn on the automatic daily schedule (09:30 AM IST = 04:00 UTC) and keep Supabase free-tier awake:
+# 1. In GitHub -> Settings -> Secrets and variables -> Actions, add two Repository Secrets:
+#    - BITA_APP_URL          (e.g. https://bita-bms.netlify.app — no trailing slash)
+#    - REMINDERS_CRON_SECRET (must match REMINDERS_CRON_SECRET in your Netlify/Vercel environment variables)
+# 2. Uncomment the `schedule:` block below and commit.
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "0 4 * * *" # Daily at 04:00 UTC (09:30 AM IST)
+
+jobs:
+  plan-payment-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger POST /api/reminders/plan
+        env:
+          BITA_APP_URL: ${{ secrets.BITA_APP_URL }}
+          REMINDERS_CRON_SECRET: ${{ secrets.REMINDERS_CRON_SECRET }}
+        run: |
+          if [ -z "$BITA_APP_URL" ] || [ -z "$REMINDERS_CRON_SECRET" ]; then
+            echo "Error: Set BITA_APP_URL and REMINDERS_CRON_SECRET in GitHub Actions repository secrets."
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST "${BITA_APP_URL%/}/api/reminders/plan" \
+            -H "x-reminders-cron-secret: ${REMINDERS_CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d "{}"
