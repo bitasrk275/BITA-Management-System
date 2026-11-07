@@ -15,7 +15,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
 | Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
-| Payments, reminders, job closure | Naveen | In review | feature/naveen-p3-price-list | Phase 2 P3: Price list module (`price_items`, `/price-list`, `/api/v1/price-items`), invoice line price-list dropdown + `+ Add new item` + editable rates |
+| Payments, reminders, job closure | Naveen | In review | feature/naveen-p4a-multi-report-invoices | Phase 2 P4a: `Invoice pending` report status + `invoice_reports` join table + combining several approved reports of the same customer GSTIN onto one invoice |
 | Dashboard | Naveen | Not started | | |
 | WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
 | Financial reports from Zoho (X4) | Naveen | In review | feature/naveen-gst-export | T36 CA GST export (GSTR-1 B2B & B2C CSV + Excel XML workbook at /invoices/export) |
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 18:03 – Naveen – Claude
+Task: P4a `Invoice pending` report status + several reports on one invoice (same GSTIN)
+Done: Added migration `supabase/migrations/20261107040000_invoice_reports_multi.sql` creating `public.invoice_reports (invoice_id, report_id)` with RLS, `private.check_invoice_report()` trigger (enforcing approved status, same customer GSTIN, and one active invoice per report), and `private.sync_invoice_report_link()` trigger. Built `lib/modules/invoices/` (`schema.ts`, `service.ts`, `invoices-module.test.ts`) and `/api/v1/invoices` + `/api/v1/invoices/pending-reports`. Updated `/review`, `/review/[reportId]`, `/dashboard`, `/invoices`, and `/invoices/[id]` so approved reports not yet on any non-cancelled invoice display `Invoice pending`, the dashboard shows an **Invoices pending** counter, and the office can tick one or several `Invoice pending` reports of the same customer GSTIN to combine them onto one invoice (combining all distinct PO numbers).
+Files changed: supabase/migrations/20261107040000_invoice_reports_multi.sql, lib/db/types.ts, lib/modules/invoices/, app/api/v1/invoices/, app/(office)/review/page.tsx, app/(office)/review/[reportId]/page.tsx, app/(office)/dashboard/page.tsx, app/(office)/invoices/page.tsx, app/(office)/invoices/[id]/page.tsx, app/(office)/invoices/actions.ts, app/(office)/invoices/db.ts, supabase/tests/phase2-foundation.test.ts, docs/PROGRESS.md
+Next: Open PR for P4a, merge into `feature/naveen-integration`, and proceed to P4b (Proforma or Tax choice + proforma series + convert to tax invoice).
+Blockers / questions: none.
 
 ### 2026-11-07 17:32 – Naveen – Claude
 Task: P3 Price list module (`price_items`, `/price-list`, `/api/v1/price-items`) + invoice line price-list dropdown

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Avatar,
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { daysBetween, greeting, longDateIST, shortDate, todayIST } from "@/lib/dates";
+import { listInvoicePendingReports } from "@/lib/modules/invoices/service";
 import { homeFor } from "@/lib/roles";
 import type { Enums } from "@/lib/db/types";
 import {
@@ -46,6 +48,7 @@ export default async function ManagementHome() {
     qualificationsAlert,
     equipmentAlert,
     recentEdits,
+    invoicePendingReports,
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -86,6 +89,7 @@ export default async function ManagementHome() {
       .select("id, edited_at, diff, old_observations, new_observations, edited_by, job_id, people!inspection_edits_edited_by_fkey(full_name), jobs(job_no, customers(name))")
       .order("edited_at", { ascending: false })
       .limit(5),
+    listInvoicePendingReports(supabase).catch(() => []),
   ]);
 
   const openJobs = jobs.data ?? [];
@@ -239,6 +243,15 @@ export default async function ManagementHome() {
         items={[
           { label: "Active jobs", value: openJobs.length, note: `${onSite.data?.length ?? 0} on site today` },
           { label: "Reports pending", value: pendingReports.count ?? 0, note: `${reviewReports.data?.length ?? 0} waiting for approval` },
+          {
+            label: "Invoices pending",
+            value: invoicePendingReports.length,
+            note: (
+              <Link href="/review?filter=invoice_pending" className="underline hover:text-ink">
+                approved reports awaiting billing
+              </Link>
+            ),
+          },
           {
             label: "Outstanding",
             value: formatINR(outstanding),

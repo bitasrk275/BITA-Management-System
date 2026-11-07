@@ -81,7 +81,7 @@ export default async function InvoiceDetailPage({
   const [invoiceRes, linesRes, paymentsRes, remindersRes, priceItemsRes] = await Promise.all([
     invoicesTable(supabase)
       .select(
-        "*, jobs(id, job_no, po_number, po_date, po_value, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), quotations(id, ref_no, status)",
+        "*, jobs(id, job_no, po_number, po_date, po_value, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), invoice_reports(report_id, reports(id, report_no, method, status, job_id, jobs(id, job_no, po_number))), quotations(id, ref_no, status)",
       )
       .eq("id", id)
       .maybeSingle() as Promise<{ data: InvoiceWithRelations | null }>,
@@ -113,6 +113,36 @@ export default async function InvoiceDetailPage({
   const report = invoice.reports;
   const quotation = invoice.quotations;
 
+  const linkedReportsMap = new Map<
+    string,
+    { id: string; report_no: string; method: string; job_no?: string | null; po_number?: string | null }
+  >();
+  for (const ir of invoice.invoice_reports ?? []) {
+    if (ir.reports) {
+      linkedReportsMap.set(ir.reports.id, {
+        id: ir.reports.id,
+        report_no: ir.reports.report_no,
+        method: ir.reports.method,
+        job_no: ir.reports.jobs?.job_no ?? job?.job_no,
+        po_number: ir.reports.jobs?.po_number ?? null,
+      });
+    }
+  }
+  if (report && !linkedReportsMap.has(report.id)) {
+    linkedReportsMap.set(report.id, {
+      id: report.id,
+      report_no: report.report_no,
+      method: report.method,
+      job_no: job?.job_no,
+      po_number: job?.po_number ?? null,
+    });
+  }
+  const linkedReports = Array.from(linkedReportsMap.values());
+  const combinedReportNos =
+    linkedReports.length > 0
+      ? linkedReports.map((r) => r.report_no).join(", ")
+      : report?.report_no ?? null;
+
   const isDraft = invoice.status === "draft";
   const isCancelled = invoice.status === "cancelled";
   const isIssued = ["issued", "partly_paid", "paid"].includes(invoice.status);
@@ -135,7 +165,7 @@ export default async function InvoiceDetailPage({
     invoiceDate: invoice.invoice_date,
     dueDate: invoice.due_date,
     jobNo: job?.job_no,
-    reportNo: report?.report_no,
+    reportNo: combinedReportNos,
     quotationRef: quotation?.ref_no,
     poNumber: invoice.customer_po_number ?? job?.po_number,
     poDate: job?.po_date,
@@ -486,12 +516,22 @@ export default async function InvoiceDetailPage({
                 <span>—</span>
               )}
             </div>
-            <div className="flex justify-between">
-              <span className="text-ink-3">Approved Report</span>
-              {report ? (
-                <Link href={`/review/${report.id}`} className="font-medium text-ink underline">
-                  <Mono>{report.report_no}</Mono>
-                </Link>
+            <div className="flex justify-between gap-2">
+              <span className="text-ink-3">
+                Approved Report{linkedReports.length > 1 ? "s" : ""}
+              </span>
+              {linkedReports.length > 0 ? (
+                <span className="flex flex-wrap justify-end gap-1.5 text-right">
+                  {linkedReports.map((r) => (
+                    <Link
+                      key={r.id}
+                      href={`/review/${r.id}`}
+                      className="font-medium text-ink underline"
+                    >
+                      <Mono>{r.report_no}</Mono>
+                    </Link>
+                  ))}
+                </span>
               ) : (
                 <span>—</span>
               )}

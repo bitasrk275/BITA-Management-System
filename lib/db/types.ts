@@ -615,6 +615,39 @@ export type Database = {
           },
         ]
       }
+      invoice_reports: {
+        Row: {
+          created_at: string
+          invoice_id: string
+          report_id: string
+        }
+        Insert: {
+          created_at?: string
+          invoice_id: string
+          report_id: string
+        }
+        Update: {
+          created_at?: string
+          invoice_id?: string
+          report_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_reports_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_reports_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           balance: number

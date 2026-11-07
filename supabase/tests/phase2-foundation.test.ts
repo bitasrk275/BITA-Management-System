@@ -5,6 +5,7 @@ const MGMT_USER = "00000000-0000-0000-0000-000000000001";
 const OFFICE_USER = "00000000-0000-0000-0000-000000000002";
 const REVIEWER_USER = "00000000-0000-0000-0000-000000000003";
 const TECH_USER = "00000000-0000-0000-0000-000000000004";
+const MGMT_PERSON = "00000000-0000-0000-0000-000000000011";
 
 describe("Phase 2 Foundation (P1): soft delete, recycle bin, settings, and permissions on PGlite", () => {
   let ctx: Awaited<ReturnType<typeof createTestDb>>;
@@ -338,5 +339,154 @@ describe("Phase 2 Foundation (P1): soft delete, recycle bin, settings, and permi
       [priceItemId],
     );
     expect(afterRestore.rows).toHaveLength(1);
+  });
+
+  it("links several approved reports of the same customer GSTIN to one invoice and enforces check_invoice_report (P4a)", async () => {
+    const custSameRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.customers (name, code, gstin)
+       values ('Same GSTIN Forgings Unit 1', 'SGF1', '29AABCS5555F1Z1')
+       returning id`,
+    );
+    const custSameId = custSameRes.rows[0]!.id;
+
+    const custDiffRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.customers (name, code, gstin)
+       values ('Different GSTIN Castings Ltd', 'DGCL', '33AABCD7777K1Z9')
+       returning id`,
+    );
+    const custDiffId = custDiffRes.rows[0]!.id;
+
+    const job1Res = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.jobs (customer_id, po_number) values ($1, 'PO-SGF-101') returning id`,
+      [custSameId],
+    );
+    const job1Id = job1Res.rows[0]!.id;
+
+    const job2Res = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.jobs (customer_id, po_number) values ($1, 'PO-SGF-102') returning id`,
+      [custSameId],
+    );
+    const job2Id = job2Res.rows[0]!.id;
+
+    const jobDiffRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.jobs (customer_id, po_number) values ($1, 'PO-DGCL-999') returning id`,
+      [custDiffId],
+    );
+    const jobDiffId = jobDiffRes.rows[0]!.id;
+
+    // Create two approved reports on job1 & job2 (same GSTIN) and one unapproved report + one different-GSTIN approved report
+    const rep1Res = await ctx.as<{ id: string }>(
+      MGMT_USER,
+      `insert into public.reports (job_id, method, report_no, status, approved_by, approved_at)
+       values ($1, 'UT', 'BITA/UT/26-27/P4A-1', 'approved', $2, now())
+       returning id`,
+      [job1Id, MGMT_PERSON],
+    );
+    const rep1Id = rep1Res.rows[0]!.id;
+
+    const rep2Res = await ctx.as<{ id: string }>(
+      MGMT_USER,
+      `insert into public.reports (job_id, method, report_no, status, approved_by, approved_at)
+       values ($1, 'MPT', 'BITA/MPT/26-27/P4A-2', 'approved', $2, now())
+       returning id`,
+      [job2Id, MGMT_PERSON],
+    );
+    const rep2Id = rep2Res.rows[0]!.id;
+
+    const repDraftRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.reports (job_id, method, report_no, status)
+       values ($1, 'DPT', 'BITA/DPT/26-27/P4A-DRAFT', 'draft')
+       returning id`,
+      [job1Id],
+    );
+    const repDraftId = repDraftRes.rows[0]!.id;
+
+    const repDiffRes = await ctx.as<{ id: string }>(
+      MGMT_USER,
+      `insert into public.reports (job_id, method, report_no, status, approved_by, approved_at)
+       values ($1, 'UT', 'BITA/UT/26-27/P4A-DIFF', 'approved', $2, now())
+       returning id`,
+      [jobDiffId, MGMT_PERSON],
+    );
+    const repDiffId = repDiffRes.rows[0]!.id;
+
+    // Create a draft invoice for job1 (setting report_id = rep1Id auto-syncs into invoice_reports)
+    const inv1Res = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.invoices (job_id, kind, report_id, customer_po_number, taxable_value, cgst, sgst, total)
+       values ($1, 'tax_invoice', $2, 'PO-SGF-101, PO-SGF-102', 15000, 1350, 1350, 17700)
+       returning id`,
+      [job1Id, rep1Id],
+    );
+    const inv1Id = inv1Res.rows[0]!.id;
+
+    // Add second approved report of the same customer GSTIN -> succeeds
+    await ctx.as(
+      OFFICE_USER,
+      `insert into public.invoice_reports (invoice_id, report_id) values ($1, $2)`,
+      [inv1Id, rep2Id],
+    );
+
+    const linkedRes = await ctx.as<{ report_id: string }>(
+      OFFICE_USER,
+      `select report_id from public.invoice_reports where invoice_id = $1`,
+      [inv1Id],
+    );
+    expect(linkedRes.rows).toHaveLength(2);
+
+    // Refuse adding an unapproved report
+    await expect(
+      ctx.as(
+        OFFICE_USER,
+        `insert into public.invoice_reports (invoice_id, report_id) values ($1, $2)`,
+        [inv1Id, repDraftId],
+      ),
+    ).rejects.toThrow(/Only approved reports/i);
+
+    // Refuse adding a report from a customer with a different GSTIN
+    await expect(
+      ctx.as(
+        OFFICE_USER,
+        `insert into public.invoice_reports (invoice_id, report_id) values ($1, $2)`,
+        [inv1Id, repDiffId],
+      ),
+    ).rejects.toThrow(/same customer GSTIN/i);
+
+    // Refuse adding rep2Id to a second active invoice while inv1Id is not cancelled
+    const inv2Res = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.invoices (job_id, kind, taxable_value, cgst, sgst, total)
+       values ($1, 'tax_invoice', 7500, 675, 675, 8850)
+       returning id`,
+      [job2Id],
+    );
+    const inv2Id = inv2Res.rows[0]!.id;
+
+    await expect(
+      ctx.as(
+        OFFICE_USER,
+        `insert into public.invoice_reports (invoice_id, report_id) values ($1, $2)`,
+        [inv2Id, rep2Id],
+      ),
+    ).rejects.toThrow(/already linked to active invoice/i);
+
+    // Once inv1Id is cancelled, rep2Id returns to Invoice pending and can be added to inv2Id
+    await ctx.as(
+      OFFICE_USER,
+      `update public.invoices set status = 'cancelled', balance = 0 where id = $1`,
+      [inv1Id],
+    );
+
+    await ctx.as(
+      OFFICE_USER,
+      `insert into public.invoice_reports (invoice_id, report_id) values ($1, $2)`,
+      [inv2Id, rep2Id],
+    );
   });
 });

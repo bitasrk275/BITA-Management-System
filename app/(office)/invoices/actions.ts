@@ -15,6 +15,7 @@ import {
   buildDraftInvoiceLinesFromPriceList,
   listPriceItems,
 } from "@/lib/modules/price-items/service";
+import { createDraftInvoiceFromReports } from "@/lib/modules/invoices/service";
 import { validUuid } from "@/lib/reports/review";
 import { homeFor } from "@/lib/roles";
 import {
@@ -164,23 +165,60 @@ export async function generateInvoiceFromReport(reportId: string) {
   if (!validUuid(reportId)) redirect("/review");
   const { supabase } = await requireBillingStaff();
 
-  const { data: report } = await supabase
-    .from("reports")
-    .select("id, job_id, approved_at")
-    .eq("id", reportId)
-    .maybeSingle();
+  try {
+    const res = await createDraftInvoiceFromReports(supabase, {
+      report_ids: [reportId],
+      kind: "tax_invoice",
+    });
+    revalidatePath("/invoices");
+    revalidatePath("/review");
+    revalidatePath(`/review/${reportId}`);
+    redirect(`/invoices/${res.invoice_id}?saved=1`);
+  } catch (err) {
+    redirect(
+      errUrl(
+        `/review/${reportId}`,
+        err instanceof Error ? err.message : "Could not generate invoice.",
+      ),
+    );
+  }
+}
 
-  if (!report) redirect("/review");
-  if (!report.approved_at) {
-    redirect(errUrl(`/review/${reportId}`, "Approve the report before generating an invoice."));
+export async function generateInvoiceFromSelectedReports(formData: FormData) {
+  const { supabase } = await requireBillingStaff();
+  const returnTo = str(formData, "return_to") ?? "/invoices";
+  const rawIds = formData
+    .getAll("report_ids")
+    .map((v) => String(v ?? "").trim())
+    .filter((v) => validUuid(v));
+
+  if (rawIds.length === 0) {
+    redirect(errUrl(returnTo, "Select at least one Invoice pending report."));
   }
 
-  const res = await createDraftInvoiceForJobAndReport(supabase, report.job_id, report.id);
-  if (res.error || !res.id) {
-    redirect(errUrl(`/review/${reportId}`, res.error ?? "Could not generate invoice."));
+  const kindRaw = str(formData, "kind");
+  const kind = kindRaw === "proforma" ? "proforma" : "tax_invoice";
+
+  let invoiceId: string;
+  try {
+    const res = await createDraftInvoiceFromReports(supabase, {
+      report_ids: rawIds,
+      kind,
+    });
+    invoiceId = res.invoice_id;
+  } catch (err) {
+    redirect(
+      errUrl(
+        returnTo,
+        err instanceof Error ? err.message : "Could not prepare draft invoice.",
+      ),
+    );
   }
 
-  redirect(`/invoices/${res.id}?saved=1`);
+  revalidatePath("/invoices");
+  revalidatePath("/review");
+  revalidatePath("/dashboard");
+  redirect(`/invoices/${invoiceId}?saved=1`);
 }
 
 export async function generateInvoiceFromJob(jobId: string) {

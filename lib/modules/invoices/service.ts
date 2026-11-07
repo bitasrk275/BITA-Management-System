@@ -1,0 +1,475 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database, Enums, Json } from "../../db/types";
+import { todayIST } from "../../dates";
+import {
+  calculateInvoiceGst,
+  sumTaxableValue,
+  type BuiltInvoiceLine,
+} from "../../invoices";
+import {
+  buildDraftInvoiceLinesFromPriceList,
+  listPriceItems,
+} from "../price-items/service";
+import { METHOD_LABEL } from "../../../app/(office)/jobs/labels";
+import type { CreateInvoiceFromReportsInput } from "./schema";
+
+type AppSupabase = SupabaseClient<Database>;
+
+export interface ReportInvoiceCandidate {
+  id: string;
+  report_no: string;
+  report_date: string;
+  method: Enums<"test_method">;
+  status: Enums<"report_status">;
+  approved_at: string | null;
+  content?: Json | null;
+  job_id: string;
+  job_no: string;
+  customer_id: string;
+  customer_name: string;
+  customer_gstin: string | null;
+  customer_billing_address?: string | null;
+  customer_po_number: string | null;
+  po_value: number | null;
+  payment_terms_days?: number;
+}
+
+export interface ActiveReportInvoiceLink {
+  invoice_id: string;
+  invoice_no: string;
+  status: string;
+  kind: Enums<"invoice_kind">;
+}
+
+/**
+ * Returns true when a report is approved (`approved_at != null` or status in `approved`/`sent`)
+ * and is NOT linked to any non-cancelled invoice (`invoice_reports` or `invoices.report_id`).
+ */
+export function isReportInvoicePending(
+  report: { id: string; status: string; approved_at: string | null },
+  activeInvoiceReportIds: ReadonlySet<string> | ReadonlyMap<string, unknown>,
+): boolean {
+  const isApproved =
+    Boolean(report.approved_at) ||
+    report.status === "approved" ||
+    report.status === "sent";
+  if (!isApproved) return false;
+  return !activeInvoiceReportIds.has(report.id);
+}
+
+/**
+ * Normalizes a GSTIN string for comparison.
+ */
+export function normalizeGstin(gstin: string | null | undefined): string {
+  return (gstin ?? "").trim().toUpperCase();
+}
+
+/**
+ * Collects distinct non-empty PO numbers in insertion order and joins them with ", ".
+ */
+export function collectDistinctPoNumbers(
+  poNumbers: readonly (string | null | undefined)[],
+): string | null {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const raw of poNumbers) {
+    const trimmed = (raw ?? "").trim();
+    if (!trimmed) continue;
+    const key = trimmed.toUpperCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      ordered.push(trimmed);
+    }
+  }
+  return ordered.length > 0 ? ordered.join(", ") : null;
+}
+
+export interface ValidatedReportGroup {
+  customer_id: string;
+  customer_name: string;
+  customer_gstin: string | null;
+  combined_po_number: string | null;
+  distinct_po_numbers: string[];
+  primary_job_id: string;
+}
+
+/**
+ * Validates that one or more reports are all approved and belong to the same customer GSTIN
+ * (or the same customer_id when both have blank GSTIN). Also combines all distinct PO numbers.
+ */
+export function validateReportsShareCustomerGstin(
+  reports: readonly ReportInvoiceCandidate[],
+): ValidatedReportGroup {
+  if (reports.length === 0) {
+    throw new Error("Select at least one approved report to prepare an invoice.");
+  }
+
+  for (const r of reports) {
+    const approved =
+      Boolean(r.approved_at) || r.status === "approved" || r.status === "sent";
+    if (!approved) {
+      throw new Error(
+        `Report ${r.report_no} is not approved yet (${r.status}). Only approved reports can be invoiced.`,
+      );
+    }
+  }
+
+  const first = reports[0];
+  const firstGstin = normalizeGstin(first.customer_gstin);
+
+  for (const r of reports.slice(1)) {
+    const gstin = normalizeGstin(r.customer_gstin);
+    if (firstGstin !== "" || gstin !== "") {
+      if (firstGstin !== gstin) {
+        throw new Error(
+          `All reports on one invoice must share the same customer GSTIN (${first.report_no} has ${firstGstin || "unregistered"} vs ${r.report_no} with ${gstin || "unregistered"}).`,
+        );
+      }
+    } else if (r.customer_id !== first.customer_id) {
+      throw new Error(
+        `All reports on one invoice must belong to the same customer (${first.customer_name} vs ${r.customer_name}).`,
+      );
+    }
+  }
+
+  const combinedPo = collectDistinctPoNumbers(
+    reports.map((r) => r.customer_po_number),
+  );
+  const distinctPos = combinedPo ? combinedPo.split(", ") : [];
+
+  return {
+    customer_id: first.customer_id,
+    customer_name: first.customer_name,
+    customer_gstin: firstGstin || null,
+    combined_po_number: combinedPo,
+    distinct_po_numbers: distinctPos,
+    primary_job_id: first.job_id,
+  };
+}
+
+/**
+ * Loads a map of `report_id -> ActiveReportInvoiceLink` for all non-cancelled invoices.
+ */
+export async function loadActiveInvoiceReportMap(
+  supabase: AppSupabase,
+): Promise<Map<string, ActiveReportInvoiceLink>> {
+  const map = new Map<string, ActiveReportInvoiceLink>();
+
+  const [{ data: joinRows }, { data: directRows }] = await Promise.all([
+    supabase
+      .from("invoice_reports")
+      .select("report_id, invoice_id, invoices!inner(id, invoice_no, number, status, kind)"),
+    supabase
+      .from("invoices")
+      .select("id, report_id, invoice_no, number, status, kind")
+      .neq("status", "cancelled")
+      .not("report_id", "is", null),
+  ]);
+
+  for (const row of joinRows ?? []) {
+    const inv = row.invoices as unknown as {
+      id: string;
+      invoice_no: string | null;
+      number: string | null;
+      status: string;
+      kind: Enums<"invoice_kind">;
+    } | null;
+    if (!inv || inv.status === "cancelled") continue;
+    map.set(row.report_id, {
+      invoice_id: inv.id,
+      invoice_no: inv.invoice_no ?? inv.number ?? "Draft",
+      status: inv.status,
+      kind: inv.kind,
+    });
+  }
+
+  for (const inv of directRows ?? []) {
+    if (!inv.report_id || inv.status === "cancelled") continue;
+    if (!map.has(inv.report_id)) {
+      map.set(inv.report_id, {
+        invoice_id: inv.id,
+        invoice_no: inv.invoice_no ?? inv.number ?? "Draft",
+        status: inv.status,
+        kind: inv.kind,
+      });
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Lists all approved reports that are currently "Invoice pending" (not on any non-cancelled invoice).
+ */
+export async function listInvoicePendingReports(
+  supabase: AppSupabase,
+): Promise<ReportInvoiceCandidate[]> {
+  const [reportsRes, activeMap] = await Promise.all([
+    supabase
+      .from("reports")
+      .select(
+        "id, report_no, report_date, method, status, approved_at, content, job_id, jobs!inner(id, job_no, customer_id, po_number, po_value, deleted_at, customers!inner(id, name, gstin, billing_address, payment_terms_days))",
+      )
+      .in("status", ["approved", "sent"])
+      .order("approved_at", { ascending: false }),
+    loadActiveInvoiceReportMap(supabase),
+  ]);
+
+  if (reportsRes.error) {
+    throw new Error(reportsRes.error.message);
+  }
+
+  const pending: ReportInvoiceCandidate[] = [];
+  for (const r of reportsRes.data ?? []) {
+    if (!isReportInvoicePending(r, activeMap)) continue;
+    const job = r.jobs as unknown as {
+      id: string;
+      job_no: string;
+      customer_id: string;
+      po_number: string | null;
+      po_value: number | null;
+      deleted_at: string | null;
+      customers: {
+        id: string;
+        name: string;
+        gstin: string | null;
+        billing_address: string | null;
+        payment_terms_days: number;
+      };
+    };
+    if (!job || job.deleted_at) continue;
+    pending.push({
+      id: r.id,
+      report_no: r.report_no,
+      report_date: r.report_date,
+      method: r.method,
+      status: r.status,
+      approved_at: r.approved_at,
+      content: r.content,
+      job_id: job.id,
+      job_no: job.job_no,
+      customer_id: job.customer_id,
+      customer_name: job.customers?.name ?? "Customer",
+      customer_gstin: job.customers?.gstin ?? null,
+      customer_billing_address: job.customers?.billing_address ?? null,
+      customer_po_number: job.po_number ?? null,
+      po_value: job.po_value !== null && job.po_value !== undefined ? Number(job.po_value) : null,
+      payment_terms_days: job.customers?.payment_terms_days ?? 30,
+    });
+  }
+
+  return pending;
+}
+
+/**
+ * Creates a draft invoice covering one or more approved reports of the same customer GSTIN.
+ */
+export async function createDraftInvoiceFromReports(
+  supabase: AppSupabase,
+  input: CreateInvoiceFromReportsInput,
+): Promise<{
+  invoice_id: string;
+  created: boolean;
+  report_ids: string[];
+  combined_po_number: string | null;
+}> {
+  const uniqueReportIds = Array.from(new Set(input.report_ids));
+
+  const [reportsRes, activeMap, priceItemsRes] = await Promise.all([
+    supabase
+      .from("reports")
+      .select(
+        "id, report_no, report_date, method, status, approved_at, content, job_id, jobs!inner(id, job_no, customer_id, po_number, po_value, quotation_id, customers!inner(id, name, gstin, billing_address, payment_terms_days))",
+      )
+      .in("id", uniqueReportIds),
+    loadActiveInvoiceReportMap(supabase),
+    listPriceItems(supabase, { activeOnly: true }),
+  ]);
+  const priceItems = priceItemsRes.data ?? [];
+
+  if (reportsRes.error) {
+    throw new Error(reportsRes.error.message);
+  }
+
+  const rows = reportsRes.data ?? [];
+  if (rows.length !== uniqueReportIds.length) {
+    throw new Error("One or more selected reports could not be found.");
+  }
+
+  // Keep the caller's order
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const orderedCandidates: (ReportInvoiceCandidate & { quotation_id: string | null })[] =
+    uniqueReportIds.map((id) => {
+      const r = byId.get(id)!;
+      const job = r.jobs as unknown as {
+        id: string;
+        job_no: string;
+        customer_id: string;
+        po_number: string | null;
+        po_value: number | null;
+        quotation_id: string | null;
+        customers: {
+          id: string;
+          name: string;
+          gstin: string | null;
+          billing_address: string | null;
+          payment_terms_days: number;
+        };
+      };
+      return {
+        id: r.id,
+        report_no: r.report_no,
+        report_date: r.report_date,
+        method: r.method,
+        status: r.status,
+        approved_at: r.approved_at,
+        content: r.content,
+        job_id: job.id,
+        job_no: job.job_no,
+        quotation_id: job.quotation_id ?? null,
+        customer_id: job.customer_id,
+        customer_name: job.customers?.name ?? "Customer",
+        customer_gstin: job.customers?.gstin ?? null,
+        customer_billing_address: job.customers?.billing_address ?? null,
+        customer_po_number: job.po_number ?? null,
+        po_value:
+          job.po_value !== null && job.po_value !== undefined
+            ? Number(job.po_value)
+            : null,
+        payment_terms_days: job.customers?.payment_terms_days ?? 30,
+      };
+    });
+
+  // If a single report is requested and already has an active invoice, return it idempotently
+  if (orderedCandidates.length === 1) {
+    const existing = activeMap.get(orderedCandidates[0].id);
+    if (existing) {
+      return {
+        invoice_id: existing.invoice_id,
+        created: false,
+        report_ids: [orderedCandidates[0].id],
+        combined_po_number: orderedCandidates[0].customer_po_number,
+      };
+    }
+  }
+
+  // Ensure none of the selected reports is already on a live invoice
+  for (const r of orderedCandidates) {
+    const existing = activeMap.get(r.id);
+    if (existing) {
+      throw new Error(
+        `Report ${r.report_no} is already on active invoice ${existing.invoice_no}. Cancel that invoice first before re-billing.`,
+      );
+    }
+  }
+
+  const group = validateReportsShareCustomerGstin(orderedCandidates);
+  const primary = orderedCandidates[0];
+
+  // Build initial lines from the price list across all selected reports
+  const allLines: BuiltInvoiceLine[] = [];
+  let pos = 1;
+  for (const rep of orderedCandidates) {
+    const methodLabel =
+      METHOD_LABEL[rep.method as keyof typeof METHOD_LABEL] ?? rep.method;
+    const built = buildDraftInvoiceLinesFromPriceList({
+      priceItems,
+      method: rep.method,
+      reportNo: rep.report_no,
+      fallbackDescription: `${methodLabel} inspection as per report ${rep.report_no} (${rep.job_no})`,
+    });
+    for (const line of built) {
+      const descWithReport =
+        orderedCandidates.length > 1 && !line.description.includes(rep.report_no)
+          ? `${line.description} — Report ${rep.report_no} (${rep.job_no})`
+          : line.description;
+      allLines.push({
+        ...line,
+        position: pos++,
+        description: descWithReport,
+      });
+    }
+  }
+
+  const gst = calculateInvoiceGst(sumTaxableValue(allLines), {
+    gstin: primary.customer_gstin,
+    billingAddress: primary.customer_billing_address,
+  });
+
+  const invoiceDate = todayIST();
+  const dueDate = todayIST(primary.payment_terms_days ?? 30);
+
+  const defaultNotes =
+    input.notes?.trim() ||
+    (orderedCandidates.length > 1
+      ? `Covers approved reports: ${orderedCandidates.map((r) => `${r.report_no} (${r.job_no})`).join(", ")}.${group.combined_po_number ? ` Customer POs: ${group.combined_po_number}.` : ""}`
+      : null);
+
+  const { data: created, error: createError } = await supabase
+    .from("invoices")
+    .insert({
+      job_id: primary.job_id,
+      kind: input.kind ?? "tax_invoice",
+      report_id: primary.id,
+      quotation_id: primary.quotation_id,
+      place_of_supply: gst.place_of_supply,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      customer_po_number: group.combined_po_number,
+      taxable_value: gst.taxable_value,
+      cgst: gst.cgst,
+      sgst: gst.sgst,
+      igst: gst.igst,
+      round_off: gst.round_off,
+      total: gst.total,
+      balance: gst.total,
+      status: "draft",
+      notes: defaultNotes,
+    })
+    .select("id")
+    .single();
+
+  if (createError || !created) {
+    throw new Error(createError?.message ?? "Could not create draft invoice.");
+  }
+
+  // Link all selected reports in public.invoice_reports
+  const joinPayload = orderedCandidates.map((r) => ({
+    invoice_id: created.id,
+    report_id: r.id,
+  }));
+  const { error: joinError } = await supabase
+    .from("invoice_reports")
+    .upsert(joinPayload, { onConflict: "invoice_id,report_id" });
+
+  if (joinError) {
+    // Rollback the draft invoice if linking any report fails (e.g., DB trigger violation)
+    await supabase.from("invoices").delete().eq("id", created.id);
+    throw new Error(joinError.message);
+  }
+
+  if (allLines.length > 0) {
+    const { error: lineError } = await supabase.from("invoice_lines").insert(
+      allLines.map((line) => ({
+        invoice_id: created.id,
+        position: line.position,
+        description: line.description,
+        sac: line.sac,
+        qty: line.qty,
+        unit: line.unit,
+        rate: line.rate,
+        amount: line.amount,
+      })),
+    );
+    if (lineError) {
+      throw new Error(lineError.message);
+    }
+  }
+
+  return {
+    invoice_id: created.id,
+    created: true,
+    report_ids: orderedCandidates.map((r) => r.id),
+    combined_po_number: group.combined_po_number,
+  };
+}

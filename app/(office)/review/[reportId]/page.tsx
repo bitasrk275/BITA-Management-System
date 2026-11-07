@@ -33,6 +33,10 @@ import {
   supportedMethod,
   validUuid,
 } from "@/lib/reports/review";
+import {
+  isReportInvoicePending,
+  loadActiveInvoiceReportMap,
+} from "@/lib/modules/invoices/service";
 import { homeFor } from "@/lib/roles";
 import { ReportTemplate } from "@/templates/reports/report";
 import type { ReportDocument } from "@/templates/reports/types";
@@ -83,36 +87,40 @@ export default async function ReportReviewPage({
 
   if (!report) notFound();
 
-  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes] = await Promise.all([
-    report.inspection_id
-      ? supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase
-      .from("jobs")
-      .select("id, job_no, status, customers(name)")
-      .eq("id", report.job_id)
-      .maybeSingle(),
-    supabase
-      .from("people")
-      .select("id, full_name, position")
-      .eq("active", true)
-      .contains("roles", ["reviewer"])
-      .order("full_name"),
-    report.approved_by
-      ? supabase.from("people").select("full_name").eq("id", report.approved_by).maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase
-      .from("attachments")
-      .select("id, kind, caption, storage_path, include_in_report, uploaded_at")
-      .eq("job_id", report.job_id)
-      .order("uploaded_at", { ascending: true }),
-  ]);
+  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes, activeInvoiceMap] =
+    await Promise.all([
+      report.inspection_id
+        ? supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("jobs")
+        .select("id, job_no, status, customers(name)")
+        .eq("id", report.job_id)
+        .maybeSingle(),
+      supabase
+        .from("people")
+        .select("id, full_name, position")
+        .eq("active", true)
+        .contains("roles", ["reviewer"])
+        .order("full_name"),
+      report.approved_by
+        ? supabase.from("people").select("full_name").eq("id", report.approved_by).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("attachments")
+        .select("id, kind, caption, storage_path, include_in_report, uploaded_at")
+        .eq("job_id", report.job_id)
+        .order("uploaded_at", { ascending: true }),
+      loadActiveInvoiceReportMap(supabase),
+    ]);
 
   const inspection = inspectionRes.data;
   const job = jobRes.data;
   const signatories = signatoriesRes.data ?? [];
   const approverName = approverRes.data?.full_name ?? null;
   const attachments = attachmentsRes.data ?? [];
+  const activeInvoiceLink = activeInvoiceMap.get(report.id) ?? null;
+  const isInvoicePending = isReportInvoicePending(report, activeInvoiceMap);
 
   const readings = extractReadings(report.content, inspection?.readings);
   const readiness = checkReportReadiness(report.method, inspection, readings);
@@ -161,6 +169,10 @@ export default async function ReportReviewPage({
           subtitle={
             <span className="inline-flex flex-wrap items-center gap-3">
               <Status tone={statusTone}>{statusLabel[report.status] ?? report.status}</Status>
+              {isInvoicePending && <Status tone="wait">Invoice pending</Status>}
+              {activeInvoiceLink && (
+                <Status tone="ok">Invoiced · {activeInvoiceLink.invoice_no}</Status>
+              )}
               <span>
                 {job?.job_no ?? "Job"} · {METHOD_LABEL[report.method]} ·{" "}
                 {job?.customers?.name ?? String(readings.client ?? "Customer")} · Report date{" "}
@@ -355,11 +367,26 @@ export default async function ReportReviewPage({
               {canBill && (
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
                   <p className="text-[12.5px] text-ink-2">
-                    Ready to bill? Generate or open the prefilled GST invoice draft from this report&apos;s quantities and the accepted quotation.
+                    {activeInvoiceLink ? (
+                      <>
+                        This report is linked to invoice{" "}
+                        <strong className="text-ink">{activeInvoiceLink.invoice_no}</strong>.
+                      </>
+                    ) : (
+                      <>
+                        <strong className="text-ink">Invoice pending:</strong> prepare a draft invoice from this report (or combine several reports on the Invoices page).
+                      </>
+                    )}
                   </p>
-                  <form action={generateInvoiceFromReport.bind(null, report.id)}>
-                    <Button type="submit">Generate invoice</Button>
-                  </form>
+                  {activeInvoiceLink ? (
+                    <ButtonLink href={`/invoices/${activeInvoiceLink.invoice_id}`} size="sm">
+                      Open invoice {activeInvoiceLink.invoice_no}
+                    </ButtonLink>
+                  ) : (
+                    <form action={generateInvoiceFromReport.bind(null, report.id)}>
+                      <Button type="submit">Generate invoice</Button>
+                    </form>
+                  )}
                 </div>
               )}
             </Card>

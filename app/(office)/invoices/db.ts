@@ -92,6 +92,21 @@ export interface InvoiceWithRelations extends InvoiceRow {
     method: string;
     status: string;
   } | null;
+  invoice_reports?: Array<{
+    report_id: string;
+    reports?: {
+      id: string;
+      report_no: string;
+      method: string;
+      status: string;
+      job_id?: string;
+      jobs?: {
+        id: string;
+        job_no: string;
+        po_number: string | null;
+      } | null;
+    } | null;
+  }> | null;
   quotations?: {
     id: string;
     ref_no: string | null;
