@@ -665,6 +665,7 @@ export type Database = {
           po_date: string | null
           po_number: string | null
           po_path: string | null
+          po_value: number | null
           quotation_id: string | null
           scope: string | null
           site: string | null
@@ -683,6 +684,7 @@ export type Database = {
           po_date?: string | null
           po_number?: string | null
           po_path?: string | null
+          po_value?: number | null
           quotation_id?: string | null
           scope?: string | null
           site?: string | null
@@ -701,6 +703,7 @@ export type Database = {
           po_date?: string | null
           po_number?: string | null
           po_path?: string | null
+          po_value?: number | null
           quotation_id?: string | null
           scope?: string | null
           site?: string | null

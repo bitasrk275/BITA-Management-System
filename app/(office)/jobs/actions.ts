@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { Constants, type Enums } from "@/lib/db/types";
 import { friendlyError, text } from "@/lib/forms";
+import { parsePoValue } from "@/lib/modules/po/schema";
 import { isJobReadyToClose } from "./closure";
 
 type Supabase = Awaited<ReturnType<typeof requireStaff>>["supabase"];
@@ -14,15 +15,20 @@ function jobFields(fd: FormData) {
     .getAll("test_methods")
     .map(String)
     .filter((m): m is Enums<"test_method"> => (Constants.public.Enums.test_method as readonly string[]).includes(m));
+  const poValRes = parsePoValue(fd, "po_value");
   return {
-    customer_id: text(fd, "customer_id") ?? "",
-    enquiry_id: text(fd, "enquiry_id"),
-    quotation_id: text(fd, "quotation_id"),
-    site: text(fd, "site"),
-    scope: text(fd, "scope"),
-    test_methods: methods,
-    po_number: text(fd, "po_number"),
-    po_date: text(fd, "po_date"),
+    fields: {
+      customer_id: text(fd, "customer_id") ?? "",
+      enquiry_id: text(fd, "enquiry_id"),
+      quotation_id: text(fd, "quotation_id"),
+      site: text(fd, "site"),
+      scope: text(fd, "scope"),
+      test_methods: methods,
+      po_number: text(fd, "po_number"),
+      po_date: text(fd, "po_date"),
+      po_value: poValRes.ok ? poValRes.value : null,
+    },
+    poValueError: poValRes.ok ? null : poValRes.error,
   };
 }
 
@@ -39,7 +45,10 @@ async function savePoFile(supabase: Supabase, jobId: string, fd: FormData): Prom
 
 export async function createJob(fd: FormData) {
   const { supabase } = await requireStaff();
-  const fields = jobFields(fd);
+  const { fields, poValueError } = jobFields(fd);
+  if (poValueError) {
+    redirect("/jobs/new?error=" + encodeURIComponent(poValueError));
+  }
 
   if (fields.quotation_id && !fields.enquiry_id) {
     const { data: qt } = await supabase
@@ -70,11 +79,15 @@ export async function createJob(fd: FormData) {
 
 export async function updateJob(id: string, fd: FormData) {
   const { supabase } = await requireStaff();
+  const { fields, poValueError } = jobFields(fd);
+  if (poValueError) {
+    redirect(`/jobs/${id}?error=` + encodeURIComponent(poValueError));
+  }
   const status = text(fd, "status") as Enums<"job_status"> | null;
   const { error } = await supabase
     .from("jobs")
     .update({
-      ...jobFields(fd),
+      ...fields,
       ...(status ? { status, closed_at: status === "closed" ? new Date().toISOString() : null } : {}),
     })
     .eq("id", id);

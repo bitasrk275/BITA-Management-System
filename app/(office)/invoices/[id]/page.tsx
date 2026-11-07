@@ -27,6 +27,7 @@ import {
   buildInvoiceDocumentSpec,
   formatPlaceOfSupply,
 } from "@/lib/invoices";
+import { checkPoUtilization } from "@/lib/modules/po/service";
 import { validUuid } from "@/lib/reports/review";
 import { homeFor } from "@/lib/roles";
 import { formatINR } from "../../jobs/labels";
@@ -79,7 +80,7 @@ export default async function InvoiceDetailPage({
   const [invoiceRes, linesRes, paymentsRes, remindersRes] = await Promise.all([
     invoicesTable(supabase)
       .select(
-        "*, jobs(id, job_no, po_number, po_date, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), quotations(id, ref_no, status)",
+        "*, jobs(id, job_no, po_number, po_date, po_value, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), quotations(id, ref_no, status)",
       )
       .eq("id", id)
       .maybeSingle() as Promise<{ data: InvoiceWithRelations | null }>,
@@ -114,6 +115,15 @@ export default async function InvoiceDetailPage({
   const isIssued = ["issued", "partly_paid", "paid"].includes(invoice.status);
   const displayNo = invoice.invoice_no ?? invoice.number ?? "Draft Invoice (Unissued)";
   const statusInfo = STATUS_META[invoice.status] ?? { label: invoice.status, tone: "none" as Tone };
+
+  const poCheck = await checkPoUtilization(supabase, {
+    jobId: invoice.job_id,
+    customerId: job?.customer_id,
+    poNumber: invoice.customer_po_number ?? job?.po_number,
+    poValue: job?.po_value,
+    excludeInvoiceId: invoice.id,
+    currentInvoiceTotal: isCancelled ? 0 : Number(invoice.total) || 0,
+  });
 
   const spec = buildInvoiceDocumentSpec({
     kind: invoice.kind,
@@ -191,6 +201,11 @@ export default async function InvoiceDetailPage({
 
       <ErrorNote message={error} />
       {saved && <SavedNote />}
+      {poCheck.exceedsPoValue && poCheck.warningMessage && (
+        <div className="rounded-lg border border-line bg-surface-2 p-3">
+          <Status tone="wait">{poCheck.warningMessage}</Status>
+        </div>
+      )}
 
       {/* Workflow Actions */}
       <div className="grid gap-5 lg:grid-cols-2">
@@ -321,6 +336,8 @@ export default async function InvoiceDetailPage({
             dueDate={invoice.due_date ?? todayIST(customer?.payment_terms_days ?? 30)}
             placeOfSupply={invoice.place_of_supply ?? "29"}
             customerPoNumber={invoice.customer_po_number ?? job?.po_number ?? ""}
+            poValue={poCheck.poValue}
+            otherInvoicesTotal={poCheck.otherInvoicesTotal}
             notes={invoice.notes ?? ""}
             customerGstin={customer?.gstin}
             customerAddress={customer?.billing_address}

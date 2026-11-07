@@ -72,6 +72,7 @@ export interface InvoiceWithRelations extends InvoiceRow {
     job_no: string;
     po_number: string | null;
     po_date: string | null;
+    po_value?: number | null;
     scope: string | null;
     status: string;
     customer_id: string;
