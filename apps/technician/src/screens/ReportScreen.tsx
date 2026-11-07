@@ -46,6 +46,13 @@ export function ReportScreen({
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoCount, setPhotoCount] = useState(0);
+  const [submittedLocally, setSubmittedLocally] = useState(false);
+
+  const isSubmitted = Boolean(
+    job.inspection?.submittedAt ||
+    job.inspection?.status === "submitted" ||
+    submittedLocally
+  );
 
   // Load template and saved draft
   useEffect(() => {
@@ -74,7 +81,7 @@ export function ReportScreen({
         if (job.inspection?.observations) {
           setObservations(job.inspection.observations);
         }
-      } catch (err) {
+      } catch {
         Alert.alert("Error", "Could not load report template for " + method);
       } finally {
         setLoading(false);
@@ -84,11 +91,13 @@ export function ReportScreen({
   }, [job, method]);
 
   function handleFieldChange(key: string, value: string) {
+    if (isSubmitted) return;
     setReadings((prev) => ({ ...prev, [key]: value }));
     setMissingFields((prev) => prev.filter((k) => k !== key));
   }
 
   async function handleSaveDraft() {
+    if (isSubmitted) return;
     setSubmitting(true);
     try {
       await saveDraftReport(job.id, readings);
@@ -101,6 +110,11 @@ export function ReportScreen({
       setMissingFields(res.missingFields || []);
       Alert.alert("Draft saved", "Your inspection draft has been saved locally and on the server.");
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setSubmittedLocally(true);
+        Alert.alert("Report Already Submitted", err.message);
+        return;
+      }
       const msg = err instanceof ApiError ? err.message : "Failed to save draft";
       Alert.alert("Error", msg);
     } finally {
@@ -109,6 +123,7 @@ export function ReportScreen({
   }
 
   async function handleSubmitFinal() {
+    if (isSubmitted) return;
     setSubmitting(true);
     try {
       const res = await submitReport(job.id, {
@@ -127,12 +142,18 @@ export function ReportScreen({
         return;
       }
 
+      setSubmittedLocally(true);
       Alert.alert(
         "Report Submitted",
         "Your report has been submitted to the office for technical review.",
         [{ text: "OK", onPress: onSubmitted }],
       );
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setSubmittedLocally(true);
+        Alert.alert("Report Already Submitted", err.message);
+        return;
+      }
       const msg = err instanceof ApiError ? err.message : "Failed to submit report";
       Alert.alert("Error", msg);
     } finally {
@@ -141,6 +162,7 @@ export function ReportScreen({
   }
 
   async function handleAddPhoto() {
+    if (isSubmitted) return;
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
@@ -169,7 +191,7 @@ export function ReportScreen({
         setPhotoCount((c) => c + 1);
         Alert.alert("Success", "Photo uploaded and attached to job.");
       }
-    } catch (err) {
+    } catch {
       Alert.alert("Upload failed", "Could not upload photo. Check connection and file size (max 6 MB).");
     } finally {
       setPhotoUploading(false);
@@ -191,15 +213,28 @@ export function ReportScreen({
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>← Cancel</Text>
+          <Text style={styles.backText}>{isSubmitted ? "← Back" : "← Cancel"}</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{method} Report Form</Text>
-        <TouchableOpacity onPress={handleSaveDraft} disabled={submitting}>
-          <Text style={styles.saveDraftText}>Save draft</Text>
-        </TouchableOpacity>
+        {!isSubmitted ? (
+          <TouchableOpacity onPress={handleSaveDraft} disabled={submitting}>
+            <Text style={styles.saveDraftText}>Save draft</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 60 }} />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {isSubmitted && (
+          <View style={styles.submittedBanner}>
+            <Text style={styles.submittedBannerTitle}>✓ Report Submitted for Office Review</Text>
+            <Text style={styles.submittedBannerText}>
+              This report has been submitted to the office and is now read-only. Contact the office to make any changes.
+            </Text>
+          </View>
+        )}
+
         <Card>
           <Text style={styles.jobBadge}>{job.jobNo} · {job.customerName}</Text>
           <Text style={styles.sectionTitle}>Inspection Details & Parameters</Text>
@@ -222,14 +257,16 @@ export function ReportScreen({
                     styles.textInput,
                     f.input === "textarea" && styles.textarea,
                     isMissing && styles.missingInput,
+                    isSubmitted && styles.readOnlyInput,
                   ]}
                   value={val}
-                  placeholder={`Enter ${f.label.toLowerCase()}`}
+                  placeholder={isSubmitted ? "Not specified" : `Enter ${f.label.toLowerCase()}`}
                   placeholderTextColor={colors.ink3}
                   multiline={f.input === "textarea"}
                   numberOfLines={f.input === "textarea" ? 3 : 1}
                   keyboardType={f.input === "number" ? "numeric" : "default"}
                   onChangeText={(text) => handleFieldChange(f.key, text)}
+                  editable={!isSubmitted}
                 />
               </View>
             );
@@ -240,13 +277,18 @@ export function ReportScreen({
         <Card>
           <Text style={styles.sectionTitle}>General Observations / Remarks</Text>
           <TextInput
-            style={[styles.textInput, styles.textarea]}
-            placeholder="Record any general test remarks, discontinuities observed, or component surface notes..."
+            style={[
+              styles.textInput,
+              styles.textarea,
+              isSubmitted && styles.readOnlyInput,
+            ]}
+            placeholder={isSubmitted ? "No observations recorded." : "Record any general test remarks, discontinuities observed, or component surface notes..."}
             placeholderTextColor={colors.ink3}
             multiline
             numberOfLines={4}
             value={observations}
             onChangeText={setObservations}
+            editable={!isSubmitted}
           />
         </Card>
 
@@ -256,32 +298,46 @@ export function ReportScreen({
             <Text style={styles.sectionTitle}>Photos ({photoCount} attached)</Text>
           </View>
           <Text style={styles.photoHint}>
-            Take site photos, weld defect images or drawing snapshots (max 6 MB per file).
+            {isSubmitted
+              ? "Inspection photos and drawings attached to this job."
+              : "Take site photos, weld defect images or drawing snapshots (max 6 MB per file)."}
           </Text>
 
-          <Button
-            title={photoUploading ? "Uploading photo..." : "📷 Take photo with camera"}
-            variant="secondary"
-            onPress={handleAddPhoto}
-            loading={photoUploading}
-            style={styles.photoButton}
-          />
+          {!isSubmitted && (
+            <Button
+              title={photoUploading ? "Uploading photo..." : "📷 Take photo with camera"}
+              variant="secondary"
+              onPress={handleAddPhoto}
+              loading={photoUploading}
+              style={styles.photoButton}
+            />
+          )}
         </Card>
 
         {/* Action Buttons */}
         <View style={styles.buttonStack}>
-          <Button
-            title="Submit final report to office"
-            onPress={handleSubmitFinal}
-            loading={submitting}
-          />
+          {isSubmitted ? (
+            <Button
+              title="← Return to job details"
+              variant="secondary"
+              onPress={onBack}
+            />
+          ) : (
+            <>
+              <Button
+                title="Submit final report to office"
+                onPress={handleSubmitFinal}
+                loading={submitting}
+              />
 
-          <Button
-            title="Save draft"
-            variant="secondary"
-            onPress={handleSaveDraft}
-            disabled={submitting}
-          />
+              <Button
+                title="Save draft"
+                variant="secondary"
+                onPress={handleSaveDraft}
+                disabled={submitting}
+              />
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -378,6 +434,30 @@ const styles = StyleSheet.create({
   missingInput: {
     borderColor: colors.bad,
     backgroundColor: colors.bad + "08",
+  },
+  readOnlyInput: {
+    backgroundColor: colors.line2,
+    borderColor: colors.line,
+    color: colors.ink2,
+  },
+  submittedBanner: {
+    backgroundColor: colors.ok + "15",
+    borderWidth: 1,
+    borderColor: colors.ok,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  submittedBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.ok,
+    marginBottom: 4,
+  },
+  submittedBannerText: {
+    fontSize: 13,
+    color: colors.ink,
+    lineHeight: 18,
   },
   cardHeader: {
     flexDirection: "row",

@@ -185,6 +185,15 @@ export function JobDetailScreen({
               <Text style={styles.completedText}>
                 ✓ Field report submitted. Office review pending.
               </Text>
+              {currentJob.testMethods.map((m) => (
+                <Button
+                  key={m}
+                  title={`View ${m} report (submitted)`}
+                  variant="secondary"
+                  onPress={() => onOpenReport(m)}
+                  style={styles.actionButton}
+                />
+              ))}
             </View>
           )}
 

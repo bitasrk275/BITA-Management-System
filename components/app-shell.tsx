@@ -65,14 +65,16 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
       ],
     };
   }
-  // Reviewer only.
-  return {
-    main: [
-      { href: "/review", label: "Reports to review", icon: "reports", count: c.reports },
-      { href: "/jobs", label: "Jobs", icon: "jobs" },
-    ],
-    records: [{ href: "/registers", label: "People & equipment", icon: "people" }],
-  };
+  if (reviewer) {
+    return {
+      main: [
+        { href: "/review", label: "Reports to review", icon: "reports", count: c.reports },
+        { href: "/jobs", label: "Jobs", icon: "jobs" },
+      ],
+      records: [{ href: "/registers", label: "People & equipment", icon: "people" }],
+    };
+  }
+  return { main: [], records: [] };
 }
 
 function Icon({ name }: { name: keyof typeof ICONS }) {
