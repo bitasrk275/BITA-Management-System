@@ -25,10 +25,10 @@ export function isStaff(roles: readonly string[] | undefined) {
   return !!roles?.some((r) => (STAFF_ROLES as readonly string[]).includes(r));
 }
 
-// For office pages. Technicians are sent to their own area (D-015); the database hides office data from them anyway.
+// For office pages. Technicians are sent to their own area (D-015, D-016); the database hides office data from them anyway.
 export async function requireStaff() {
   const ctx = await requireUser();
-  if (ctx.person && !isStaff(ctx.person.roles) && ctx.person.roles.includes("technician")) redirect("/my-jobs");
+  if (ctx.person && !isStaff(ctx.person.roles) && ctx.person.roles.includes("technician")) redirect("/technician");
   return ctx;
 }
 

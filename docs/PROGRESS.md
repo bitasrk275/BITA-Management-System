@@ -11,7 +11,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Email intake + AI extraction | Naveen | Not started | | |
 | Customer and enquiry screens | Naveen | In review | feature/naveen-login-customers-enquiries | Login, customers with contacts, enquiries with customer link |
 | Jobs, quotations, POs, scheduling | Naveen | Not started | | |
-| Technician field form | Naveen | Not started | | |
+| Technician field form | Naveen | Done | feature/naveen-retire-field-web | Web routes retired for Android APK (D-016); /technician notice; Expo app in apps/technician |
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
 | Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
@@ -67,13 +67,19 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-07 11:18 – Naveen – Antigravity
+Task: T38 Retire technician web screens (APK only, D-016) + apps/technician fixes & README
+Done: Removed technician-only web routes (app/(field)/my-jobs and all subroutes) and retired technician menu in app-shell. Updated lib/roles.ts (homeFor sends technicians to /technician) and lib/auth.ts (requireStaff redirects technicians to /technician). Added /technician notice page directing technicians to the Android APK and office pairing code. Added lib/roles.test.ts. In apps/technician: fixed 3 lint warnings (unused Alert in PairScreen, unused err in ReportScreen), added HTTP 409 handling and read-only mode for already submitted reports, enabled viewing submitted reports from job details, updated README with EAS free-tier APK build steps and what BITA must provide (Expo account, Firebase project under BITA's Google account). cd apps/technician && npm run typecheck passes cleanly.
+Files changed: app/(field)/, lib/roles.ts, lib/roles.test.ts, lib/auth.ts, components/app-shell.tsx, apps/technician/, docs/FIELD_APP.md, docs/PROGRESS.md
+Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
+Blockers / questions: none.
+
 ### 2026-11-07 11:12 – Naveen – Claude
 Task: T36 CA GST export (GSTR-1 B2B & B2C)
 Done: Built single-source GSTR-1 export module (lib/invoices/gst-export.ts + unit tests) separating B2B (with Customer GSTIN) and B2C (without Customer GSTIN) rows from issued, partly_paid and paid tax invoices, listing cancelled invoices with zero amounts and excluding drafts. Added /invoices/export screen with month & date-range pickers, live B2B/B2C tables, and /invoices/export/download route for combined CSV, B2B CSV, B2C CSV and multi-sheet Excel (.xls) workbook.
 Files changed: lib/invoices/gst-export.ts, lib/invoices/gst-export.test.ts, lib/invoices/index.ts, app/(office)/invoices/export/, app/(office)/invoices/page.tsx, docs/PROGRESS.md
 Next: T37 email-only payment reminders on in-app invoices and n8n workflow export.
 Blockers / questions: none.
-
 ### 2026-11-06 18:38 – Naveen – Claude
 Task: T35 Generate Invoice inside the app (no Zoho, Decision D-017)
 Done: Built in-app GST invoicing migration (20261106040000_invoices_in_app.sql with invoice_counters, reshaped invoices, invoice_lines, payments, line/tax consistency on Issue, due_date from customer payment_terms_days, freezing after Issue, and overpayment protection), pure invoicing library (lib/invoices/ for 18% intra/inter-state GST, exact paise rounding & whole-rupee round-off, Indian amount in words, quotation+report line builder with minimum charge, and single PDF/Word .docx invoice template), and /invoices screens + routes (/invoices, /invoices/[id], /invoices/[id]/pdf, /invoices/[id]/docx, plus Generate invoice on approved reports and jobs). All 184 tests, lint, type check and production build pass.

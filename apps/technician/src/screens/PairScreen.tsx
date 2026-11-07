@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
