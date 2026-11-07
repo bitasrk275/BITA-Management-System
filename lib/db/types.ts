@@ -370,14 +370,18 @@ export type Database = {
           calibration_due: string | null
           certificate_path: string | null
           created_at: string
+          current_job_id: string | null
+          current_location: string | null
           deleted_at: string | null
           deleted_by: string | null
+          equipment_type_id: string | null
           id: string
-          kind: Database["public"]["Enums"]["equipment_kind"]
+          kind: Database["public"]["Enums"]["equipment_kind"] | null
           make: string | null
           model: string | null
           notes: string | null
           serial_no: string | null
+          status: "in_office" | "at_site" | "out_for_calibration"
         }
         Insert: {
           active?: boolean
@@ -385,14 +389,18 @@ export type Database = {
           calibration_due?: string | null
           certificate_path?: string | null
           created_at?: string
+          current_job_id?: string | null
+          current_location?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          equipment_type_id?: string | null
           id?: string
-          kind: Database["public"]["Enums"]["equipment_kind"]
+          kind?: Database["public"]["Enums"]["equipment_kind"] | null
           make?: string | null
           model?: string | null
           notes?: string | null
           serial_no?: string | null
+          status?: "in_office" | "at_site" | "out_for_calibration"
         }
         Update: {
           active?: boolean
@@ -400,16 +408,137 @@ export type Database = {
           calibration_due?: string | null
           certificate_path?: string | null
           created_at?: string
+          current_job_id?: string | null
+          current_location?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          equipment_type_id?: string | null
           id?: string
-          kind?: Database["public"]["Enums"]["equipment_kind"]
+          kind?: Database["public"]["Enums"]["equipment_kind"] | null
           make?: string | null
           model?: string | null
           notes?: string | null
           serial_no?: string | null
+          status?: "in_office" | "at_site" | "out_for_calibration"
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "equipment_equipment_type_id_fkey"
+            columns: ["equipment_type_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_current_job_id_fkey"
+            columns: ["current_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_movements: {
+        Row: {
+          created_at: string
+          delivery_challan_no: string | null
+          delivery_challan_path: string | null
+          equipment_id: string
+          from_location: string | null
+          id: string
+          job_id: string | null
+          moved_by: string | null
+          moved_on: string
+          notes: string | null
+          status: "in_office" | "at_site" | "out_for_calibration"
+          to_location: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_challan_no?: string | null
+          delivery_challan_path?: string | null
+          equipment_id: string
+          from_location?: string | null
+          id?: string
+          job_id?: string | null
+          moved_by?: string | null
+          moved_on?: string
+          notes?: string | null
+          status: "in_office" | "at_site" | "out_for_calibration"
+          to_location: string
+        }
+        Update: {
+          created_at?: string
+          delivery_challan_no?: string | null
+          delivery_challan_path?: string | null
+          equipment_id?: string
+          from_location?: string | null
+          id?: string
+          job_id?: string | null
+          moved_by?: string | null
+          moved_on?: string
+          notes?: string | null
+          status?: "in_office" | "at_site" | "out_for_calibration"
+          to_location?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_movements_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_movements_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_movements_moved_by_fkey"
+            columns: ["moved_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_types: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_types_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inspection_edits: {
         Row: {

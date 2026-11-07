@@ -82,6 +82,7 @@ export default async function ManagementHome() {
       .from("equipment")
       .select("id, make, model, serial_no, calibration_due, active")
       .eq("active", true)
+      .is("deleted_at", null)
       .lte("calibration_due", monthAhead)
       .order("calibration_due", { ascending: true }),
     supabase
@@ -170,8 +171,8 @@ export default async function ManagementHome() {
       tone: eq.tone,
       title: eq.title,
       detail: eq.detail,
-      href: "/registers?tab=equipment",
-      label: "Registers",
+      href: `/equipment/${eq.id}`,
+      label: "Equipment",
     })),
     ...(draftQuotes.data ?? []).map((q) => ({
       key: "q" + q.id,

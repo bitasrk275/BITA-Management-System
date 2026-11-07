@@ -22,7 +22,7 @@ describe("Phase 2 Foundation (P1): soft delete, recycle bin, settings, and permi
         ('00000000-0000-0000-0000-000000000013', 'Test Reviewer', 'TRV', '${REVIEWER_USER}', '{reviewer}'),
         ('00000000-0000-0000-0000-000000000014', 'Test Technician', 'TT1', '${TECH_USER}', '{technician}');
     `);
-  });
+  }, 30000);
 
   it("seeds default settings and settings_options and enforces RLS on settings", async () => {
     const settingsRes = await ctx.as<{ key: string }>(

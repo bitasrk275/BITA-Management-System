@@ -40,7 +40,7 @@ export type MethodQualificationCheck =
 
 export type EquipmentRecord = {
   id: string;
-  kind: Enums<"equipment_kind">;
+  kind: Enums<"equipment_kind"> | null;
   make: string | null;
   model: string | null;
   serial_no: string | null;
@@ -133,7 +133,7 @@ export function isCalibrationOverdue(calibrationDue: string | null, referenceDat
 }
 
 export function formatEquipmentLabel(eq: EquipmentRecord): string {
-  const kind = EQUIPMENT_KIND_LABEL[eq.kind];
+  const kind = eq.kind ? EQUIPMENT_KIND_LABEL[eq.kind] : "Equipment";
   const model = [eq.make, eq.model].filter(Boolean).join(" ");
   const serial = eq.serial_no ? `#${eq.serial_no}` : null;
   return [kind, model || null, serial].filter(Boolean).join(" · ");

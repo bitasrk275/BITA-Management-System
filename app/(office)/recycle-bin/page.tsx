@@ -29,6 +29,7 @@ const TABLE_LABELS: Record<SoftDeleteTable, string> = {
   people: "Person",
   equipment: "Equipment",
   price_items: "Price list item",
+  equipment_types: "Equipment type",
 };
 
 function formatIst(iso: string): string {

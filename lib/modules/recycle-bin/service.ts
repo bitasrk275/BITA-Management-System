@@ -9,6 +9,7 @@ export const SOFT_DELETE_TABLES = [
   "people",
   "equipment",
   "price_items",
+  "equipment_types",
 ] as const;
 
 export type SoftDeleteTable = (typeof SOFT_DELETE_TABLES)[number];

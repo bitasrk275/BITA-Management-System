@@ -1,6 +1,7 @@
 import { todayIST } from "../../../../lib/dates";
 import type { Database } from "../../../../lib/db/types";
 import { checkRemindersEnv, getMissingEnvVars, REQUIRED_ADMIN_ENV_VARS } from "../../../../lib/env";
+import { getCalibrationAlerts } from "../../../../lib/modules/equipment/service";
 import { planAndInsertReminders } from "../../../../lib/reminders/plan";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -81,11 +82,19 @@ export async function POST(req: Request) {
 
   try {
     const result = await planAndInsertReminders(supabaseAdmin, targetDate);
+    const calibrationAlerts = await getCalibrationAlerts(supabaseAdmin, { refDateStr: targetDate }).catch(() => null);
 
     return NextResponse.json({
       ok: true,
       channel: "email",
       ...result,
+      calibration_alerts: calibrationAlerts
+        ? {
+            total: calibrationAlerts.totalAlerts,
+            expired: calibrationAlerts.expired.length,
+            due_soon: calibrationAlerts.dueSoon.length,
+          }
+        : undefined,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
