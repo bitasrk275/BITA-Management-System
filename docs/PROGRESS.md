@@ -7,7 +7,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 
 | Area | Owner | Status | Branch / PR | Notes |
 | --- | --- | --- | --- | --- |
-| Repo, schema, roles, security | Naveen | In review | feature/naveen-deploy-ready | App skeleton + first schema with RLS and correction log; T41 deployment readiness (.env.example, lib/env.ts, docs/DEPLOY.md, .github/workflows/reminders.yml) |
+| Repo, schema, roles, security | Naveen | In review | feature/naveen-p1-foundation | Phase 2 Foundation (P1): modules + /api/v1, soft delete + recycle bin, settings & settings_options tables, docs/ARCHITECTURE.md |
 | Email intake + AI extraction | Naveen | Not started | | |
 | Customer and enquiry screens | Naveen | In review | feature/naveen-login-customers-enquiries | Login, customers with contacts, enquiries with customer link |
 | Jobs, quotations, POs, scheduling | Naveen | Not started | | |
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 17:06 – Naveen – Claude
+Task: P1 Phase 2 Foundation: modules + /api/v1, soft delete + recycle bin, settings tables
+Done: Added `docs/ARCHITECTURE.md` defining the modular, API-first pattern (`lib/modules/<module>/` + `app/api/v1/<module>/`) with `customers` as the worked example (`lib/modules/customers/`, `app/api/v1/customers/`, and refactored `app/(office)/customers/`). Added migration `supabase/migrations/20261107010000_phase2_foundation.sql` with `settings` and `settings_options` tables, `private.has_permission(perm)` and `private.can_delete()`, soft-delete columns (`deleted_at`, `deleted_by`) and `private.soft_delete()` trigger across `customers`, `enquiries`, `quotations`, `jobs`, `people`, and `equipment`, RLS policies hiding soft-deleted rows from normal SELECTs, audit triggers on all lists, and RPC helpers (`soft_delete_record`, `restore_record`, `list_recycle_bin`). Added `/recycle-bin` and `/settings` pages plus `/api/v1/recycle-bin` and `/api/v1/settings`, updated `lib/db/types.ts`, and added unit + PGlite tests (`lib/modules/customers/customers.test.ts`, `supabase/tests/phase2-foundation.test.ts`).
+Files changed: supabase/migrations/20261107010000_phase2_foundation.sql, lib/db/types.ts, lib/api/v1.ts, lib/modules/customers/, lib/modules/recycle-bin/, lib/modules/settings/, app/api/v1/, app/(office)/customers/, app/(office)/recycle-bin/, app/(office)/settings/, docs/ARCHITECTURE.md, supabase/tests/phase2-foundation.test.ts, docs/PROGRESS.md
+Next: Merge P1 into `feature/naveen-integration` and start P2 (Customer PO on accept + po_value + PO warning).
+Blockers / questions: none.
 
 ### 2026-11-07 16:37 – Naveen – Claude
 Task: T41 Deployment readiness for either host (.env.example, lib/env.ts, docs/DEPLOY.md, .github/workflows/reminders.yml)

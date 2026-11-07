@@ -1,8 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Button, Card, Checkbox, ErrorNote, Field, Input, PageHeader, SecondaryButton, SavedNote } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  ErrorNote,
+  Field,
+  Input,
+  PageHeader,
+  SavedNote,
+  SecondaryButton,
+} from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
-import { addContact, deleteContact, updateContact, updateCustomer } from "../actions";
+import { getCustomerDetail } from "@/lib/modules/customers/service";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
+import {
+  addContact,
+  deleteContact,
+  deleteCustomer,
+  updateContact,
+  updateCustomer,
+} from "../actions";
 import { CustomerForm } from "../customer-form";
 
 export default async function CustomerPage({
@@ -14,20 +33,15 @@ export default async function CustomerPage({
 }) {
   const { id } = await params;
   const { error, saved } = await searchParams;
-  const { supabase } = await requireStaff();
+  const { supabase, person } = await requireStaff();
 
-  const { data: customer } = await supabase.from("customers").select("*").eq("id", id).maybeSingle();
-  if (!customer) notFound();
-
-  const [{ data: contacts }, { data: enquiries }] = await Promise.all([
-    supabase.from("customer_contacts").select("*").eq("customer_id", id).order("name"),
-    supabase
-      .from("enquiries")
-      .select("id, subject, source, status, received_at")
-      .eq("customer_id", id)
-      .order("received_at", { ascending: false })
-      .limit(10),
+  const [{ data: detail }, canDelete] = await Promise.all([
+    getCustomerDetail(supabase, id),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
   ]);
+
+  if (!detail) notFound();
+  const { customer, contacts, enquiries } = detail;
 
   return (
     <>
@@ -36,16 +50,38 @@ export default async function CustomerPage({
       {saved && <SavedNote />}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <h2 className="mb-3 font-semibold">Details</h2>
-          <CustomerForm action={updateCustomer.bind(null, id)} customer={customer} submitLabel="Save changes" />
-        </Card>
+        <div className="space-y-6">
+          <Card>
+            <h2 className="mb-3 font-semibold">Details</h2>
+            <CustomerForm action={updateCustomer.bind(null, id)} customer={customer} submitLabel="Save changes" />
+          </Card>
+
+          {canDelete && (
+            <Card>
+              <details>
+                <summary className="cursor-pointer text-sm font-medium text-bad">
+                  Delete customer
+                </summary>
+                <p className="mt-2 text-xs text-ink-3">
+                  Deleting moves <strong>{customer.name}</strong> to the{" "}
+                  <Link href="/recycle-bin" className="underline">
+                    recycle bin
+                  </Link>
+                  , where management can restore it at any time.
+                </p>
+                <form action={deleteCustomer.bind(null, id)} className="mt-3">
+                  <SecondaryButton type="submit">Confirm delete customer</SecondaryButton>
+                </form>
+              </details>
+            </Card>
+          )}
+        </div>
 
         <div className="space-y-6">
           <Card>
             <h2 className="mb-3 font-semibold">Contacts</h2>
             <ul className="space-y-4">
-              {contacts?.map((c) => (
+              {contacts.map((c) => (
                 <li key={c.id} className="border-b border-line-2 pb-4 last:border-0">
                   <details>
                     <summary className="cursor-pointer">
@@ -65,7 +101,7 @@ export default async function CustomerPage({
                   </details>
                 </li>
               ))}
-              {contacts?.length === 0 && <li className="text-sm text-ink-3">No contacts yet.</li>}
+              {contacts.length === 0 && <li className="text-sm text-ink-3">No contacts yet.</li>}
             </ul>
             <details className="mt-4">
               <summary className="cursor-pointer text-sm font-semibold text-ink">Add a contact</summary>
@@ -79,7 +115,7 @@ export default async function CustomerPage({
           <Card>
             <h2 className="mb-3 font-semibold">Recent enquiries</h2>
             <ul className="space-y-2 text-sm">
-              {enquiries?.map((e) => (
+              {enquiries.map((e) => (
                 <li key={e.id} className="break-words">
                   <Link href={`/enquiries/${e.id}`} className="hover:text-ink">
                     {e.subject || "(no subject)"}
@@ -89,7 +125,7 @@ export default async function CustomerPage({
                   </span>
                 </li>
               ))}
-              {enquiries?.length === 0 && <li className="text-ink-3">No enquiries yet.</li>}
+              {enquiries.length === 0 && <li className="text-ink-3">No enquiries yet.</li>}
             </ul>
           </Card>
         </div>
@@ -101,7 +137,14 @@ export default async function CustomerPage({
 function ContactFields({
   contact,
 }: {
-  contact?: { name: string; mobile: string | null; email: string | null; notes: string | null; receives_reports: boolean; receives_invoices: boolean };
+  contact?: {
+    name: string;
+    mobile: string | null;
+    email: string | null;
+    notes: string | null;
+    receives_reports: boolean;
+    receives_invoices: boolean;
+  };
 }) {
   return (
     <>
