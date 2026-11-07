@@ -2,11 +2,13 @@ import { todayIST } from "../dates";
 import type { Database } from "../db/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  ELIGIBLE_REMINDER_STATUSES,
   getReminderKindForInvoice,
   type InvoiceReminderCandidate,
   type ReminderKind,
 } from "./schedule";
 import {
+  buildReminderEmailContent,
   resolveReminderMailbox,
   resolveReminderRecipients,
   type ReminderContact,
@@ -15,6 +17,11 @@ import {
 
 export interface InvoiceForPlanning extends InvoiceReminderCandidate {
   id: string;
+  invoice_no?: string | null;
+  number?: string | null;
+  invoice_date?: string | null;
+  total?: number | null;
+  job_no?: string | null;
   customer?: ReminderCustomer | null;
   contacts?: ReminderContact[] | null;
 }
@@ -30,6 +37,19 @@ export interface PlannedPaymentReminder {
   kind: ReminderKind;
   from_mailbox: string | null;
   sent_to: string[];
+}
+
+export interface PlannedReminderEmail extends PlannedPaymentReminder {
+  reminder_id: string | null;
+  invoice_no: string;
+  invoice_date: string | null;
+  due_date: string;
+  job_no: string | null;
+  customer_name: string | null;
+  total: number;
+  balance: number;
+  subject: string;
+  body: string;
 }
 
 /**
@@ -65,8 +85,10 @@ export function normalizeInvoiceForPlanning(
 
   const contacts: ReminderContact[] = Array.isArray(rawContacts)
     ? rawContacts.map((c: unknown) => {
-        const contactObj = typeof c === "object" && c !== null ? (c as Record<string, unknown>) : {};
+        const contactObj =
+          typeof c === "object" && c !== null ? (c as Record<string, unknown>) : {};
         return {
+          name: typeof contactObj.name === "string" ? contactObj.name : null,
           email: typeof contactObj.email === "string" ? contactObj.email : null,
           receives_invoices: Boolean(contactObj.receives_invoices),
         };
@@ -75,14 +97,28 @@ export function normalizeInvoiceForPlanning(
 
   return {
     id: String(raw.id),
+    status: typeof raw.status === "string" ? raw.status : undefined,
+    kind: typeof raw.kind === "string" ? raw.kind : undefined,
+    invoice_no: typeof raw.invoice_no === "string" ? raw.invoice_no : null,
+    number: typeof raw.number === "string" ? raw.number : null,
+    invoice_date: typeof raw.invoice_date === "string" ? raw.invoice_date : null,
     due_date: typeof raw.due_date === "string" ? raw.due_date : null,
+    total:
+      raw.total !== null && raw.total !== undefined ? Number(raw.total) : null,
     balance:
       raw.balance !== null && raw.balance !== undefined
         ? Number(raw.balance)
         : null,
     reminders_paused: Boolean(raw.reminders_paused),
+    job_no:
+      typeof raw.job_no === "string"
+        ? raw.job_no
+        : typeof job?.job_no === "string"
+          ? job.job_no
+          : null,
     customer: customer
       ? {
+          name: typeof customer.name === "string" ? customer.name : null,
           mailbox: typeof customer.mailbox === "string" ? customer.mailbox : null,
         }
       : null,
@@ -93,6 +129,7 @@ export function normalizeInvoiceForPlanning(
 /**
  * Builds the list of payment_reminders records due on the given day (default: today in IST).
  * Skips invoices that:
+ * - Are not eligible in-app tax invoices (e.g. status draft/paid/cancelled or kind proforma)
  * - Have no reminder due on this date (based on schedule rules)
  * - Already have a reminder in the table for (invoice_id, scheduled_for)
  */
@@ -143,9 +180,70 @@ export function planPaymentReminders(
 }
 
 /**
- * Fetches eligible invoices from Supabase, calculates reminders due on targetDate,
- * checks existing reminders to prevent duplicates, and inserts the planned rows.
- * Does NOT send emails (sending waits for Stage 2).
+ * Builds rich email-only reminder payloads for n8n from planned reminders and normalized invoices.
+ */
+export function buildPlannedReminderEmails(
+  invoices: InvoiceForPlanning[],
+  planned: PlannedPaymentReminder[],
+  reminderIdByInvoiceId: Map<string, string> = new Map(),
+): PlannedReminderEmail[] {
+  const invoiceById = new Map<string, InvoiceForPlanning>();
+  for (const inv of invoices) {
+    invoiceById.set(inv.id, inv);
+  }
+
+  return planned.map((p) => {
+    const inv = invoiceById.get(p.invoice_id);
+    const invoiceNo =
+      inv?.invoice_no?.trim() || inv?.number?.trim() || p.invoice_id;
+    const dueDate = inv?.due_date ?? p.scheduled_for;
+    const balance = Number(inv?.balance ?? 0);
+    const total =
+      inv?.total !== null && inv?.total !== undefined
+        ? Number(inv.total)
+        : balance;
+    const customerName = inv?.customer?.name ?? null;
+    const jobNo = inv?.job_no ?? null;
+    const invoiceDate = inv?.invoice_date ?? null;
+
+    const { subject, body } = buildReminderEmailContent({
+      invoice_no: invoiceNo,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      scheduled_for: p.scheduled_for,
+      kind: p.kind,
+      total,
+      balance,
+      customer_name: customerName,
+      job_no: jobNo,
+    });
+
+    return {
+      reminder_id: reminderIdByInvoiceId.get(p.invoice_id) ?? null,
+      invoice_id: p.invoice_id,
+      invoice_no: invoiceNo,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      job_no: jobNo,
+      customer_name: customerName,
+      total,
+      balance,
+      scheduled_for: p.scheduled_for,
+      kind: p.kind,
+      from_mailbox: p.from_mailbox,
+      sent_to: p.sent_to,
+      subject,
+      body,
+    };
+  });
+}
+
+/**
+ * Fetches eligible in-app tax invoices from Supabase (kind = 'tax_invoice',
+ * status in ['issued', 'partly_paid'], balance > 0, reminders_paused = false, due_date not null),
+ * calculates reminders due on targetDate, checks existing reminders to prevent duplicates,
+ * inserts the planned rows into payment_reminders, and returns both raw records and
+ * email-ready payloads for the n8n workflow.
  */
 export async function planAndInsertReminders(
   supabase: SupabaseClient<Database>,
@@ -156,11 +254,16 @@ export async function planAndInsertReminders(
   planned_count: number;
   inserted_count: number;
   records: PlannedPaymentReminder[];
+  emails: PlannedReminderEmail[];
 }> {
-  // 1. Fetch invoices with balance > 0, unpaused, due_date set
+  // 1. Fetch in-app tax invoices with status issued/partly_paid, balance > 0, unpaused, due_date set
   const { data: invoices, error: invError } = await supabase
     .from("invoices")
-    .select("id, job_id, due_date, balance, reminders_paused")
+    .select(
+      "id, job_id, kind, status, invoice_no, number, invoice_date, due_date, total, balance, reminders_paused",
+    )
+    .eq("kind", "tax_invoice")
+    .in("status", [...ELIGIBLE_REMINDER_STATUSES])
     .gt("balance", 0)
     .eq("reminders_paused", false)
     .not("due_date", "is", null);
@@ -183,6 +286,7 @@ export async function planAndInsertReminders(
       planned_count: 0,
       inserted_count: 0,
       records: [],
+      emails: [],
     };
   }
 
@@ -214,32 +318,35 @@ export async function planAndInsertReminders(
       planned_count: 0,
       inserted_count: 0,
       records: [],
+      emails: [],
     };
   }
 
-  // 3. Resolve customer mailbox and contacts with receives_invoices for needingPlanning
+  // 3. Resolve job_no, customer name/mailbox, and contacts with receives_invoices = true
   const jobIds = Array.from(new Set(needingPlanning.map((c) => c.job_id)));
   const { data: jobs, error: jobError } = await supabase
     .from("jobs")
-    .select("id, customer_id")
+    .select("id, job_no, customer_id")
     .in("id", jobIds);
 
   if (jobError) {
     throw new Error(`Failed to fetch jobs for invoices: ${jobError.message}`);
   }
 
-  const customerIdByJob = new Map<string, string>();
+  const jobMap = new Map<string, { job_no: string; customer_id: string }>();
   for (const j of jobs ?? []) {
-    customerIdByJob.set(j.id, j.customer_id);
+    jobMap.set(j.id, { job_no: j.job_no, customer_id: j.customer_id });
   }
 
-  const customerIds = Array.from(new Set(Array.from(customerIdByJob.values())));
+  const customerIds = Array.from(
+    new Set(Array.from(jobMap.values()).map((j) => j.customer_id)),
+  );
 
   const [custRes, contactsRes] = await Promise.all([
-    supabase.from("customers").select("id, mailbox").in("id", customerIds),
+    supabase.from("customers").select("id, name, mailbox").in("id", customerIds),
     supabase
       .from("customer_contacts")
-      .select("customer_id, email, receives_invoices")
+      .select("customer_id, name, email, receives_invoices")
       .in("customer_id", customerIds)
       .eq("receives_invoices", true),
   ]);
@@ -251,27 +358,42 @@ export async function planAndInsertReminders(
     throw new Error(`Failed to fetch customer contacts: ${contactsRes.error.message}`);
   }
 
-  const customerMap = new Map<string, { mailbox: string | null }>();
+  const customerMap = new Map<string, { name: string | null; mailbox: string | null }>();
   for (const c of custRes.data ?? []) {
-    customerMap.set(c.id, { mailbox: c.mailbox });
+    customerMap.set(c.id, { name: c.name, mailbox: c.mailbox });
   }
 
-  const contactsMap = new Map<string, Array<{ email: string | null; receives_invoices: boolean }>>();
+  const contactsMap = new Map<
+    string,
+    Array<{ name: string | null; email: string | null; receives_invoices: boolean }>
+  >();
   for (const ct of contactsRes.data ?? []) {
     const list = contactsMap.get(ct.customer_id) ?? [];
-    list.push({ email: ct.email, receives_invoices: ct.receives_invoices });
+    list.push({
+      name: ct.name,
+      email: ct.email,
+      receives_invoices: ct.receives_invoices,
+    });
     contactsMap.set(ct.customer_id, list);
   }
 
   const fullInvoices: InvoiceForPlanning[] = needingPlanning.map((inv) => {
-    const customerId = customerIdByJob.get(inv.job_id);
+    const jobInfo = jobMap.get(inv.job_id);
+    const customerId = jobInfo?.customer_id;
     const customer = customerId ? customerMap.get(customerId) ?? null : null;
     const contacts = customerId ? contactsMap.get(customerId) ?? [] : [];
     return {
       id: inv.id,
+      status: inv.status,
+      kind: inv.kind,
+      invoice_no: inv.invoice_no,
+      number: inv.number,
+      invoice_date: inv.invoice_date,
       due_date: inv.due_date,
+      total: inv.total,
       balance: inv.balance,
       reminders_paused: inv.reminders_paused,
+      job_no: jobInfo?.job_no ?? null,
       customer,
       contacts,
     };
@@ -280,8 +402,10 @@ export async function planAndInsertReminders(
   const planned = planPaymentReminders(fullInvoices, existingKeys, targetDate);
 
   let insertedCount = 0;
+  const reminderIdByInvoiceId = new Map<string, string>();
+
   if (planned.length > 0) {
-    const { error: insertError } = await supabase
+    const { data: insertedRows, error: insertError } = await supabase
       .from("payment_reminders")
       .insert(
         planned.map((p) => ({
@@ -291,13 +415,23 @@ export async function planAndInsertReminders(
           from_mailbox: p.from_mailbox,
           sent_to: p.sent_to,
         })),
-      );
+      )
+      .select("id, invoice_id");
 
     if (insertError) {
       throw new Error(`Failed to insert payment reminders: ${insertError.message}`);
     }
     insertedCount = planned.length;
+    for (const row of insertedRows ?? []) {
+      reminderIdByInvoiceId.set(row.invoice_id, row.id);
+    }
   }
+
+  const emails = buildPlannedReminderEmails(
+    fullInvoices,
+    planned,
+    reminderIdByInvoiceId,
+  );
 
   return {
     scheduled_for: targetDate,
@@ -305,5 +439,6 @@ export async function planAndInsertReminders(
     planned_count: planned.length,
     inserted_count: insertedCount,
     records: planned,
+    emails,
   };
 }

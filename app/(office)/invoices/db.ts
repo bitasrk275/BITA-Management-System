@@ -56,6 +56,16 @@ export interface PaymentRow {
   created_at: string;
 }
 
+export interface PaymentReminderRow {
+  id: string;
+  invoice_id: string;
+  kind: "before_due" | "on_due" | "overdue" | string;
+  scheduled_for: string;
+  sent_at: string | null;
+  from_mailbox: string | null;
+  sent_to: string[];
+}
+
 export interface InvoiceWithRelations extends InvoiceRow {
   jobs?: {
     id: string;
@@ -102,4 +112,9 @@ export function invoiceLinesTable(supabase: SupabaseClient<Database>): any {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function paymentsTable(supabase: SupabaseClient<Database>): any {
   return supabase.from("payments" as never);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function paymentRemindersTable(supabase: SupabaseClient<Database>): any {
+  return supabase.from("payment_reminders" as never);
 }

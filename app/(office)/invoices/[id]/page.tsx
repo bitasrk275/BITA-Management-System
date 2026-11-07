@@ -40,9 +40,11 @@ import {
 import {
   invoiceLinesTable,
   invoicesTable,
+  paymentRemindersTable,
   paymentsTable,
   type InvoiceLineRow,
   type InvoiceWithRelations,
+  type PaymentReminderRow,
   type PaymentRow,
 } from "../db";
 import { InvoiceDraftEditor } from "./invoice-draft-editor";
@@ -74,7 +76,7 @@ export default async function InvoiceDetailPage({
     redirect(homeFor(person?.roles));
   }
 
-  const [invoiceRes, linesRes, paymentsRes] = await Promise.all([
+  const [invoiceRes, linesRes, paymentsRes, remindersRes] = await Promise.all([
     invoicesTable(supabase)
       .select(
         "*, jobs(id, job_no, po_number, po_date, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), quotations(id, ref_no, status)",
@@ -90,6 +92,10 @@ export default async function InvoiceDetailPage({
       .eq("invoice_id", id)
       .order("paid_on", { ascending: false })
       .order("created_at", { ascending: false }) as Promise<{ data: PaymentRow[] | null }>,
+    paymentRemindersTable(supabase)
+      .select("*")
+      .eq("invoice_id", id)
+      .order("scheduled_for", { ascending: false }) as Promise<{ data: PaymentReminderRow[] | null }>,
   ]);
 
   const invoice = invoiceRes.data;
@@ -97,6 +103,7 @@ export default async function InvoiceDetailPage({
 
   const lines = linesRes.data ?? [];
   const payments = paymentsRes.data ?? [];
+  const reminders = remindersRes.data ?? [];
   const job = invoice.jobs;
   const customer = job?.customers;
   const report = invoice.reports;
@@ -345,6 +352,53 @@ export default async function InvoiceDetailPage({
             ))}
             {payments.length === 0 && (
               <EmptyRow>No payments recorded against this invoice yet.</EmptyRow>
+            )}
+          </List>
+        </section>
+      )}
+
+      {/* Email Payment Reminders History */}
+      {(isIssued || reminders.length > 0) && (
+        <section>
+          <SectionTitle>Email payment reminders ({reminders.length})</SectionTitle>
+          <List>
+            {reminders.map((r) => {
+              const kindLabel =
+                r.kind === "before_due"
+                  ? "Before due (-2 days)"
+                  : r.kind === "on_due"
+                    ? "On due date"
+                    : "Overdue follow-up";
+              return (
+                <ListRow
+                  key={r.id}
+                  tone={r.sent_at ? "ok" : "info"}
+                  title={
+                    <span>
+                      <strong className="font-semibold text-ink">{kindLabel}</strong>
+                      <span className="ml-2.5 text-[13px] text-ink-2">
+                        Scheduled for {shortDate(r.scheduled_for)}
+                      </span>
+                    </span>
+                  }
+                  detail={
+                    <span>
+                      To:{" "}
+                      {r.sent_to && r.sent_to.length > 0
+                        ? r.sent_to.join(", ")
+                        : "No invoice-receiving contacts configured"}
+                      {r.from_mailbox ? ` · From: ${r.from_mailbox}` : ""}
+                      {" · "}
+                      {r.sent_at ? `Sent ${formatIST(r.sent_at)}` : "Planned (pending email dispatch)"}
+                    </span>
+                  }
+                />
+              );
+            })}
+            {reminders.length === 0 && (
+              <EmptyRow>
+                No email reminders planned yet. Reminders trigger automatically 2 days before due date, on the due date, and daily from day +5 overdue while balance &gt; 0.
+              </EmptyRow>
             )}
           </List>
         </section>
