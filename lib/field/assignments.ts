@@ -19,7 +19,7 @@ export type TechnicianJobItem = {
   completedAt: string | null;
   equipment: Array<{
     id: string;
-    kind: Enums<"equipment_kind">;
+    kind: Enums<"equipment_kind"> | null;
     model: string | null;
     serialNo: string | null;
     calibrationDue: string | null;
@@ -107,7 +107,7 @@ export async function getTechnicianJobs(
     string,
     Array<{
       id: string;
-      kind: Enums<"equipment_kind">;
+      kind: Enums<"equipment_kind"> | null;
       model: string | null;
       serialNo: string | null;
       calibrationDue: string | null;

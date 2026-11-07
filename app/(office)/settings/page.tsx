@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Badge,
   Button,
@@ -148,7 +149,12 @@ export default async function SettingsPage({
 
         <div className="space-y-6">
           <Card>
-            <h2 className="mb-2 text-sm font-semibold text-ink">Add dropdown option</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-ink">Add dropdown option</h2>
+              <Link href="/equipment/types" className="text-xs text-ink-2 hover:text-ink underline">
+                Equipment categories →
+              </Link>
+            </div>
             <p className="mb-3 text-xs text-ink-3">
               Dropdown options are used across report templates, equipment types, and forms.
             </p>

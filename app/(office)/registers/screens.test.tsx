@@ -24,7 +24,7 @@ const qualification: Tables<"qualifications"> = {
   id: "20000000-0000-0000-0000-000000000001", person_id: person.id, method: "UT", level: "Level II", scheme: "Test scheme", certifying_body: "Fake Certification Body", certificate_no: "FAKE-CERT-001", issued_on: "2025-01-01", valid_until: "2026-01-01", certificate_path: null, created_at: "2026-11-06T00:00:00Z",
 };
 const equipment: Tables<"equipment"> = {
-  id: "30000000-0000-0000-0000-000000000001", kind: "ut_flaw_detector", make: "Test Instruments", model: "Demo Detector", serial_no: "FAKE-EQ-001", calibrated_on: "2025-01-01", calibration_due: "2026-01-01", active: true, notes: "Fake test equipment", certificate_path: null, created_at: "2026-11-06T00:00:00Z", deleted_at: null, deleted_by: null,
+  id: "30000000-0000-0000-0000-000000000001", equipment_type_id: null, kind: "ut_flaw_detector", make: "Test Instruments", model: "Demo Detector", serial_no: "FAKE-EQ-001", calibrated_on: "2025-01-01", calibration_due: "2026-01-01", status: "in_office", current_location: "In office", current_job_id: null, active: true, notes: "Fake test equipment", certificate_path: null, created_at: "2026-11-06T00:00:00Z", deleted_at: null, deleted_by: null,
 };
 
 function setup(roles = ["management"], failure = false) {

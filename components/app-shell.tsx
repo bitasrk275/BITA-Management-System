@@ -46,7 +46,8 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
       ],
       records: [
         { href: "/customers", label: "Customers", icon: "customers" },
-        { href: "/registers", label: "People & equipment", icon: "people" },
+        { href: "/equipment", label: "Equipment", icon: "equipment" },
+        { href: "/registers", label: "People & qualifications", icon: "people" },
         { href: "/settings/users", label: "Users & logins", icon: "people" },
       ],
     };
@@ -63,7 +64,8 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
       ],
       records: [
         { href: "/customers", label: "Customers", icon: "customers" },
-        { href: "/registers", label: "People & equipment", icon: "people" },
+        { href: "/equipment", label: "Equipment", icon: "equipment" },
+        { href: "/registers", label: "People & qualifications", icon: "people" },
       ],
     };
   }
@@ -73,7 +75,10 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/review", label: "Reports to review", icon: "reports", count: c.reports },
         { href: "/jobs", label: "Jobs", icon: "jobs" },
       ],
-      records: [{ href: "/registers", label: "People & equipment", icon: "people" }],
+      records: [
+        { href: "/equipment", label: "Equipment", icon: "equipment" },
+        { href: "/registers", label: "People & qualifications", icon: "people" },
+      ],
     };
   }
   return { main: [], records: [] };
