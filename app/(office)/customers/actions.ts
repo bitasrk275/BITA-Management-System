@@ -3,64 +3,100 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
-import { checked, friendlyError, text } from "@/lib/forms";
-
-function customerFields(fd: FormData) {
-  return {
-    name: text(fd, "name") ?? "",
-    code: text(fd, "code")?.toUpperCase() ?? null,
-    gstin: text(fd, "gstin")?.toUpperCase() ?? null,
-    billing_address: text(fd, "billing_address"),
-    uses_proforma: checked(fd, "uses_proforma"),
-    payment_terms_days: Number(text(fd, "payment_terms_days") ?? 30),
-    mailbox: text(fd, "mailbox"),
-    notes: text(fd, "notes"),
-  };
-}
+import { friendlyError } from "@/lib/forms";
+import { parseContactInput, parseCustomerInput } from "@/lib/modules/customers/schema";
+import {
+  addCustomerContact,
+  createCustomerRecord,
+  deleteCustomerContact,
+  deleteCustomerRecord,
+  restoreCustomerRecord,
+  updateCustomerContact,
+  updateCustomerRecord,
+} from "@/lib/modules/customers/service";
 
 export async function createCustomer(fd: FormData) {
   const { supabase } = await requireStaff();
-  const { data, error } = await supabase.from("customers").insert(customerFields(fd)).select("id").single();
-  if (error) redirect("/customers/new?error=" + encodeURIComponent(friendlyError(error.message)));
+  const parsed = parseCustomerInput(fd);
+  if (!parsed.ok) {
+    redirect("/customers/new?error=" + encodeURIComponent(parsed.error));
+  }
+  const { data, error } = await createCustomerRecord(supabase, parsed.value);
+  if (error || !data) {
+    redirect("/customers/new?error=" + encodeURIComponent(friendlyError(error ?? "Could not create customer.")));
+  }
+  revalidatePath("/customers");
   redirect(`/customers/${data.id}`);
 }
 
 export async function updateCustomer(id: string, fd: FormData) {
   const { supabase } = await requireStaff();
-  const { error } = await supabase.from("customers").update(customerFields(fd)).eq("id", id);
-  if (error) redirect(`/customers/${id}?error=` + encodeURIComponent(friendlyError(error.message)));
+  const parsed = parseCustomerInput(fd);
+  if (!parsed.ok) {
+    redirect(`/customers/${id}?error=` + encodeURIComponent(parsed.error));
+  }
+  const { error } = await updateCustomerRecord(supabase, id, parsed.value);
+  if (error) {
+    redirect(`/customers/${id}?error=` + encodeURIComponent(friendlyError(error)));
+  }
+  revalidatePath("/customers");
   revalidatePath(`/customers/${id}`);
   redirect(`/customers/${id}?saved=1`);
 }
 
-function contactFields(fd: FormData) {
-  return {
-    name: text(fd, "name") ?? "",
-    mobile: text(fd, "mobile"),
-    email: text(fd, "email"),
-    notes: text(fd, "notes"),
-    receives_reports: checked(fd, "receives_reports"),
-    receives_invoices: checked(fd, "receives_invoices"),
-  };
+export async function deleteCustomer(id: string) {
+  const { supabase } = await requireStaff();
+  const res = await deleteCustomerRecord(supabase, id);
+  if (!res.ok) {
+    redirect(`/customers/${id}?error=` + encodeURIComponent(friendlyError(res.error)));
+  }
+  revalidatePath("/customers");
+  revalidatePath("/recycle-bin");
+  redirect("/customers?deleted=1");
+}
+
+export async function restoreCustomer(id: string) {
+  const { supabase } = await requireStaff();
+  const res = await restoreCustomerRecord(supabase, id);
+  if (!res.ok) {
+    redirect("/recycle-bin?error=" + encodeURIComponent(friendlyError(res.error)));
+  }
+  revalidatePath("/customers");
+  revalidatePath("/recycle-bin");
+  redirect(`/customers/${id}?saved=1`);
 }
 
 export async function addContact(customerId: string, fd: FormData) {
   const { supabase } = await requireStaff();
-  const { error } = await supabase.from("customer_contacts").insert({ customer_id: customerId, ...contactFields(fd) });
-  if (error) redirect(`/customers/${customerId}?error=` + encodeURIComponent(friendlyError(error.message)));
+  const parsed = parseContactInput(fd);
+  if (!parsed.ok) {
+    redirect(`/customers/${customerId}?error=` + encodeURIComponent(parsed.error));
+  }
+  const { error } = await addCustomerContact(supabase, customerId, parsed.value);
+  if (error) {
+    redirect(`/customers/${customerId}?error=` + encodeURIComponent(friendlyError(error)));
+  }
   revalidatePath(`/customers/${customerId}`);
 }
 
 export async function updateContact(customerId: string, contactId: string, fd: FormData) {
   const { supabase } = await requireStaff();
-  const { error } = await supabase.from("customer_contacts").update(contactFields(fd)).eq("id", contactId);
-  if (error) redirect(`/customers/${customerId}?error=` + encodeURIComponent(friendlyError(error.message)));
+  const parsed = parseContactInput(fd);
+  if (!parsed.ok) {
+    redirect(`/customers/${customerId}?error=` + encodeURIComponent(parsed.error));
+  }
+  const { error } = await updateCustomerContact(supabase, contactId, parsed.value);
+  if (error) {
+    redirect(`/customers/${customerId}?error=` + encodeURIComponent(friendlyError(error)));
+  }
   revalidatePath(`/customers/${customerId}`);
 }
 
 export async function deleteContact(customerId: string, contactId: string) {
   const { supabase } = await requireStaff();
-  const { error } = await supabase.from("customer_contacts").delete().eq("id", contactId);
-  if (error) redirect(`/customers/${customerId}?error=` + encodeURIComponent(friendlyError(error.message)));
+  const res = await deleteCustomerContact(supabase, contactId);
+  if (!res.ok) {
+    redirect(`/customers/${customerId}?error=` + encodeURIComponent(friendlyError(res.error)));
+  }
   revalidatePath(`/customers/${customerId}`);
 }

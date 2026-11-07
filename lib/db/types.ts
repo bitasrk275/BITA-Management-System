@@ -255,6 +255,8 @@ export type Database = {
           billing_address: string | null
           code: string | null
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
           gstin: string | null
           id: string
           mailbox: string | null
@@ -268,6 +270,8 @@ export type Database = {
           billing_address?: string | null
           code?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           gstin?: string | null
           id?: string
           mailbox?: string | null
@@ -281,6 +285,8 @@ export type Database = {
           billing_address?: string | null
           code?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           gstin?: string | null
           id?: string
           mailbox?: string | null
@@ -297,6 +303,8 @@ export type Database = {
           body: string | null
           created_at: string
           customer_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           external_id: string | null
           extracted: Json
           from_address: string | null
@@ -312,6 +320,8 @@ export type Database = {
           body?: string | null
           created_at?: string
           customer_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           external_id?: string | null
           extracted?: Json
           from_address?: string | null
@@ -327,6 +337,8 @@ export type Database = {
           body?: string | null
           created_at?: string
           customer_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           external_id?: string | null
           extracted?: Json
           from_address?: string | null
@@ -355,6 +367,8 @@ export type Database = {
           calibration_due: string | null
           certificate_path: string | null
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
           kind: Database["public"]["Enums"]["equipment_kind"]
           make: string | null
@@ -368,6 +382,8 @@ export type Database = {
           calibration_due?: string | null
           certificate_path?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           kind: Database["public"]["Enums"]["equipment_kind"]
           make?: string | null
@@ -381,6 +397,8 @@ export type Database = {
           calibration_due?: string | null
           certificate_path?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["equipment_kind"]
           make?: string | null
@@ -639,6 +657,8 @@ export type Database = {
           closed_at: string | null
           created_at: string
           customer_id: string
+          deleted_at: string | null
+          deleted_by: string | null
           enquiry_id: string | null
           id: string
           job_no: string
@@ -655,6 +675,8 @@ export type Database = {
           closed_at?: string | null
           created_at?: string
           customer_id: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           enquiry_id?: string | null
           id?: string
           job_no?: string
@@ -671,6 +693,8 @@ export type Database = {
           closed_at?: string | null
           created_at?: string
           customer_id?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           enquiry_id?: string | null
           id?: string
           job_no?: string
@@ -825,6 +849,8 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           full_name: string
           id: string
@@ -838,6 +864,8 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           full_name: string
           id?: string
@@ -851,6 +879,8 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           full_name?: string
           id?: string
@@ -961,6 +991,8 @@ export type Database = {
           attention: string | null
           created_at: string
           customer_id: string
+          deleted_at: string | null
+          deleted_by: string | null
           enquiry_id: string | null
           id: string
           pdf_path: string | null
@@ -977,6 +1009,8 @@ export type Database = {
           attention?: string | null
           created_at?: string
           customer_id: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           enquiry_id?: string | null
           id?: string
           pdf_path?: string | null
@@ -993,6 +1027,8 @@ export type Database = {
           attention?: string | null
           created_at?: string
           customer_id?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           enquiry_id?: string | null
           id?: string
           pdf_path?: string | null
@@ -1136,6 +1172,68 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      settings: {
+        Row: {
+          description: string | null
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settings_options: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          list_key: string
+          position: number
+          value: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          list_key: string
+          position?: number
+          value: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          list_key?: string
+          position?: number
+          value?: string
+        }
+        Relationships: []
       }
       technician_devices: {
         Row: {
@@ -1293,7 +1391,32 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      list_recycle_bin: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          deleted_at: string
+          deleted_by: string | null
+          deleted_by_name: string | null
+          detail: string
+          label: string
+          record_id: string
+          table_name: string
+        }[]
+      }
+      restore_record: {
+        Args: {
+          p_id: string
+          p_table: string
+        }
+        Returns: undefined
+      }
+      soft_delete_record: {
+        Args: {
+          p_id: string
+          p_table: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "management" | "office" | "reviewer" | "technician"
