@@ -18,7 +18,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Payments, reminders, job closure | Naveen | In review | feature/naveen-invoices | T35 in-app GST invoicing (no Zoho, D-017): migration, GST 18% & paise rounding, Indian words, quote/report line matching with minimum charge, PDF/Word template, /invoices screens and payment recording |
 | Dashboard | Naveen | Not started | | |
 | WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
-| Financial reports from Zoho (X4) | Naveen | Not started | | Needs Zoho access |
+| Financial reports from Zoho (X4) | Naveen | In review | feature/naveen-gst-export | T36 CA GST export (GSTR-1 B2B & B2C CSV + Excel XML workbook at /invoices/export) |
 | Submission checks + correction history view (X2, X3) | Naveen | Not started | | Database side done in setup PR |
 | Qualification + equipment registers (R19–R20, R29–R31) | Naveen | In review | PR 6, feature/naveen-registers | Registers and private certificate copies built; 44 tests, build, lint/typecheck and 375 px fixture checks pass |
 | Glossary | Krishna | Not started | | |
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 11:12 – Naveen – Claude
+Task: T36 CA GST export (GSTR-1 B2B & B2C)
+Done: Built single-source GSTR-1 export module (lib/invoices/gst-export.ts + unit tests) separating B2B (with Customer GSTIN) and B2C (without Customer GSTIN) rows from issued, partly_paid and paid tax invoices, listing cancelled invoices with zero amounts and excluding drafts. Added /invoices/export screen with month & date-range pickers, live B2B/B2C tables, and /invoices/export/download route for combined CSV, B2B CSV, B2C CSV and multi-sheet Excel (.xls) workbook.
+Files changed: lib/invoices/gst-export.ts, lib/invoices/gst-export.test.ts, lib/invoices/index.ts, app/(office)/invoices/export/, app/(office)/invoices/page.tsx, docs/PROGRESS.md
+Next: T37 email-only payment reminders on in-app invoices and n8n workflow export.
+Blockers / questions: none.
 
 ### 2026-11-06 18:38 – Naveen – Claude
 Task: T35 Generate Invoice inside the app (no Zoho, Decision D-017)
