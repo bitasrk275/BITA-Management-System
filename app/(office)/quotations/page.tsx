@@ -197,7 +197,7 @@ export default async function QuotationsPage({
                 </>
               }
               action={
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
                   {qt.status === "accepted" && (
                     <ButtonLink
                       href={`/jobs/new?quotation=${qt.id}&customer=${qt.customer_id}${

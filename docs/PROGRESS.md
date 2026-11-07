@@ -7,25 +7,25 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 
 | Area | Owner | Status | Branch / PR | Notes |
 | --- | --- | --- | --- | --- |
-| Repo, schema, roles, security | Naveen | In review | feature/naveen-setup | App skeleton + first schema with RLS and correction log; Supabase project not created yet |
+| Repo, schema, roles, security | Naveen | In review | feature/naveen-deploy-ready | App skeleton + first schema with RLS and correction log; T41 deployment readiness (.env.example, lib/env.ts, docs/DEPLOY.md, .github/workflows/reminders.yml) |
 | Email intake + AI extraction | Naveen | Not started | | |
 | Customer and enquiry screens | Naveen | In review | feature/naveen-login-customers-enquiries | Login, customers with contacts, enquiries with customer link |
 | Jobs, quotations, POs, scheduling | Naveen | Not started | | |
-| Technician field form | Naveen | Not started | | |
+| Technician field form | Naveen | Done | feature/naveen-retire-field-web | Web routes retired for Android APK (D-016); /technician notice; Expo app in apps/technician |
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
 | Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
-| Payments, reminders, job closure | Naveen | Not started | | |
+| Payments, reminders, job closure | Naveen | In review | feature/naveen-email-reminders | T37 email-only payment reminders on in-app tax invoices (issued/partly_paid, balance > 0, reminders_paused false, due_date) + n8n workflow export (n8n/payment-reminders-email.json) |
 | Dashboard | Naveen | Not started | | |
 | WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
-| Financial reports from Zoho (X4) | Naveen | Not started | | Needs Zoho access |
+| Financial reports from Zoho (X4) | Naveen | In review | feature/naveen-gst-export | T36 CA GST export (GSTR-1 B2B & B2C CSV + Excel XML workbook at /invoices/export) |
 | Submission checks + correction history view (X2, X3) | Naveen | Not started | | Database side done in setup PR |
 | Qualification + equipment registers (R19–R20, R29–R31) | Naveen | In review | PR 6, feature/naveen-registers | Registers and private certificate copies built; 44 tests, build, lint/typecheck and 375 px fixture checks pass |
 | Glossary | Krishna | Not started | | |
 | Test data | Krishna | Not started | | |
 | Client inputs tracker | Krishna | Not started | | See `docs/CLIENT_INPUTS.md` |
 | Excel import | Naveen | Not started | | Needs BITA lists |
-| Smoke tests | Naveen | Not started | | |
+| Smoke tests | Naveen | In review | feature/naveen-field-db-tests | T42 Field API PGlite tests (tests/field-api.test.ts); T40 e2e flow |
 | User guide | Krishna | Not started | | |
 
 Status values: Not started · In progress · In review · Done · Blocked
@@ -66,6 +66,60 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 16:37 – Naveen – Claude
+Task: T41 Deployment readiness for either host (.env.example, lib/env.ts, docs/DEPLOY.md, .github/workflows/reminders.yml)
+Done: Updated `.env.example` with every environment variable read across the codebase (names only, one-line comments, marking `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` required, plus `REMINDERS_CRON_SECRET` and `EXPO_PUBLIC_API_URL`). Added `lib/env.ts` and unit tests (`lib/env.test.ts`) for server-side required variable checks and wired them into `lib/field/service.ts`, `app/api/reminders/plan/route.ts`, and `lib/ai/extract-enquiry.ts`. Added `docs/DEPLOY.md` covering Netlify Free, Vercel Hobby (noting non-commercial terms), Supabase production checklist, daily payment reminders via n8n or free cron, and building the technician APK against the live URL. Added `.github/workflows/reminders.yml` (`workflow_dispatch` by default with commented daily cron).
+Files changed: .env.example, lib/env.ts, lib/env.test.ts, lib/field/service.ts, app/api/reminders/plan/route.ts, lib/ai/extract-enquiry.ts, docs/DEPLOY.md, .github/workflows/reminders.yml, docs/PROGRESS.md
+Next: Merge PR into `feature/naveen-integration`.
+Blockers / questions: none.
+
+### 2026-11-07 16:45 – Naveen – Antigravity
+Task: T42 Field API tests against real database rules (PGlite) and RLS
+Done: Added tests/field-api.test.ts running against real PostgreSQL (PGlite) via createTestDb(). Tested production field API operations against real database constraints and schema without mocks: 1) pairing code generation, redemption, single-use enforcement, double-redeem failure, and expiry check; 2) authenticateDevice secret check, 401 on wrong secret, 401 on revoked device; 3) technician assignment isolation (technician A cannot acknowledge, start, report, or upload photo on technician B's assignment -> 404); 4) inspection report draft vs. completion, mandatory fields validation, automatic transition of job to inspection_done, assignment completed_at timestamp, 409 conflict on re-submitting already completed report, valid photo attachment and rejection of photos > 6 MB; 5) technician delay messages and validation; 6) RLS enforcement verifying authenticated staff role cannot insert into pairing_codes directly (RLS refusal) while service role succeeds and staff can read per 77cdf95. Verified apps/technician with Expo SDK 58 (typecheck clean). Full test suite (27 test files, 252 tests), lint, typecheck, and next build pass cleanly.
+Files changed: tests/field-api.test.ts, docs/PROGRESS.md
+Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
+Blockers / questions: none.
+
+### 2026-11-07 13:45 – Naveen – Antigravity
+Task: T39 Remove leftover Zoho / WhatsApp wording (D-017) and 375 px mobile audit across office screens
+Done: Cleaned leftover Zoho Books references and WhatsApp copy per D-017 while retaining enquiry intake source 'whatsapp' and database mirror columns. Audited all office screens at 375 px phone width (dashboard, office, enquiries, quotations, jobs, technician assignment, technical report review & history, in-app invoices, GSTR-1 export, registers, customer details, and users/logins). Fixed overflow, text wrapping, and tap target issues strictly without visual redesign (added break-words/break-all for emails, addresses and audit diffs, flex-wrap on header and row action containers, w-full on file inputs, and stacked metric grid on narrow viewports). 244 tests green, ESLint clean, tsc clean, and production build clean.
+Files changed: app/(office)/dashboard/page.tsx, app/(office)/jobs/labels.ts, app/(office)/invoices/db.ts, app/(office)/registers/register-form.tsx, app/(office)/enquiries/[id]/page.tsx, app/(office)/quotations/page.tsx, app/(office)/quotations/[id]/page.tsx, app/(office)/jobs/[id]/page.tsx, app/(office)/jobs/[id]/assign/page.tsx, app/(office)/review/page.tsx, app/(office)/review/[reportId]/page.tsx, app/(office)/review/[reportId]/history/page.tsx, app/(office)/invoices/page.tsx, app/(office)/invoices/[id]/page.tsx, app/(office)/invoices/[id]/invoice-draft-editor.tsx, app/(office)/customers/[id]/page.tsx, app/(office)/settings/users/page.tsx, docs/PROGRESS.md
+Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
+Blockers / questions: none.
+
+### 2026-11-07 13:34 – Naveen – Claude
+Task: T40 End-to-end PGlite flow test plus demo in-app invoices
+Done: Added shared PGlite test harness (`supabase/tests/setup.ts`) and full end-to-end lifecycle test (`tests/e2e-flow.test.ts`) covering one fake job from customer enquiry -> uploaded quotation & items -> management approval & acceptance -> job creation -> qualification/equipment registers & technician assignment -> service-role device pairing -> field inspection submission (with mandatory reading guard) -> report drafting -> reviewer approval & freeze -> in-app GST invoice generation & issue (`BITA/YY-YY/INV-xxxx`) -> partial & full payments -> job closure, asserting status and role-based refusals at each step. Updated `supabase/seed/demo.sql` with idempotent in-app tax invoices (`draft`, `issued`, `partly_paid`, `paid`), lines, and payments.
+Files changed: supabase/tests/setup.ts, supabase/tests/schema.test.ts, tests/e2e-flow.test.ts, supabase/seed/demo.sql, docs/PROGRESS.md
+Next: Merge PR into `feature/naveen-integration`.
+Blockers / questions: none.
+### 2026-11-07 11:18 – Naveen – Antigravity
+Task: T38 Retire technician web screens (APK only, D-016) + apps/technician fixes & README
+Done: Removed technician-only web routes (app/(field)/my-jobs and all subroutes) and retired technician menu in app-shell. Updated lib/roles.ts (homeFor sends technicians to /technician) and lib/auth.ts (requireStaff redirects technicians to /technician). Added /technician notice page directing technicians to the Android APK and office pairing code. Added lib/roles.test.ts. In apps/technician: fixed 3 lint warnings (unused Alert in PairScreen, unused err in ReportScreen), added HTTP 409 handling and read-only mode for already submitted reports, enabled viewing submitted reports from job details, updated README with EAS free-tier APK build steps and what BITA must provide (Expo account, Firebase project under BITA's Google account). cd apps/technician && npm run typecheck passes cleanly.
+Files changed: app/(field)/, lib/roles.ts, lib/roles.test.ts, lib/auth.ts, components/app-shell.tsx, apps/technician/, docs/FIELD_APP.md, docs/PROGRESS.md
+Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
+Blockers / questions: none.
+
+### 2026-11-07 11:25 – Naveen – Claude
+Task: T37 Email-only payment reminders on in-app invoices + n8n workflow export
+Done: Adapted payment reminder planning (`lib/reminders/` and `/api/reminders/plan`) to in-app tax invoices (`kind = 'tax_invoice'`, `status in ('issued', 'partly_paid')`, `balance > 0`, `reminders_paused = false`, `due_date` set), added email-only subject/body composition (`buildReminderEmailContent`) and `PATCH /api/reminders/plan` to mark `sent_at`, surfaced email reminder history on `/invoices/[id]`, and added the importable n8n workflow export (`n8n/payment-reminders-email.json` + `n8n/README.md`) with zero WhatsApp nodes.
+Files changed: lib/reminders/schedule.ts, lib/reminders/sender.ts, lib/reminders/plan.ts, lib/reminders/reminders.test.ts, app/api/reminders/plan/route.ts, app/api/reminders/plan/route.test.ts, app/(office)/invoices/db.ts, app/(office)/invoices/[id]/page.tsx, n8n/payment-reminders-email.json, n8n/README.md, docs/PROGRESS.md
+Next: Import `n8n/payment-reminders-email.json` into n8n once BITA's SMTP credentials arrive.
+Blockers / questions: none.
+
+### 2026-11-07 11:12 – Naveen – Claude
+Task: T36 CA GST export (GSTR-1 B2B & B2C)
+Done: Built single-source GSTR-1 export module (lib/invoices/gst-export.ts + unit tests) separating B2B (with Customer GSTIN) and B2C (without Customer GSTIN) rows from issued, partly_paid and paid tax invoices, listing cancelled invoices with zero amounts and excluding drafts. Added /invoices/export screen with month & date-range pickers, live B2B/B2C tables, and /invoices/export/download route for combined CSV, B2B CSV, B2C CSV and multi-sheet Excel (.xls) workbook.
+Files changed: lib/invoices/gst-export.ts, lib/invoices/gst-export.test.ts, lib/invoices/index.ts, app/(office)/invoices/export/, app/(office)/invoices/page.tsx, docs/PROGRESS.md
+Next: T37 email-only payment reminders on in-app invoices and n8n workflow export.
+Blockers / questions: none.
+### 2026-11-06 18:38 – Naveen – Claude
+Task: T35 Generate Invoice inside the app (no Zoho, Decision D-017)
+Done: Built in-app GST invoicing migration (20261106040000_invoices_in_app.sql with invoice_counters, reshaped invoices, invoice_lines, payments, line/tax consistency on Issue, due_date from customer payment_terms_days, freezing after Issue, and overpayment protection), pure invoicing library (lib/invoices/ for 18% intra/inter-state GST, exact paise rounding & whole-rupee round-off, Indian amount in words, quotation+report line builder with minimum charge, and single PDF/Word .docx invoice template), and /invoices screens + routes (/invoices, /invoices/[id], /invoices/[id]/pdf, /invoices/[id]/docx, plus Generate invoice on approved reports and jobs). All 184 tests, lint, type check and production build pass.
+Files changed: supabase/migrations/20261106040000_invoices_in_app.sql, supabase/tests/schema.test.ts, lib/invoices/, app/(office)/invoices/, app/(office)/review/[reportId]/page.tsx, app/(office)/jobs/[id]/page.tsx, docs/PROGRESS.md
+Next: Merge PR into feature/naveen-integration; plug in BITA's exact SAC code, bank details and terms into DEFAULT_BITA_INVOICE_PROFILE when reference invoices arrive.
+Blockers / questions: none.
 
 ### 2026-11-06 11:54 – Naveen – Codex
 Task: T8a typed report fields and UT/MT/DPT paper templates

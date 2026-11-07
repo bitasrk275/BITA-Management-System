@@ -22,7 +22,7 @@ Limits: 5 failed pairing attempts per minute per IP; codes are 6 random digits; 
 | `POST /api/field/assignments/:id/acknowledge` | – | Sets `acknowledged_at` |
 | `POST /api/field/assignments/:id/start` | – | Sets `started_at` (the "Start work" button); the office sees it |
 | `GET /api/field/report-template/:method` | – | The report fields for UT, MPT or DPT from `lib/reports/fields.ts`: kind (fixed / dropdown with Others / type in), options and required |
-| `POST /api/field/assignments/:id/report` | `{ method, readings, observations, draft }` | Upserts the `inspections` row for this assignment with `submitted_by` = the technician and `missing_fields = missingFields(method, readings)`. When `draft` is false and nothing required is missing, it sets `submitted_at`, `assignments.completed_at`, and the job to `inspection_done`. Returns the missing fields |
+| `POST /api/field/assignments/:id/report` | `{ method, readings, observations, draft }` | Upserts the `inspections` row for this assignment with `submitted_by` = the technician and `missing_fields = missingFields(method, readings)`. When `draft` is false and nothing required is missing, it sets `submitted_at`, `assignments.completed_at`, and the job to `inspection_done`. Returns the missing fields. If already submitted, returns HTTP 409 (`already submitted`) and locks changes |
 | `POST /api/field/assignments/:id/photos` | multipart `file`, `caption`, `kind` (site_photo / defect_photo / drawing) | Stores the file at `documents/jobs/<job id>/<timestamp>-<name>` and adds an `attachments` row with `uploaded_by` = the technician. 6 MB maximum |
 | `POST /api/field/messages` | `{ kind, body, jobId? }` | A delay, leave, equipment problem or site issue, saved to `technician_messages` |
 
@@ -38,3 +38,7 @@ When the office assigns a technician (`app/(office)/jobs/[id]/assign`), the serv
 - Screens, as in the workflow map: **Link this phone** → **My jobs** → **Job details** → **Start work** → **Report form** (BITA's template: fixed fields shown, dropdowns with an **Others** free-text option, type-in fields; photos; missing required fields highlighted; Save draft / Submit) → **Report a problem**.
 - The look follows `DESIGN.md`: white, black main buttons, status dots, big touch targets for use on site.
 - The server URL is configurable (`EXPO_PUBLIC_API_URL`), with nothing secret in the app.
+
+## Web screen retirement (D-016)
+
+Technician web screens (`/my-jobs`, `/my-jobs/[assignmentId]`, `/my-jobs/report-issue`) have been retired. Technicians now use exclusively the Android APK. If a technician logs into the web app, `homeFor(["technician"])` directs them to `/technician`, which displays an informational notice instructing them to install the mobile app and request a 6-digit link code from the office. All underlying database security rules (RLS) remain intact.

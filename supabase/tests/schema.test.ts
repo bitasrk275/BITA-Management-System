@@ -1,58 +1,18 @@
 // Runs the migrations in an in-memory Postgres (PGlite) with a minimal stand-in for Supabase's auth schema,
 // then checks the business rules the database enforces. Test data only.
-import { PGlite } from "@electric-sql/pglite";
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import type { PGlite, Results } from "@electric-sql/pglite";
 import { beforeAll, describe, expect, it } from "vitest";
-
-const MIGRATIONS = join(__dirname, "..", "migrations");
-
-const SUPABASE_STANDIN = `
-  create role anon nologin;
-  create role authenticated nologin;
-  create role service_role nologin bypassrls;
-  create schema auth;
-  create table auth.users (id uuid primary key);
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  create schema storage;
-  create table storage.buckets (id text primary key, name text not null, public boolean default false);
-  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text, owner uuid);
-  alter table storage.objects enable row level security;
-  grant usage on schema storage to anon, authenticated, service_role;
-  grant all on storage.objects to authenticated, service_role;
-  grant usage on schema public, auth to anon, authenticated, service_role;
-  grant execute on function auth.uid() to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
-`;
+import { createTestDb } from "./setup";
 
 const OFFICE = "00000000-0000-0000-0000-00000000000a";
 const REVIEWER = "00000000-0000-0000-0000-00000000000b";
 const OUTSIDER = "00000000-0000-0000-0000-00000000000c";
 
 let db: PGlite;
-
-// Run SQL as a logged-in Supabase user (RLS applies), or as the server's service role.
-async function as<T>(userId: string | "service", sql: string, params: unknown[] = []) {
-  await db.exec(
-    userId === "service"
-      ? "set role service_role; select set_config('request.jwt.claim.sub', '', false);"
-      : `set role authenticated; select set_config('request.jwt.claim.sub', '${userId}', false);`,
-  );
-  try {
-    return await db.query<T>(sql, params);
-  } finally {
-    await db.exec("reset role;");
-  }
-}
+let as: <T>(userId: string | "service", sql: string, params?: unknown[]) => Promise<Results<T>>;
 
 beforeAll(async () => {
-  db = new PGlite();
-  await db.exec(SUPABASE_STANDIN);
-  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort()) {
-    await db.exec(readFileSync(join(MIGRATIONS, file), "utf8"));
-  }
+  ({ db, as } = await createTestDb());
   await db.exec(`
     insert into auth.users (id) values ('${OFFICE}'), ('${REVIEWER}'), ('${OUTSIDER}');
     insert into people (id, full_name, user_id, roles) values
@@ -174,6 +134,149 @@ describe("invoices", () => {
     await db.query(`insert into invoices (job_id, kind, zoho_id) values ($1, 'tax_invoice', 'I-1')`, [job]);
     await expect(db.query(`insert into invoices (job_id, kind, zoho_id) values ($1, 'tax_invoice', 'I-2')`, [job])).rejects.toThrow();
   });
+
+  it("issues an in-app invoice with BITA/YY-YY/INV-0001, freezes it, and tracks payments into balance", async () => {
+    const job = "30000000-0000-0000-0000-000000000031";
+    await db.exec(`insert into jobs (id, customer_id) values ('${job}', '20000000-0000-0000-0000-000000000001')`);
+
+    const draft = await as<{ id: string; status: string; balance: string }>(
+      OFFICE,
+      `insert into invoices (job_id, kind, taxable_value, cgst, sgst, total)
+       values ($1, 'tax_invoice', 10000, 900, 900, 11800)
+       returning id, status, balance`,
+      [job],
+    );
+    const invId = draft.rows[0].id;
+    expect(draft.rows[0].status).toBe("draft");
+    expect(Number(draft.rows[0].balance)).toBe(11800);
+
+    await as(
+      OFFICE,
+      `insert into invoice_lines (invoice_id, position, description, qty, rate, amount)
+       values ($1, 1, 'UT of exciter shaft', 2, 5000, 10000)`,
+      [invId],
+    );
+
+    // Cannot record a payment before the invoice is issued
+    await expect(
+      as(OFFICE, `insert into payments (invoice_id, amount, mode) values ($1, 5000, 'NEFT')`, [invId]),
+    ).rejects.toThrow(/issued invoice/);
+
+    // Issue the invoice -> assigns invoice_no and freezes content
+    const issued = await as<{ invoice_no: string; number: string; status: string; issued_at: string }>(
+      OFFICE,
+      `update invoices set status = 'issued' where id = $1 returning invoice_no, number, status, issued_at`,
+      [invId],
+    );
+    expect(issued.rows[0].invoice_no).toMatch(/^BITA\/\d{2}-\d{2}\/INV-\d{4}$/);
+    expect(issued.rows[0].number).toBe(issued.rows[0].invoice_no);
+    expect(issued.rows[0].issued_at).toBeTruthy();
+
+    // Editing total or lines after issue is blocked
+    await expect(as(OFFICE, `update invoices set total = 20000 where id = $1`, [invId])).rejects.toThrow(/Issued invoices cannot be edited/);
+    await expect(
+      as(OFFICE, `insert into invoice_lines (invoice_id, description, qty, rate, amount) values ($1, 'Extra', 1, 100, 100)`, [invId]),
+    ).rejects.toThrow(/Cannot modify lines/);
+
+    // Partial payment -> partly_paid and balance reduced
+    const p1 = await as<{ id: string }>(
+      OFFICE,
+      `insert into payments (invoice_id, amount, mode, reference) values ($1, 5000, 'NEFT', 'UTR-1') returning id`,
+      [invId],
+    );
+    const afterPart = await as<{ status: string; balance: string }>(
+      OFFICE,
+      `select status, balance from invoices where id = $1`,
+      [invId],
+    );
+    expect(afterPart.rows[0].status).toBe("partly_paid");
+    expect(Number(afterPart.rows[0].balance)).toBe(6800);
+
+    // Overpayment (> remaining balance 6800) is refused
+    await expect(
+      as(OFFICE, `insert into payments (invoice_id, amount, mode) values ($1, 7000, 'NEFT')`, [invId]),
+    ).rejects.toThrow(/exceeds the invoice balance/);
+
+    // Updating an existing payment within (balance + old.amount = 11800) is allowed
+    await as(OFFICE, `update payments set amount = 6000 where id = $1`, [p1.rows[0].id]);
+
+    // Remaining payment (5800) -> paid and balance 0
+    await as(OFFICE, `insert into payments (invoice_id, amount, mode, reference) values ($1, 5800, 'NEFT', 'UTR-2')`, [invId]);
+    const afterFull = await as<{ status: string; balance: string }>(
+      OFFICE,
+      `select status, balance from invoices where id = $1`,
+      [invId],
+    );
+    expect(afterFull.rows[0].status).toBe("paid");
+    expect(Number(afterFull.rows[0].balance)).toBe(0);
+  });
+
+  it("refuses to issue an invoice with no lines or mismatched totals, and fills due_date from customer payment_terms_days", async () => {
+    const cust45 = "20000000-0000-0000-0000-000000000045";
+    const job = "30000000-0000-0000-0000-000000000032";
+    await db.exec(`
+      insert into customers (id, name, code, payment_terms_days) values ('${cust45}', 'Forty-Five Day Co', 'FFDC', 45);
+      insert into jobs (id, customer_id) values ('${job}', '${cust45}');
+    `);
+
+    const draft = await as<{ id: string }>(
+      OFFICE,
+      `insert into invoices (job_id, kind, invoice_date, taxable_value, cgst, sgst, total)
+       values ($1, 'tax_invoice', '2026-11-06', 10000, 900, 900, 11800)
+       returning id`,
+      [job],
+    );
+    const invId = draft.rows[0].id;
+
+    // 1. Refuse issuing with 0 lines
+    await expect(as(OFFICE, `update invoices set status = 'issued' where id = $1`, [invId])).rejects.toThrow(
+      /without at least one line item/,
+    );
+
+    // Add a line whose amount (8000) does not match taxable_value (10000)
+    await as(
+      OFFICE,
+      `insert into invoice_lines (invoice_id, position, description, qty, rate, amount)
+       values ($1, 1, 'DPT inspection', 1, 8000, 8000)`,
+      [invId],
+    );
+    await expect(as(OFFICE, `update invoices set status = 'issued' where id = $1`, [invId])).rejects.toThrow(
+      /does not match sum of line amounts/,
+    );
+
+    // Fix line amount to 10000, but test mismatched total and both IGST + CGST
+    await as(OFFICE, `update invoice_lines set rate = 10000, amount = 10000 where invoice_id = $1`, [invId]);
+    await expect(
+      as(OFFICE, `update invoices set igst = 1800, total = 13600, status = 'issued' where id = $1`, [invId]),
+    ).rejects.toThrow(/both IGST and CGST\/SGST/);
+
+    await expect(
+      as(OFFICE, `update invoices set total = 12000, status = 'issued' where id = $1`, [invId]),
+    ).rejects.toThrow(/does not equal taxable_value/);
+
+    // Valid issue -> sets due_date = '2026-11-06' + 45 days = '2026-12-21'
+    const issued = await as<{ due_date: string }>(
+      OFFICE,
+      `update invoices set status = 'issued' where id = $1 returning due_date::text as due_date`,
+      [invId],
+    );
+    expect(issued.rows[0].due_date).toBe("2026-12-21");
+  });
+
+  it("lets only the server set the old Zoho id, so nobody can skip the issue checks", async () => {
+    const job = "30000000-0000-0000-0000-000000000003";
+    await expect(
+      as(OFFICE, `insert into invoices (job_id, kind, zoho_id) values ('${job}', 'proforma', 'Z-OFFICE')`),
+    ).rejects.toThrow(/zoho_id can only be set by the server/);
+    await expect(
+      as(REVIEWER, "update invoices set zoho_id = 'Z-CHANGED' where zoho_id = 'P-1'"),
+    ).rejects.toThrow(/zoho_id can only be set by the server/);
+    const ok = await as(
+      "service",
+      `insert into invoices (job_id, kind, zoho_id) values ('${job}', 'proforma', 'Z-SERVER') returning id`,
+    );
+    expect(ok.rows).toHaveLength(1);
+  });
 });
 
 describe("file storage", () => {
@@ -216,7 +319,7 @@ describe("technician logins", () => {
   });
 
   it("never sees invoices, quotations or enquiries", async () => {
-    for (const table of ["invoices", "quotations", "quotation_items", "enquiries", "audit_log"]) {
+    for (const table of ["invoices", "invoice_lines", "payments", "quotations", "quotation_items", "enquiries", "audit_log"]) {
       const r = await as(TECH, `select * from ${table}`);
       expect(r.rows, table).toHaveLength(0);
     }

@@ -306,7 +306,7 @@ describe("lib/zoho – Zoho Books India API client & sync (T28)", () => {
       number: "INV-26-27/0801",
       total: 29500,
       balance: 10000,
-      status: "partially_paid",
+      status: "partly_paid",
     });
     expect(updatedJobIds).toEqual(["77000000-0000-4000-8000-000000000007"]);
   });

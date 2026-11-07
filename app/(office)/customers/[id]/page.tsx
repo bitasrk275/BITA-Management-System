@@ -51,13 +51,13 @@ export default async function CustomerPage({
                     <summary className="cursor-pointer">
                       <span className="font-medium">{c.name}</span>{" "}
                       {c.receives_reports && <Badge>Reports</Badge>} {c.receives_invoices && <Badge>Invoices</Badge>}
-                      <div className="text-xs text-ink-3">
+                      <div className="text-xs text-ink-3 break-words">
                         {[c.mobile, c.email].filter(Boolean).join(" · ") || "No phone or email"}
                       </div>
                     </summary>
                     <form action={updateContact.bind(null, id, c.id)} className="mt-3 space-y-3">
                       <ContactFields contact={c} />
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button type="submit">Save contact</Button>
                         <SecondaryButton formAction={deleteContact.bind(null, id, c.id)}>Remove</SecondaryButton>
                       </div>
@@ -80,7 +80,7 @@ export default async function CustomerPage({
             <h2 className="mb-3 font-semibold">Recent enquiries</h2>
             <ul className="space-y-2 text-sm">
               {enquiries?.map((e) => (
-                <li key={e.id}>
+                <li key={e.id} className="break-words">
                   <Link href={`/enquiries/${e.id}`} className="hover:text-ink">
                     {e.subject || "(no subject)"}
                   </Link>{" "}

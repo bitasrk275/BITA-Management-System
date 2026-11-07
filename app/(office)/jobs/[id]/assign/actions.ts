@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { friendlyError, text } from "@/lib/forms";
+import { notifyTechnician } from "../../../../../lib/field/notify";
 
 export async function assignTechnician(jobId: string, fd: FormData) {
   const { supabase } = await requireStaff();
@@ -58,10 +59,27 @@ export async function assignTechnician(jobId: string, fd: FormData) {
   }
 
   // Advance job status from enquiry_received or awaiting_approval to scheduled when first assigned.
-  const { data: job } = await supabase.from("jobs").select("status").eq("id", jobId).maybeSingle();
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("status, customer_id, customers (name)")
+    .eq("id", jobId)
+    .maybeSingle();
+
   if (job && (job.status === "enquiry_received" || job.status === "awaiting_approval")) {
     await supabase.from("jobs").update({ status: "scheduled" }).eq("id", jobId);
   }
+
+  // Push notification to technician's linked phones (T34 / docs/FIELD_APP.md)
+  const customerName = (job?.customers as { name?: string } | null)?.name || "Customer";
+  await notifyTechnician(
+    supabase,
+    person_id,
+    {
+      title: "New Job Assigned",
+      body: `New job: ${customerName} · ${work_date}`,
+      data: { jobId, assignmentId: assignment.id },
+    },
+  ).catch(() => null);
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/assign`);

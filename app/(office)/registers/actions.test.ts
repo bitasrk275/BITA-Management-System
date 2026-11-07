@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ requireStaff: vi.fn(), revalidatePath: vi.fn() }));
+const mocks = vi.hoisted(() => ({ requireStaff: vi.fn(), revalidatePath: vi.fn(), admin: { current: null as unknown } }));
 vi.mock("@/lib/auth", () => ({ requireStaff: mocks.requireStaff }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error(`REDIRECT ${url}`); } }));
 vi.mock("@/lib/forms", async () => await import("../../../lib/forms"));
+vi.mock("../../../lib/field/service", () => ({ getSupabaseAdmin: () => mocks.admin.current }));
 
-import { saveRegister } from "./actions";
+import { createPhonePairingCode, revokeTechnicianDevice, saveRegister } from "./actions";
 
 const PERSON = "10000000-0000-0000-0000-000000000001";
 const EQUIPMENT = "20000000-0000-0000-0000-000000000001";
@@ -21,6 +22,8 @@ function database(roles = ["management"]) {
   const upload = vi.fn().mockResolvedValue({ error: null });
   const supabase = { from: vi.fn().mockReturnValue(query), storage: { from: vi.fn().mockReturnValue({ upload }) } };
   mocks.requireStaff.mockResolvedValue({ supabase, person: { id: PERSON, roles } });
+  // Pairing codes are written with the service-role client; the test uses the same fake.
+  mocks.admin.current = supabase;
   return { query, supabase, upload };
 }
 
@@ -69,5 +72,29 @@ describe("management-only register saves", () => {
     const fd = new FormData(); fd.set("full_name", "Test Manager"); fd.set("roles", "management");
     await expect(saveRegister("people", PERSON, fd)).rejects.toThrow("cannot%20deactivate%20yourself");
     expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("createPhonePairingCode blocks non-management users", async () => {
+    database(["office"]);
+    await expect(createPhonePairingCode(PERSON)).rejects.toThrow("Only%20management%20can%20link%20phones");
+  });
+
+  it("createPhonePairingCode creates 6-digit code and redirects with code in URL", async () => {
+    const { query } = database();
+    query.single.mockResolvedValue({ data: { id: "code-id-1" }, error: null });
+    await expect(createPhonePairingCode(PERSON)).rejects.toThrow(/pairingCode=\d{6}/);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/registers/people/${PERSON}`);
+  });
+
+  it("revokeTechnicianDevice blocks non-management users", async () => {
+    database(["office"]);
+    await expect(revokeTechnicianDevice(PERSON, "device-1")).rejects.toThrow("Only%20management%20can%20revoke%20phones");
+  });
+
+  it("revokeTechnicianDevice sets revoked_at timestamp and redirects", async () => {
+    const { query } = database();
+    query.eq.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+    await expect(revokeTechnicianDevice(PERSON, "device-1")).rejects.toThrow(`REDIRECT /registers/people/${PERSON}?saved=1`);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/registers/people/${PERSON}`);
   });
 });

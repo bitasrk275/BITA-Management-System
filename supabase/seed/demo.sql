@@ -266,21 +266,145 @@ values
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
--- 11. Invoices (1 proforma + 3 tax_invoices: not yet due, due this week, overdue)
+-- 11. In-App Invoices (D-017: 1 draft, 2 issued, 1 partly_paid, 1 paid) + Lines & Payments
 -- ---------------------------------------------------------------------------
-insert into public.invoices (id, job_id, kind, zoho_id, number, invoice_date, due_date, total, balance, status, customer_po_number, reminders_paused, last_synced_at)
+-- Step 11a: Insert as draft first so invoice_lines can be added before issuing.
+insert into public.invoices (
+  id, job_id, kind, report_id, quotation_id, invoice_no, number,
+  place_of_supply, invoice_date, due_date,
+  taxable_value, cgst, sgst, igst, round_off, total, balance,
+  status, customer_po_number, reminders_paused, notes
+)
 values
-  -- Proforma for Test Turbines India Ltd (Job 9007)
-  ('7a000000-0000-0000-0000-000000000001', '76000000-0000-0000-0000-000000000007', 'proforma', 'DEMO-ZOHO-PI-001', 'PI-26-27/041', current_date - 3, current_date + 27, 7552.00, 7552.00, 'sent', null, false, now() - interval '1 hour'),
-  -- Tax invoice not yet due (Job 9008)
-  ('7a000000-0000-0000-0000-000000000002', '76000000-0000-0000-0000-000000000008', 'tax_invoice', 'DEMO-ZOHO-INV-001', 'BITA/26-27/INV-112', current_date - 8, current_date + 22, 18880.00, 18880.00, 'sent', 'SSAL/PO/2026/310', false, now() - interval '1 hour'),
-  -- Tax invoice due this week (Job 9009)
-  ('7a000000-0000-0000-0000-000000000003', '76000000-0000-0000-0000-000000000009', 'tax_invoice', 'DEMO-ZOHO-INV-002', 'BITA/26-27/INV-098', current_date - 26, current_date + 4, 14160.00, 14160.00, 'sent', 'FHCC/PO/512', false, now() - interval '1 hour'),
-  -- Tax invoice overdue (Job 9010)
-  ('7a000000-0000-0000-0000-000000000004', '76000000-0000-0000-0000-000000000010', 'tax_invoice', 'DEMO-ZOHO-INV-003', 'BITA/26-27/INV-074', current_date - 45, current_date - 15, 42480.00, 42480.00, 'overdue', 'SFPL/PO/198', false, now() - interval '1 hour'),
-  -- Paid tax invoice on closed Job 9011
-  ('7a000000-0000-0000-0000-000000000005', '76000000-0000-0000-0000-000000000011', 'tax_invoice', 'DEMO-ZOHO-INV-004', 'BITA/26-27/INV-051', current_date - 55, current_date - 25, 23600.00, 0.00, 'paid', 'PHEL/PO/088', false, now() - interval '10 days')
+  -- 1. Draft tax invoice for Test Turbines India Ltd (Job 9007, linked to approved report & accepted quotation)
+  (
+    '7a000000-0000-0000-0000-000000000001',
+    '76000000-0000-0000-0000-000000000007',
+    'tax_invoice',
+    '79000000-0000-0000-0000-000000000003',
+    '75000000-0000-0000-0000-000000000003',
+    null,
+    null,
+    '29-Karnataka',
+    current_date,
+    current_date + 30,
+    6500.00, 585.00, 585.00, 0.00, 0.00, 7670.00, 7670.00,
+    'draft',
+    null,
+    false,
+    'Draft invoice generated from approved UT report DEMO-BITA/UT/26-27/0895 (minimum visit charge applied).'
+  ),
+  -- 2. Issued tax invoice not yet due (Job 9008, Synthetic Shafts & Axles Ltd)
+  (
+    '7a000000-0000-0000-0000-000000000002',
+    '76000000-0000-0000-0000-000000000008',
+    'tax_invoice',
+    null,
+    null,
+    'BITA/26-27/INV-0901',
+    'BITA/26-27/INV-0901',
+    '29-Karnataka',
+    current_date - 8,
+    current_date + 22,
+    16000.00, 1440.00, 1440.00, 0.00, 0.00, 18880.00, 18880.00,
+    'draft',
+    'SSAL/PO/2026/310',
+    false,
+    'UT of 6 forged stepped drive axles at Doddaballapur Plant.'
+  ),
+  -- 3. Partly paid tax invoice due this week (Job 9009, Fictional Hydraulics & Cylinders Co)
+  (
+    '7a000000-0000-0000-0000-000000000003',
+    '76000000-0000-0000-0000-000000000009',
+    'tax_invoice',
+    null,
+    null,
+    'BITA/26-27/INV-0902',
+    'BITA/26-27/INV-0902',
+    '29-Karnataka',
+    current_date - 26,
+    current_date + 4,
+    12000.00, 1080.00, 1080.00, 0.00, 0.00, 14160.00, 14160.00,
+    'draft',
+    'FHCC/PO/512',
+    false,
+    'DPT of hydraulic cylinder end-cap welds at Mysore Road Works.'
+  ),
+  -- 4. Issued overdue tax invoice (Job 9010, Sample Forgings Pvt Ltd)
+  (
+    '7a000000-0000-0000-0000-000000000004',
+    '76000000-0000-0000-0000-000000000010',
+    'tax_invoice',
+    null,
+    null,
+    'BITA/26-27/INV-0903',
+    'BITA/26-27/INV-0903',
+    '29-Karnataka',
+    current_date - 45,
+    current_date - 15,
+    36000.00, 3240.00, 3240.00, 0.00, 0.00, 42480.00, 42480.00,
+    'draft',
+    'SFPL/PO/198',
+    false,
+    'UT & MPT of 10 heavy crusher shafts at Peenya 2nd Stage.'
+  ),
+  -- 5. Paid tax invoice on closed Job 9011 (Placeholder Heavy Engineering Ltd)
+  (
+    '7a000000-0000-0000-0000-000000000005',
+    '76000000-0000-0000-0000-000000000011',
+    'tax_invoice',
+    null,
+    null,
+    'BITA/26-27/INV-0904',
+    'BITA/26-27/INV-0904',
+    '29-Karnataka',
+    current_date - 55,
+    current_date - 25,
+    20000.00, 1800.00, 1800.00, 0.00, 0.00, 23600.00, 23600.00,
+    'draft',
+    'PHEL/PO/088',
+    false,
+    'UT of gantry girder butt welds at Peenya Phase 3.'
+  )
 on conflict do nothing;
+
+-- Step 11b: Insert invoice_lines while target invoices are in draft state (idempotent on re-run).
+insert into public.invoice_lines (id, invoice_id, position, description, sac, qty, unit, rate, amount)
+select v.id, v.invoice_id, v.position, v.description, v.sac, v.qty, v.unit, v.rate, v.amount
+from (
+  values
+    ('7a100000-0000-0000-0000-000000000001'::uuid, '7a000000-0000-0000-0000-000000000001'::uuid, 1, 'Ultrasonic testing (Normal & Angle beam) of 2 generator exciter shafts (minimum charge applied)', '998346', 1.000, 'visit', 6500.00, 6500.00),
+    ('7a100000-0000-0000-0000-000000000002'::uuid, '7a000000-0000-0000-0000-000000000002'::uuid, 1, 'Ultrasonic testing of forged stepped drive axles', '998346', 6.000, 'nos', 2000.00, 12000.00),
+    ('7a100000-0000-0000-0000-000000000003'::uuid, '7a000000-0000-0000-0000-000000000002'::uuid, 2, 'Site mobilization & calibration block charges (Doddaballapur)', '998346', 1.000, 'visit', 4000.00, 4000.00),
+    ('7a100000-0000-0000-0000-000000000004'::uuid, '7a000000-0000-0000-0000-000000000003'::uuid, 1, 'Dye penetrant testing of hydraulic cylinder end-cap welds', '998346', 15.000, 'joints', 800.00, 12000.00),
+    ('7a100000-0000-0000-0000-000000000005'::uuid, '7a000000-0000-0000-0000-000000000004'::uuid, 1, 'Ultrasonic & magnetic particle testing of heavy crusher shafts', '998346', 10.000, 'shafts', 3600.00, 36000.00),
+    ('7a100000-0000-0000-0000-000000000006'::uuid, '7a000000-0000-0000-0000-000000000005'::uuid, 1, 'Ultrasonic flaw detection of gantry girder butt welds', '998346', 25.000, 'metres', 800.00, 20000.00)
+) as v(id, invoice_id, position, description, sac, qty, unit, rate, amount)
+where not exists (select 1 from public.invoice_lines l where l.id = v.id)
+  and exists (select 1 from public.invoices i where i.id = v.invoice_id and i.status = 'draft');
+
+-- Step 11c: Issue invoices 2, 3, 4, and 5 (leaves invoice 1 as draft).
+update public.invoices
+set status = 'issued',
+    issued_at = coalesce(issued_at, (invoice_date::timestamp at time zone 'Asia/Kolkata') + interval '10 hours')
+where id in (
+  '7a000000-0000-0000-0000-000000000002',
+  '7a000000-0000-0000-0000-000000000003',
+  '7a000000-0000-0000-0000-000000000004',
+  '7a000000-0000-0000-0000-000000000005'
+)
+  and status = 'draft';
+
+-- Step 11d: Record partial payment on invoice 3 (-> partly_paid) and full payments on invoice 5 (-> paid).
+insert into public.payments (id, invoice_id, amount, paid_on, mode, reference)
+select v.id, v.invoice_id, v.amount, v.paid_on, v.mode, v.reference
+from (
+  values
+    ('7a200000-0000-0000-0000-000000000001'::uuid, '7a000000-0000-0000-0000-000000000003'::uuid, 8000.00, current_date - 10, 'NEFT', 'DEMO-UTR-FHCC-8001'),
+    ('7a200000-0000-0000-0000-000000000002'::uuid, '7a000000-0000-0000-0000-000000000005'::uuid, 10000.00, current_date - 40, 'NEFT', 'DEMO-UTR-PHEL-4001'),
+    ('7a200000-0000-0000-0000-000000000003'::uuid, '7a000000-0000-0000-0000-000000000005'::uuid, 13600.00, current_date - 28, 'RTGS', 'DEMO-UTR-PHEL-4002')
+) as v(id, invoice_id, amount, paid_on, mode, reference)
+where not exists (select 1 from public.payments p where p.id = v.id);
 
 -- ---------------------------------------------------------------------------
 -- 12. Technician leave / delay messages today (X1)

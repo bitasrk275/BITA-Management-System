@@ -189,7 +189,7 @@ export default async function QuotationPage({
                 action={uploadQuotationFile.bind(null, id)}
                 className="mt-3 flex flex-wrap items-center gap-2 border-t border-line-2 pt-3"
               >
-                <Input name="pdf_file" type="file" accept={QUOTATION_FILE_ACCEPT} required className="max-w-xs" />
+                <Input name="pdf_file" type="file" accept={QUOTATION_FILE_ACCEPT} required className="w-full max-w-xs" />
                 <SecondaryButton type="submit">
                   {uploadedFileName ? "Replace quotation file" : "Upload quotation file"}
                 </SecondaryButton>
@@ -295,7 +295,7 @@ export default async function QuotationPage({
                   {customer.data.name}
                 </Link>
                 {customer.data.billing_address && (
-                  <p className="mt-1 whitespace-pre-wrap text-xs text-ink-2">{customer.data.billing_address}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-xs text-ink-2 break-words">{customer.data.billing_address}</p>
                 )}
                 <p className="mt-1 text-xs text-ink-3">
                   {[
@@ -323,7 +323,7 @@ export default async function QuotationPage({
           </Card>
 
           <Card className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <SectionTitle>Priced items, rates &amp; total (R9)</SectionTitle>
               <div className="text-xs text-ink-2">
                 Total: <strong className="text-ink"><Mono>{formatINR(totalAmount)}</Mono></strong>
@@ -343,7 +343,7 @@ export default async function QuotationPage({
                     </summary>
                     <form action={updateQuotationItem.bind(null, id, it.id)} className="mt-3 space-y-3">
                       <ItemFields item={it} />
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button type="submit">Save item</Button>
                         <SecondaryButton formAction={deleteQuotationItem.bind(null, id, it.id)}>
                           Remove
@@ -360,7 +360,7 @@ export default async function QuotationPage({
               )}
             </ul>
 
-            <div className="flex items-center justify-between rounded-md border border-line bg-surface-2 px-3 py-2 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2 px-3 py-2 text-sm">
               <span className="font-medium text-ink-2">Quoted total (before GST)</span>
               <strong className="text-ink"><Mono>{formatINR(totalAmount)}</Mono></strong>
             </div>

@@ -1,5 +1,6 @@
 import { todayIST } from "../../../../lib/dates";
 import type { Database } from "../../../../lib/db/types";
+import { checkRemindersEnv, getMissingEnvVars, REQUIRED_ADMIN_ENV_VARS } from "../../../../lib/env";
 import { planAndInsertReminders } from "../../../../lib/reminders/plan";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -7,9 +8,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
-  // Validate authorization
-  const expectedSecret = process.env.REMINDERS_CRON_SECRET;
+function authenticateCronRequest(req: Request): NextResponse | null {
+  const { cronSecret: expectedSecret } = checkRemindersEnv();
   if (!expectedSecret) {
     return NextResponse.json(
       { error: "REMINDERS_CRON_SECRET is not configured on the server" },
@@ -29,11 +29,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return null;
+}
+
+function getSupabaseAdmin() {
+  const missing = getMissingEnvVars(REQUIRED_ADMIN_ENV_VARS);
+  if (missing.length > 0) {
+    return { client: null, missing };
+  }
+
+  const { url, serviceRoleKey } = checkRemindersEnv();
   if (!url || !serviceRoleKey) {
+    return { client: null, missing: [...REQUIRED_ADMIN_ENV_VARS] };
+  }
+
+  return {
+    client: createClient<Database>(url, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    }),
+    missing: [] as string[],
+  };
+}
+
+export async function POST(req: Request) {
+  const authError = authenticateCronRequest(req);
+  if (authError) return authError;
+
+  const { client: supabaseAdmin, missing } = getSupabaseAdmin();
+  if (!supabaseAdmin) {
     return NextResponse.json(
-      { error: "Supabase service role credentials not configured" },
+      {
+        error: `Supabase service role credentials not configured (missing: ${missing.join(", ")})`,
+      },
       { status: 500 },
     );
   }
@@ -50,19 +80,87 @@ export async function POST(req: Request) {
   }
 
   try {
-    const supabaseAdmin = createClient<Database>(url, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-
     const result = await planAndInsertReminders(supabaseAdmin, targetDate);
 
     return NextResponse.json({
       ok: true,
+      channel: "email",
       ...result,
-      note: "Sending reminder emails waits for Stage 2 mailbox access.",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}
+
+/**
+ * Marks a planned payment reminder as sent (`sent_at`) after n8n delivers the email
+ * to the customer's `receives_invoices = true` contacts.
+ */
+export async function PATCH(req: Request) {
+  const authError = authenticateCronRequest(req);
+  if (authError) return authError;
+
+  let body: Record<string, unknown> | null = null;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    body = null;
+  }
+
+  const reminderId =
+    body && typeof body.reminder_id === "string" ? body.reminder_id.trim() : "";
+  const invoiceId =
+    body && typeof body.invoice_id === "string" ? body.invoice_id.trim() : "";
+  const scheduledFor =
+    body && typeof body.scheduled_for === "string" ? body.scheduled_for.trim() : "";
+
+  if (!reminderId && (!invoiceId || !scheduledFor)) {
+    return NextResponse.json(
+      { error: "Provide reminder_id or (invoice_id and scheduled_for)" },
+      { status: 400 },
+    );
+  }
+
+  const { client: supabaseAdmin, missing } = getSupabaseAdmin();
+  if (!supabaseAdmin) {
+    return NextResponse.json(
+      {
+        error: `Supabase service role credentials not configured (missing: ${missing.join(", ")})`,
+      },
+      { status: 500 },
+    );
+  }
+
+  const sentAt =
+    body && typeof body.sent_at === "string" && body.sent_at.trim()
+      ? body.sent_at.trim()
+      : new Date().toISOString();
+
+  try {
+    let query = supabaseAdmin
+      .from("payment_reminders")
+      .update({ sent_at: sentAt });
+
+    if (reminderId) {
+      query = query.eq("id", reminderId);
+    } else {
+      query = query
+        .eq("invoice_id", invoiceId)
+        .eq("scheduled_for", scheduledFor);
+    }
+
+    const { error } = await query;
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      reminder_id: reminderId || null,
+      invoice_id: invoiceId || null,
+      scheduled_for: scheduledFor || null,
+      sent_at: sentAt,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { friendlyError } from "@/lib/forms";
+import { createPairingCode } from "../../../lib/field/pairing";
+import { getSupabaseAdmin } from "../../../lib/field/service";
 import { equipmentFields, isId, isRegister, personFields, qualificationFields, type Register } from "./fields";
 
 function fail(path: string, message: string): never {
@@ -65,4 +67,37 @@ export async function saveRegister(register: Register, recordId: string, fd: For
   const savedPath = `/registers/${register}/${id}`;
   revalidatePath("/registers", "layout");
   redirect(`${savedPath}?saved=1`);
+}
+
+export async function createPhonePairingCode(personId: string) {
+  const { person } = await requireStaff();
+  if (!person?.roles.includes("management")) {
+    fail(`/registers/people/${personId}`, "Only management can link phones.");
+  }
+  // pairing_codes is written only by the server (service role); RLS lets staff read, not insert.
+  const result = await createPairingCode(getSupabaseAdmin(), {
+    personId,
+    createdBy: person.id,
+  });
+  revalidatePath(`/registers/people/${personId}`);
+  redirect(`/registers/people/${personId}?pairingCode=${result.code}&expiresAt=${encodeURIComponent(result.expiresAt)}`);
+}
+
+export async function revokeTechnicianDevice(personId: string, deviceId: string) {
+  const { supabase, person } = await requireStaff();
+  if (!person?.roles.includes("management")) {
+    fail(`/registers/people/${personId}`, "Only management can revoke phones.");
+  }
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("technician_devices")
+    .update({ revoked_at: now })
+    .eq("id", deviceId)
+    .eq("person_id", personId);
+
+  if (error) {
+    fail(`/registers/people/${personId}`, error.message);
+  }
+  revalidatePath(`/registers/people/${personId}`);
+  redirect(`/registers/people/${personId}?saved=1`);
 }

@@ -96,9 +96,9 @@ export default async function SettingsUsersPage({
                 return (
                   <li key={p.id} className="border-t border-line-2 px-4 py-3.5 first:border-t-0">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
                         <Avatar name={p.full_name} />
-                        <div>
+                        <div className="min-w-0 flex-1 break-words">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium text-ink">{p.full_name}</span>
                             {p.initials && (

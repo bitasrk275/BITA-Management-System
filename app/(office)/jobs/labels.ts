@@ -24,7 +24,7 @@ export const METHOD_LABEL: Record<Enums<"test_method">, string> = {
   general_inspection: "General inspection",
 };
 
-// Shown as Indian rupees; the amounts themselves come from Zoho Books (AGENTS.md rule 4).
+// Shown as Indian rupees (D-017 in-app invoicing).
 export function formatINR(n: number | null) {
   if (n === null) return "–";
   return n.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });

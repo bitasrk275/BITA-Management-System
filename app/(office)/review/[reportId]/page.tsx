@@ -45,6 +45,7 @@ import {
   sendReportForReview,
   updateReportContent,
 } from "../actions";
+import { generateInvoiceFromReport } from "../../invoices/actions";
 import { PrintButton } from "@/app/(reports)/report-preview/[method]/print-button";
 import { ReportEditor } from "./report-editor";
 import "@/templates/reports/report.css";
@@ -110,6 +111,7 @@ export default async function ReportReviewPage({
   const readiness = checkReportReadiness(report.method, inspection, readings);
   const isApproved = (report.status === "approved" || report.status === "sent") && !!report.approved_at;
   const isReviewer = person.roles.includes("reviewer");
+  const canBill = person.roles.some((r) => r === "management" || r === "office");
 
   const assets = await loadReportApprovalAssets(supabase, {
     approved: isApproved,
@@ -255,7 +257,7 @@ export default async function ReportReviewPage({
                     )}
                   </Select>
                 </Field>
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   {!isReviewer && (
                     <span className="text-xs text-bad">
                       Reviewer role required to approve (AGENTS.md rule 6).
@@ -307,12 +309,12 @@ export default async function ReportReviewPage({
                   IST
                 </p>
                 {report.pdf_path && (
-                  <p>
+                  <p className="break-all">
                     Signed PDF path: <Mono>{report.pdf_path}</Mono>
                   </p>
                 )}
                 {report.sent_at && (
-                  <p>
+                  <p className="break-all">
                     Marked sent on{" "}
                     <strong className="text-ink">
                       {new Date(report.sent_at).toLocaleString("en-IN", {
@@ -342,6 +344,17 @@ export default async function ReportReviewPage({
                   {report.status === "sent" ? "Update sent recipients" : "Mark as sent"}
                 </Button>
               </form>
+
+              {canBill && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+                  <p className="text-[12.5px] text-ink-2">
+                    Ready to bill? Generate or open the prefilled GST invoice draft from this report&apos;s quantities and the accepted quotation.
+                  </p>
+                  <form action={generateInvoiceFromReport.bind(null, report.id)}>
+                    <Button type="submit">Generate invoice</Button>
+                  </form>
+                </div>
+              )}
             </Card>
           )}
         </div>
