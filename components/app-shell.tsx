@@ -42,6 +42,7 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/quotations", label: "Quotations", icon: "quotations", count: c.quotations },
         { href: "/jobs", label: "Jobs", icon: "jobs", count: c.jobs },
         { href: "/review", label: "Reports", icon: "reports", count: c.reports },
+        { href: "/invoices", label: "Invoices & payments", icon: "money" },
       ],
       records: [
         { href: "/customers", label: "Customers", icon: "customers" },
@@ -58,6 +59,7 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/quotations", label: "Quotations", icon: "quotations" },
         { href: "/jobs", label: "Jobs", icon: "jobs", count: c.jobs },
         ...(reviewer ? [{ href: "/review", label: "Reports", icon: "reports" as const, count: c.reports }] : []),
+        { href: "/invoices", label: "Invoices & payments", icon: "money" },
       ],
       records: [
         { href: "/customers", label: "Customers", icon: "customers" },
