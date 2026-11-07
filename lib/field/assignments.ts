@@ -309,9 +309,14 @@ export async function submitInspectionReport(
   // Check if an inspection already exists for this assignment
   const { data: existingInspection } = await supabase
     .from("inspections")
-    .select("id")
+    .select("id, submitted_at")
     .eq("assignment_id", assignmentId)
     .maybeSingle();
+
+  // Once submitted, the office works from it; the phone can no longer change or reopen it.
+  if (existingInspection?.submitted_at) {
+    return { error: "This report was already submitted. Ask the office to make changes.", status: 409 };
+  }
 
   let inspectionId: string;
 
@@ -472,6 +477,7 @@ export async function createTechnicianMessage(
   }
 
   const validKinds: Enums<"technician_message_kind">[] = [
+    "delay",
     "leave",
     "equipment_problem",
     "site_issue",

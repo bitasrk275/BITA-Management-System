@@ -319,7 +319,11 @@ describe("Field App: pairing & rate limiting", () => {
   it("redeemPairingCode successfully redeems valid code and marks used", async () => {
     const code = "654321";
     const updateSpy = vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({ error: null }),
+      eq: vi.fn().mockReturnValue({
+        is: vi.fn().mockReturnValue({
+          select: vi.fn().mockResolvedValue({ data: [{ id: "code-row" }], error: null }),
+        }),
+      }),
     });
     const insertDeviceSpy = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({

@@ -134,17 +134,28 @@ export async function redeemPairingCode(
     };
   }
 
-  // Mark code as used immediately to prevent reuse
-  const { error: updateError } = await supabase
+  // Claim the code atomically: only one request can flip used_at from null, so two phones
+  // racing with the same code cannot both pair.
+  const { data: claimed, error: updateError } = await supabase
     .from("pairing_codes")
     .update({ used_at: now })
-    .eq("id", codeRow.id);
+    .eq("id", codeRow.id)
+    .is("used_at", null)
+    .select("id");
 
   if (updateError) {
     return {
       ok: false,
       status: 500,
       error: "Failed to process pairing code.",
+    };
+  }
+  if (!claimed || claimed.length === 0) {
+    recordFailedAttempt(ip);
+    return {
+      ok: false,
+      status: 400,
+      error: "Invalid or expired pairing code.",
     };
   }
 

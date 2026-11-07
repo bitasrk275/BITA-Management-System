@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 
 /**
  * Computes sha256 hex digest of a UTF-8 string.
@@ -34,6 +34,5 @@ export function generateRandomSecret(): string {
  * Generates a 6-digit random pairing code string (e.g. "492104").
  */
 export function generatePairingCode(): string {
-  const num = Math.floor(100000 + Math.random() * 900000);
-  return num.toString();
+  return randomInt(100000, 1000000).toString();
 }
