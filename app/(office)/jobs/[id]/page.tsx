@@ -43,8 +43,10 @@ export default async function JobPage({
   const poUrl = job.po_path
     ? (await supabase.storage.from("documents").createSignedUrl(job.po_path, 600)).data?.signedUrl
     : null;
-  // Outstanding is the sum of the balances Zoho Books reports; nothing is calculated here.
-  const outstanding = (invoices.data ?? []).reduce((sum, i) => sum + (i.balance ?? 0), 0);
+  // Outstanding is the balance of issued invoices only; drafts are not owed yet (D-017).
+  const outstanding = (invoices.data ?? [])
+    .filter((i) => i.status === "issued" || i.status === "partly_paid")
+    .reduce((sum, i) => sum + (i.balance ?? 0), 0);
   const canWriteJob = !!person?.roles.some((r) => r === "management" || r === "office");
   const readyToClose = isJobReadyToClose({
     status: job.status,

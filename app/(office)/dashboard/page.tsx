@@ -63,6 +63,7 @@ export default async function ManagementHome() {
       .from("invoices")
       .select("id, number, balance, due_date, job_id, jobs(customers(name))")
       .eq("kind", "tax_invoice")
+      .in("status", ["issued", "partly_paid"])
       .gt("balance", 0),
     supabase.from("quotations").select("id, ref_no, subject, customers(name)").eq("status", "draft").order("created_at"),
     supabase.from("enquiries").select("id, subject, source, customers(name)").eq("status", "new").order("received_at", { ascending: false }),
@@ -95,7 +96,7 @@ export default async function ManagementHome() {
 
   const due = invoices.data ?? [];
   const overdue = due.filter((i) => i.due_date && i.due_date < today);
-  // Totals are the balances Zoho Books reports; nothing is calculated as tax or ledger here.
+  // Totals are the balances of issued invoices (drafts are not owed yet; D-017).
   const sum = (rows: typeof due) => rows.reduce((t, i) => t + (i.balance ?? 0), 0);
   const outstanding = sum(due);
   const dueThisWeek = due.filter((i) => i.due_date && i.due_date >= today && i.due_date <= weekAhead);
