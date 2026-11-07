@@ -43,7 +43,7 @@ async function as<T>(userId: string | "service", sql: string, params: unknown[] 
   try {
     return await db.query<T>(sql, params);
   } finally {
-    await db.exec("reset role;");
+    await db.exec("reset role; select set_config('request.jwt.claim.sub', '', false);");
   }
 }
 
@@ -301,6 +301,21 @@ describe("invoices", () => {
       [invId],
     );
     expect(issued.rows[0].due_date).toBe("2026-12-21");
+  });
+
+  it("lets only the server set the old Zoho id, so nobody can skip the issue checks", async () => {
+    const job = "30000000-0000-0000-0000-000000000003";
+    await expect(
+      as(OFFICE, `insert into invoices (job_id, kind, zoho_id) values ('${job}', 'proforma', 'Z-OFFICE')`),
+    ).rejects.toThrow(/zoho_id can only be set by the server/);
+    await expect(
+      as(REVIEWER, "update invoices set zoho_id = 'Z-CHANGED' where zoho_id = 'P-1'"),
+    ).rejects.toThrow(/zoho_id can only be set by the server/);
+    const ok = await as(
+      "service",
+      `insert into invoices (job_id, kind, zoho_id) values ('${job}', 'proforma', 'Z-SERVER') returning id`,
+    );
+    expect(ok.rows).toHaveLength(1);
   });
 });
 

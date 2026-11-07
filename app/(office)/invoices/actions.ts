@@ -99,19 +99,9 @@ async function createDraftInvoiceForJobAndReport(
     }
   }
 
-  // 5. Load accepted/approved quotation & its items
-  let quotationId = job.quotation_id;
-  if (!quotationId) {
-    const { data: fallbackQuote } = await supabase
-      .from("quotations")
-      .select("id")
-      .eq("customer_id", job.customer_id)
-      .in("status", ["accepted", "sent", "approved"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    quotationId = fallbackQuote?.id ?? null;
-  }
+  // 5. Load this job's quotation & its items. No guessing from other quotes of the same customer:
+  // without one, the draft starts from the fallback line and the office fills in the rates.
+  const quotationId = job.quotation_id;
 
   let quotationItems: QuotationItemSource[] = [];
   if (quotationId) {

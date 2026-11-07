@@ -75,9 +75,17 @@ export async function syncInvoices(options?: {
         number: inv.number,
         invoice_date: inv.invoice_date,
         due_date: inv.due_date,
-        total: inv.total,
-        balance: inv.balance,
-        status: inv.status,
+        total: inv.total ?? 0,
+        balance: inv.balance ?? 0,
+        // In-app invoice statuses (D-017); Zoho's draft/sent/overdue map onto them.
+        status:
+          inv.status === "draft"
+            ? "draft"
+            : inv.balance === 0 && (inv.total ?? 0) > 0
+              ? "paid"
+              : (inv.balance ?? 0) < (inv.total ?? 0)
+                ? "partly_paid"
+                : "issued",
         last_synced_at: nowIso,
       },
       { onConflict: "zoho_id" }

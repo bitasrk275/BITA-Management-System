@@ -451,54 +451,149 @@ export type Database = {
           },
         ]
       }
+      invoice_counters: {
+        Row: {
+          financial_year: string
+          last_no: number
+        }
+        Insert: {
+          financial_year: string
+          last_no: number
+        }
+        Update: {
+          financial_year?: string
+          last_no?: number
+        }
+        Relationships: []
+      }
+      invoice_lines: {
+        Row: {
+          amount: number
+          description: string
+          id: string
+          invoice_id: string
+          position: number
+          qty: number
+          rate: number
+          sac: string
+          unit: string | null
+        }
+        Insert: {
+          amount?: number
+          description: string
+          id?: string
+          invoice_id: string
+          position?: number
+          qty?: number
+          rate?: number
+          sac?: string
+          unit?: string | null
+        }
+        Update: {
+          amount?: number
+          description?: string
+          id?: string
+          invoice_id?: string
+          position?: number
+          qty?: number
+          rate?: number
+          sac?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
-          balance: number | null
+          balance: number
+          cgst: number
           created_at: string
           customer_po_number: string | null
           due_date: string | null
           id: string
+          igst: number
           invoice_date: string | null
+          invoice_no: string | null
+          issued_at: string | null
           job_id: string
           kind: Database["public"]["Enums"]["invoice_kind"]
           last_synced_at: string | null
+          notes: string | null
           number: string | null
+          pdf_path: string | null
+          place_of_supply: string | null
+          quotation_id: string | null
           reminders_paused: boolean
-          status: string | null
-          total: number | null
-          zoho_id: string
+          report_id: string | null
+          round_off: number
+          sgst: number
+          status: string
+          taxable_value: number
+          total: number
+          zoho_id: string | null
         }
         Insert: {
-          balance?: number | null
+          balance?: number
+          cgst?: number
           created_at?: string
           customer_po_number?: string | null
           due_date?: string | null
           id?: string
+          igst?: number
           invoice_date?: string | null
+          invoice_no?: string | null
+          issued_at?: string | null
           job_id: string
           kind: Database["public"]["Enums"]["invoice_kind"]
           last_synced_at?: string | null
+          notes?: string | null
           number?: string | null
+          pdf_path?: string | null
+          place_of_supply?: string | null
+          quotation_id?: string | null
           reminders_paused?: boolean
-          status?: string | null
-          total?: number | null
-          zoho_id: string
+          report_id?: string | null
+          round_off?: number
+          sgst?: number
+          status?: string
+          taxable_value?: number
+          total?: number
+          zoho_id?: string | null
         }
         Update: {
-          balance?: number | null
+          balance?: number
+          cgst?: number
           created_at?: string
           customer_po_number?: string | null
           due_date?: string | null
           id?: string
+          igst?: number
           invoice_date?: string | null
+          invoice_no?: string | null
+          issued_at?: string | null
           job_id?: string
           kind?: Database["public"]["Enums"]["invoice_kind"]
           last_synced_at?: string | null
+          notes?: string | null
           number?: string | null
+          pdf_path?: string | null
+          place_of_supply?: string | null
+          quotation_id?: string | null
           reminders_paused?: boolean
-          status?: string | null
-          total?: number | null
-          zoho_id?: string
+          report_id?: string | null
+          round_off?: number
+          sgst?: number
+          status?: string
+          taxable_value?: number
+          total?: number
+          zoho_id?: string | null
         }
         Relationships: [
           {
@@ -506,6 +601,20 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
             referencedColumns: ["id"]
           },
         ]
@@ -667,6 +776,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "payment_reminders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: string
+          mode: string | null
+          paid_on: string
+          reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          mode?: string | null
+          paid_on?: string
+          reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          mode?: string | null
+          paid_on?: string
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
