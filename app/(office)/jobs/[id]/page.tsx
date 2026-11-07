@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Button, ButtonLink, Card, ErrorNote, PageHeader, SavedNote, Status } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
+import { checkPoUtilization } from "@/lib/modules/po/service";
 import { formatIST } from "../../enquiries/labels";
 import { closeJob, updateJob } from "../actions";
 import { generateInvoiceFromJob } from "../../invoices/actions";
@@ -43,6 +44,12 @@ export default async function JobPage({
   const poUrl = job.po_path
     ? (await supabase.storage.from("documents").createSignedUrl(job.po_path, 600)).data?.signedUrl
     : null;
+  const poCheck = await checkPoUtilization(supabase, {
+    jobId: job.id,
+    customerId: job.customer_id,
+    poNumber: job.po_number,
+    poValue: job.po_value,
+  });
   // Outstanding is the balance of issued invoices only; drafts are not owed yet (D-017).
   const outstanding = (invoices.data ?? [])
     .filter((i) => i.status === "issued" || i.status === "partly_paid")
@@ -151,6 +158,9 @@ export default async function JobPage({
                 <dd>
                   {job.po_number ?? "Not received yet"}
                   {job.po_date && ` · ${job.po_date}`}
+                  {job.po_value !== null && job.po_value !== undefined && (
+                    <span> · Value {formatINR(job.po_value)}</span>
+                  )}
                   {poUrl && (
                     <>
                       {" · "}
@@ -160,6 +170,11 @@ export default async function JobPage({
                     </>
                   )}
                 </dd>
+                {poCheck.exceedsPoValue && poCheck.warningMessage && (
+                  <div className="mt-2">
+                    <Status tone="wait">{poCheck.warningMessage}</Status>
+                  </div>
+                )}
               </div>
             </dl>
           </Card>

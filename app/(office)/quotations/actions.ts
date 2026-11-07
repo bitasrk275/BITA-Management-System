@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { Constants, type Enums } from "@/lib/db/types";
 import { friendlyError, text } from "@/lib/forms";
+import { parseAcceptQuotationInput } from "@/lib/modules/po/schema";
+import { acceptQuotationAndRecordPo } from "@/lib/modules/po/service";
 import { DEFAULT_QUOTATION_TERMS } from "./labels";
 import { buildQuotationStoragePath, validateQuotationFile } from "./upload";
 
@@ -265,38 +267,49 @@ export async function markQuotationSent(id: string) {
   redirect(`/quotations/${id}?saved=sent`);
 }
 
-// T30: Records that the customer accepted the quotation (sent -> accepted).
-export async function acceptQuotation(id: string) {
+// T30 + P2: Records that the customer accepted the quotation (sent -> accepted),
+// optionally records the Customer PO (PO number, PO date, PO value, PO file) and creates the linked job in one step.
+export async function acceptQuotation(id: string, fd?: FormData) {
   const { supabase, person } = await requireStaff();
-  const { data: existing } = await supabase
-    .from("quotations")
-    .select("approved_at, approved_by")
-    .eq("id", id)
-    .maybeSingle();
-
-  let approvalPatch: { approved_by?: string; approved_at?: string } = {};
-  if (!existing?.approved_at) {
-    if (!person || !person.roles.includes("management")) {
-      redirect(`/quotations/${id}?error=` + encodeURIComponent("Only management can mark a quotation as accepted."));
-    }
-    approvalPatch = {
-      approved_by: person.id,
-      approved_at: new Date().toISOString(),
-    };
+  if (!person) {
+    redirect(`/quotations/${id}?error=` + encodeURIComponent("You must be signed in."));
   }
 
-  const { error } = await supabase
-    .from("quotations")
-    .update({
-      status: "accepted",
-      superseded_by: null,
-      ...approvalPatch,
-    })
-    .eq("id", id);
+  const parsed = parseAcceptQuotationInput(fd ?? null);
+  if (!parsed.ok) {
+    redirect(`/quotations/${id}?error=` + encodeURIComponent(parsed.error));
+  }
 
-  if (error) redirect(`/quotations/${id}?error=` + encodeURIComponent(friendlyError(error.message)));
+  const poFileCandidate = fd?.get("po_file");
+  const poFile = poFileCandidate instanceof File && poFileCandidate.size > 0 ? poFileCandidate : null;
+
+  const result = await acceptQuotationAndRecordPo(
+    supabase,
+    id,
+    { id: person.id, roles: person.roles },
+    parsed.value,
+    poFile,
+  );
+
+  if (!result.ok) {
+    redirect(`/quotations/${id}?error=` + encodeURIComponent(friendlyError(result.error)));
+  }
+
   revalidatePath(`/quotations/${id}`);
   revalidatePath("/quotations");
+  if (result.jobId) {
+    revalidatePath(`/jobs/${result.jobId}`);
+    revalidatePath("/jobs");
+    revalidatePath("/enquiries");
+  }
+
+  if (result.fileError) {
+    redirect(
+      `/quotations/${id}?error=` +
+        encodeURIComponent("Quotation accepted, but PO file was not saved: " + result.fileError),
+    );
+  }
+
   redirect(`/quotations/${id}?saved=accepted`);
 }
 

@@ -8,6 +8,7 @@ import {
   SecondaryButton,
   SectionTitle,
   Select,
+  Status,
   Textarea,
 } from "@/components/ui";
 import {
@@ -17,6 +18,7 @@ import {
   computeLineAmount,
   sumTaxableValue,
 } from "@/lib/invoices";
+import { evaluatePoValueWarning } from "@/lib/modules/po/schema";
 import { formatINR } from "../../jobs/labels";
 import type { InvoiceLineRow } from "../db";
 
@@ -36,6 +38,8 @@ export function InvoiceDraftEditor({
   dueDate,
   placeOfSupply,
   customerPoNumber,
+  poValue,
+  otherInvoicesTotal,
   notes,
   customerGstin,
   customerAddress,
@@ -46,12 +50,15 @@ export function InvoiceDraftEditor({
   dueDate: string;
   placeOfSupply: string;
   customerPoNumber: string;
+  poValue?: number | null;
+  otherInvoicesTotal?: number | null;
   notes: string;
   customerGstin?: string | null;
   customerAddress?: string | null;
   initialLines: InvoiceLineRow[];
 }) {
   const [selectedState, setSelectedState] = useState(placeOfSupply || "29");
+  const [poNumber, setPoNumber] = useState(customerPoNumber || "");
   const [defaultSac, setDefaultSac] = useState(initialLines[0]?.sac ?? "");
   const [lines, setLines] = useState<EditableLine[]>(() => {
     if (initialLines.length === 0) {
@@ -126,6 +133,13 @@ export function InvoiceDraftEditor({
     billingAddress: customerAddress,
   });
 
+  const livePoCheck = evaluatePoValueWarning({
+    poNumber,
+    poValue,
+    otherInvoicesTotal,
+    currentInvoiceTotal: gst.total,
+  });
+
   return (
     <form action={action} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -148,10 +162,28 @@ export function InvoiceDraftEditor({
             ))}
           </Select>
         </Field>
-        <Field label="Customer PO number">
-          <Input name="customer_po_number" defaultValue={customerPoNumber} placeholder="e.g. PO/2026/104" />
+        <Field
+          label="Customer PO number"
+          hint={
+            poValue !== null && poValue !== undefined
+              ? `PO value: ${formatINR(poValue)}`
+              : "Prefilled from the job PO (editable)"
+          }
+        >
+          <Input
+            name="customer_po_number"
+            value={poNumber}
+            onChange={(e) => setPoNumber(e.target.value)}
+            placeholder="e.g. PO/2026/104"
+          />
         </Field>
       </div>
+
+      {livePoCheck.exceedsPoValue && livePoCheck.warningMessage && (
+        <div className="rounded-lg border border-line bg-surface-2 p-3">
+          <Status tone="wait">{livePoCheck.warningMessage}</Status>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field

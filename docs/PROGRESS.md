@@ -10,7 +10,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Repo, schema, roles, security | Naveen | In review | feature/naveen-p1-foundation | Phase 2 Foundation (P1): modules + /api/v1, soft delete + recycle bin, settings & settings_options tables, docs/ARCHITECTURE.md |
 | Email intake + AI extraction | Naveen | Not started | | |
 | Customer and enquiry screens | Naveen | In review | feature/naveen-login-customers-enquiries | Login, customers with contacts, enquiries with customer link |
-| Jobs, quotations, POs, scheduling | Naveen | Not started | | |
+| Jobs, quotations, POs, scheduling | Naveen | In review | feature/naveen-p2-customer-po | Phase 2 P2: Customer PO on quotation accept (PO number, date, value, file + 1-click job creation), jobs.po_value, PO link & over-PO invoice warning |
 | Technician field form | Naveen | Done | feature/naveen-retire-field-web | Web routes retired for Android APK (D-016); /technician notice; Expo app in apps/technician |
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 17:20 – Naveen – Claude
+Task: P2 Customer PO on quotation accept + jobs.po_value + PO link & warning on invoices
+Done: Added migration `supabase/migrations/20261107020000_customer_po_value.sql` (`po_value numeric(14,2) check (po_value is null or po_value >= 0)` on `public.jobs`) and updated `lib/db/types.ts` and `app/(office)/invoices/db.ts`. Built `lib/modules/po/` (`schema.ts`, `service.ts`, `po.test.ts`) and `/api/v1/quotations/[id]/accept` and `/api/v1/jobs/[id]/po`. Updated `/quotations/[id]` so "Accepted by customer" allows recording PO number, PO date, PO value, PO file, and creating the linked job in one step (while keeping PO optional so work can start before the PO arrives). Updated `/jobs/[id]`, `JobForm`, `/invoices/[id]`, and `InvoiceDraftEditor` to display `po_value`, prefill the job PO on invoices (editable), and warn whenever invoices against one PO total more than its value.
+Files changed: supabase/migrations/20261107020000_customer_po_value.sql, lib/db/types.ts, lib/modules/po/, app/api/v1/quotations/[id]/accept/route.ts, app/api/v1/jobs/[id]/po/route.ts, app/(office)/quotations/, app/(office)/jobs/, app/(office)/invoices/, supabase/tests/phase2-foundation.test.ts, docs/PROGRESS.md
+Next: Merge P1 & P2 into `feature/naveen-integration` and start P3 (Price list module).
+Blockers / questions: none.
 
 ### 2026-11-07 17:06 – Naveen – Claude
 Task: P1 Phase 2 Foundation: modules + /api/v1, soft delete + recycle bin, settings tables

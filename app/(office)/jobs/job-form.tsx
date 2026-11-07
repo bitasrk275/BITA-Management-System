@@ -97,12 +97,22 @@ export function JobForm({
           placeholder="Customer works, or site address"
         />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <Field label="PO number" hint="Not needed before work starts; add it when the PO arrives">
           <Input name="po_number" defaultValue={job?.po_number ?? ""} />
         </Field>
         <Field label="PO date">
           <Input name="po_date" type="date" defaultValue={job?.po_date ?? ""} />
+        </Field>
+        <Field label="PO value (₹)" hint="Warn if invoices exceed this amount">
+          <Input
+            name="po_value"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={job?.po_value ?? ""}
+            placeholder="0.00"
+          />
         </Field>
       </div>
       <Field label={job?.po_path ? "Replace PO file" : "PO file"}>

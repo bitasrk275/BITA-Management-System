@@ -248,4 +248,40 @@ describe("Phase 2 Foundation (P1): soft delete, recycle bin, settings, and permi
        where key = 'permissions'`,
     );
   });
+
+  it("records Customer PO value (po_value) on jobs and rejects negative po_value (P2)", async () => {
+    const custRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.customers (name, code, gstin)
+       values ('PO Value Turbine Works', 'PVTW', '29AABCP1234F1Z2')
+       returning id`,
+    );
+    const custId = custRes.rows[0]!.id;
+
+    const jobRes = await ctx.as<{
+      id: string;
+      po_number: string | null;
+      po_date: string | null;
+      po_value: string | null;
+    }>(
+      OFFICE_USER,
+      `insert into public.jobs (customer_id, site, po_number, po_date, po_value)
+       values ($1, 'Peenya Stage II', 'PO/PVTW/2026/88', '2026-11-07', 125000.50)
+       returning id, po_number, po_date::text as po_date, po_value::text as po_value`,
+      [custId],
+    );
+
+    expect(jobRes.rows[0]?.po_number).toBe("PO/PVTW/2026/88");
+    expect(jobRes.rows[0]?.po_date).toBe("2026-11-07");
+    expect(Number(jobRes.rows[0]?.po_value)).toBe(125000.5);
+
+    // Negative po_value is rejected by the database check constraint
+    await expect(
+      ctx.as(
+        OFFICE_USER,
+        `update public.jobs set po_value = -100 where id = $1`,
+        [jobRes.rows[0]!.id],
+      ),
+    ).rejects.toThrow(/check/i);
+  });
 });

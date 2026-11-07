@@ -87,7 +87,7 @@ export default async function QuotationPage({
       : null,
     supabase
       .from("jobs")
-      .select("id, job_no, status, scope")
+      .select("id, job_no, status, scope, po_number, po_date, po_value")
       .eq("quotation_id", id)
       .order("created_at", { ascending: false }),
     pastRatesQuery,
@@ -203,9 +203,63 @@ export default async function QuotationPage({
               </div>
 
               {quotation.status === "accepted" && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line-2 bg-surface-2 p-3">
-                  <Status tone="ok">Accepted by customer — ready to create the job and start work.</Status>
-                  <ButtonLink href={createJobHref}>Create job</ButtonLink>
+                <div className="space-y-3 rounded-md border border-line-2 bg-surface-2 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Status tone="ok">Accepted by customer — ready to create the job and start work.</Status>
+                    {linkedJobs.data && linkedJobs.data.length > 0 ? (
+                      <ButtonLink href={`/jobs/${linkedJobs.data[0]!.id}`}>
+                        Open Job {linkedJobs.data[0]!.job_no}
+                      </ButtonLink>
+                    ) : (
+                      <ButtonLink href={createJobHref}>Create job</ButtonLink>
+                    )}
+                  </div>
+                  {isManagement && (
+                    <details className="border-t border-line-2 pt-2">
+                      <summary className="cursor-pointer text-xs font-medium text-ink underline">
+                        {linkedJobs.data && linkedJobs.data.length > 0
+                          ? "Record or update Customer PO on linked job"
+                          : "Record Customer PO & create job in one click"}
+                      </summary>
+                      <form action={acceptQuotation.bind(null, id)} className="mt-3 space-y-3">
+                        <input type="hidden" name="create_job" value="on" />
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <Field label="PO number (opt.)">
+                            <Input
+                              name="po_number"
+                              defaultValue={linkedJobs.data?.[0]?.po_number ?? ""}
+                              placeholder="e.g. PO/2026/104"
+                            />
+                          </Field>
+                          <Field label="PO date (opt.)">
+                            <Input
+                              name="po_date"
+                              type="date"
+                              defaultValue={linkedJobs.data?.[0]?.po_date ?? ""}
+                            />
+                          </Field>
+                          <Field label="PO value ₹ (opt.)">
+                            <Input
+                              name="po_value"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              defaultValue={linkedJobs.data?.[0]?.po_value ?? ""}
+                              placeholder="0.00"
+                            />
+                          </Field>
+                        </div>
+                        <Field label="Customer PO file (PDF or image, opt.)">
+                          <Input name="po_file" type="file" accept=".pdf,image/*" />
+                        </Field>
+                        <Button type="submit">
+                          {linkedJobs.data && linkedJobs.data.length > 0
+                            ? "Save Customer PO"
+                            : "Save PO & Create Job"}
+                        </Button>
+                      </form>
+                    </details>
+                  )}
                 </div>
               )}
 
@@ -230,34 +284,73 @@ export default async function QuotationPage({
               )}
 
               {isManagement ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  {(quotation.status === "draft" || quotation.status === "approved") && (
-                    <form action={markQuotationSent.bind(null, id)}>
-                      <Button type="submit">Sent to customer</Button>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(quotation.status === "draft" || quotation.status === "approved") && (
+                      <form action={markQuotationSent.bind(null, id)}>
+                        <Button type="submit">Sent to customer</Button>
+                      </form>
+                    )}
+
+                    {!statusInfo.isRejected && quotation.status !== "superseded" && (
+                      <form action={rejectQuotation.bind(null, id)}>
+                        <SecondaryButton type="submit">Rejected</SecondaryButton>
+                      </form>
+                    )}
+
+                    <form action={reviseQuotation.bind(null, id)}>
+                      <SecondaryButton type="submit">Create revised quotation (R11)</SecondaryButton>
                     </form>
-                  )}
+                  </div>
 
                   {(quotation.status === "sent" ||
                     quotation.status === "approved" ||
                     quotation.status === "draft") && (
-                    <form action={acceptQuotation.bind(null, id)}>
-                      {quotation.status === "sent" ? (
-                        <Button type="submit">Accepted by customer</Button>
-                      ) : (
-                        <SecondaryButton type="submit">Accepted by customer</SecondaryButton>
-                      )}
+                    <form
+                      action={acceptQuotation.bind(null, id)}
+                      className="space-y-3 rounded-md border border-line-2 bg-surface-2/60 p-3"
+                    >
+                      <div className="text-xs font-semibold text-ink">
+                        Customer Acceptance &amp; PO (optional — work can start before PO arrives)
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <Field label="PO number">
+                          <Input name="po_number" placeholder="e.g. PO/2026/104" />
+                        </Field>
+                        <Field label="PO date">
+                          <Input name="po_date" type="date" />
+                        </Field>
+                        <Field label="PO value (₹)">
+                          <Input
+                            name="po_value"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder={totalAmount > 0 ? String(totalAmount) : "0.00"}
+                          />
+                        </Field>
+                      </div>
+                      <Field label="PO file (PDF or image)">
+                        <Input name="po_file" type="file" accept=".pdf,image/*" />
+                      </Field>
+                      <label className="flex items-center gap-2 text-xs text-ink-2">
+                        <input
+                          type="checkbox"
+                          name="create_job"
+                          defaultChecked
+                          className="h-4 w-4 rounded border-line"
+                        />
+                        Create linked job (<Mono>BITA/YY-YY/0001</Mono>) immediately on acceptance
+                      </label>
+                      <div>
+                        {quotation.status === "sent" ? (
+                          <Button type="submit">Accepted by customer</Button>
+                        ) : (
+                          <SecondaryButton type="submit">Accepted by customer</SecondaryButton>
+                        )}
+                      </div>
                     </form>
                   )}
-
-                  {!statusInfo.isRejected && quotation.status !== "superseded" && (
-                    <form action={rejectQuotation.bind(null, id)}>
-                      <SecondaryButton type="submit">Rejected</SecondaryButton>
-                    </form>
-                  )}
-
-                  <form action={reviseQuotation.bind(null, id)}>
-                    <SecondaryButton type="submit">Create revised quotation (R11)</SecondaryButton>
-                  </form>
                 </div>
               ) : (
                 <Status tone="wait">
