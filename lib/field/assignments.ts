@@ -27,7 +27,8 @@ export type TechnicianJobItem = {
   inspection: {
     id: string;
     method: Enums<"test_method">;
-    status: "draft" | "submitted";
+    status: "draft" | "submitted" | "approved";
+    isApproved: boolean;
     missingFields: string[];
     observations: string | null;
     readings: Json;
@@ -143,15 +144,42 @@ export async function getTechnicianJobs(
     `)
     .in("assignment_id", assignmentIds);
 
+  // Check if any of these inspections have approved reports
+  const inspectionIds = inspections?.map((i) => i.id) || [];
+  const reportsByInspection = new Map<string, { status: string; approved_at: string | null }>();
+  if (inspectionIds.length > 0) {
+    const { data: reports } = await supabase
+      .from("reports")
+      .select("inspection_id, status, approved_at")
+      .in("inspection_id", inspectionIds);
+
+    if (reports) {
+      for (const rep of reports) {
+        if (rep.inspection_id) {
+          reportsByInspection.set(rep.inspection_id, {
+            status: rep.status,
+            approved_at: rep.approved_at,
+          });
+        }
+      }
+    }
+  }
+
   const inspectionByAssignment = new Map<string, TechnicianJobItem["inspection"]>();
 
   if (inspections) {
     for (const insp of inspections) {
       if (!insp.assignment_id) continue;
+      const rep = insp.id ? reportsByInspection.get(insp.id) : undefined;
+      const isApproved = Boolean(
+        rep && (rep.status === "approved" || rep.status === "sent" || Boolean(rep.approved_at))
+      );
+
       inspectionByAssignment.set(insp.assignment_id, {
         id: insp.id,
         method: insp.method,
-        status: insp.submitted_at ? "submitted" : "draft",
+        status: isApproved ? "approved" : insp.submitted_at ? "submitted" : "draft",
+        isApproved,
         missingFields: insp.missing_fields || [],
         observations: insp.observations,
         readings: insp.readings,
@@ -309,16 +337,90 @@ export async function submitInspectionReport(
   // Check if an inspection already exists for this assignment
   const { data: existingInspection } = await supabase
     .from("inspections")
-    .select("id, submitted_at")
+    .select("id, readings, observations, submitted_at")
     .eq("assignment_id", assignmentId)
     .maybeSingle();
 
-  // Once submitted, the office works from it; the phone can no longer change or reopen it.
-  if (existingInspection?.submitted_at) {
-    return { error: "This report was already submitted. Ask the office to make changes.", status: 409 };
+  // If inspection exists, check if there is an approved report.
+  // Per Phase 2 / A1: a submitted report CAN be edited and resubmitted from the phone
+  // until the office approves it; after approval, only the office edits (409 lock).
+  let existingReport: { id: string; status: string; approved_at: string | null } | null = null;
+  if (existingInspection) {
+    const { data: rep } = await supabase
+      .from("reports")
+      .select("id, status, approved_at")
+      .eq("inspection_id", existingInspection.id)
+      .maybeSingle();
+    existingReport = rep;
+
+    const isApproved = Boolean(
+      rep && (rep.status === "approved" || rep.status === "sent" || Boolean(rep.approved_at))
+    );
+
+    if (isApproved) {
+      return {
+        error: "This report has been approved by the office and is locked. Contact the office to make changes.",
+        status: 409,
+      };
+    }
+  }
+
+  // If this is an edit of an already submitted report, log the diff to inspection_edits & audit_log
+  const isEditOfSubmitted = Boolean(existingInspection?.submitted_at);
+  if (isEditOfSubmitted && existingInspection) {
+    const oldReadings = (existingInspection.readings ?? {}) as Record<string, unknown>;
+    const newReadings = (params.readings ?? {}) as Record<string, unknown>;
+    const diff: Record<string, { old: unknown; new: unknown }> = {};
+
+    const allKeys = new Set([...Object.keys(oldReadings), ...Object.keys(newReadings)]);
+    for (const k of allKeys) {
+      const oldVal = oldReadings[k];
+      const newVal = newReadings[k];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        diff[k] = { old: oldVal ?? null, new: newVal ?? null };
+      }
+    }
+
+    const obsChanged = (existingInspection.observations ?? "") !== (params.observations ?? "");
+    if (obsChanged) {
+      diff["observations"] = {
+        old: existingInspection.observations ?? null,
+        new: params.observations ?? null,
+      };
+    }
+
+    if (Object.keys(diff).length > 0) {
+      await supabase.from("inspection_edits").insert({
+        assignment_id: assignmentId,
+        inspection_id: existingInspection.id,
+        job_id: assignment.job_id,
+        edited_by: personId,
+        edited_at: now,
+        old_readings: (existingInspection.readings ?? {}) as Json,
+        new_readings: (params.readings ?? {}) as Json,
+        diff: diff as unknown as Json,
+        old_observations: existingInspection.observations ?? null,
+        new_observations: params.observations ?? null,
+      });
+
+      await supabase.from("audit_log").insert({
+        action: "update",
+        table_name: "inspections",
+        record_id: existingInspection.id,
+        changed_by_person: personId,
+        changed_fields: Object.keys(diff),
+        old_row: (existingInspection.readings ?? {}) as Json,
+        new_row: (params.readings ?? {}) as Json,
+      });
+    }
   }
 
   let inspectionId: string;
+  const effectiveSubmittedAt = isEditOfSubmitted && existingInspection
+    ? existingInspection.submitted_at
+    : canFinalize
+      ? now
+      : null;
 
   if (existingInspection) {
     inspectionId = existingInspection.id;
@@ -330,12 +432,17 @@ export async function submitInspectionReport(
         observations: params.observations ?? null,
         missing_fields: missing,
         submitted_by: personId,
-        submitted_at: canFinalize ? now : null,
+        submitted_at: effectiveSubmittedAt,
       })
       .eq("id", inspectionId);
 
     if (updateError) {
       return { error: `Failed to update inspection: ${updateError.message}`, status: 500 };
+    }
+
+    // If report was returned, resubmitting sets it back to waiting for review
+    if (existingReport && existingReport.status === "returned" && canFinalize) {
+      await supabase.from("reports").update({ status: "in_review" }).eq("id", existingReport.id);
     }
   } else {
     const { data: newInspection, error: insertError } = await supabase
@@ -348,7 +455,7 @@ export async function submitInspectionReport(
         observations: params.observations ?? null,
         missing_fields: missing,
         submitted_by: personId,
-        submitted_at: canFinalize ? now : null,
+        submitted_at: effectiveSubmittedAt,
       })
       .select("id")
       .single();
@@ -359,7 +466,7 @@ export async function submitInspectionReport(
     inspectionId = newInspection.id;
   }
 
-  if (canFinalize) {
+  if (canFinalize || isEditOfSubmitted) {
     // 1. Mark assignment completed
     await supabase
       .from("assignments")
@@ -378,7 +485,7 @@ export async function submitInspectionReport(
     id: inspectionId,
     draft: isDraft,
     missingFields: missing,
-    submittedAt: canFinalize ? now : null,
+    submittedAt: effectiveSubmittedAt,
   };
 }
 

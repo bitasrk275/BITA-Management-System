@@ -497,3 +497,24 @@ export async function markReportSent(reportId: string, fd: FormData) {
   revalidateReportPaths(report.id, report.job_id);
   redirect(`${path}?saved=sent`);
 }
+
+export async function toggleAttachmentInclude(
+  reportId: string,
+  attachmentId: string,
+  include: boolean
+) {
+  if (!validUuid(reportId) || !validUuid(attachmentId)) redirect("/review");
+  const { supabase, person } = await requireStaff();
+  if (!person) redirect("/login");
+
+  const path = `/review/${reportId}`;
+  const { error } = await supabase
+    .from("attachments")
+    .update({ include_in_report: include })
+    .eq("id", attachmentId);
+
+  if (error) redirectError(path, error.message);
+
+  revalidatePath(path);
+  redirect(`${path}?saved=photo`);
+}

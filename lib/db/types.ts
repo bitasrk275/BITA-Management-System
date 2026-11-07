@@ -103,6 +103,7 @@ export type Database = {
         Row: {
           caption: string | null
           id: string
+          include_in_report: boolean
           inspection_id: string | null
           job_id: string
           kind: string
@@ -114,6 +115,7 @@ export type Database = {
         Insert: {
           caption?: string | null
           id?: string
+          include_in_report?: boolean
           inspection_id?: string | null
           job_id: string
           kind: string
@@ -125,6 +127,7 @@ export type Database = {
         Update: {
           caption?: string | null
           id?: string
+          include_in_report?: boolean
           inspection_id?: string | null
           job_id?: string
           kind?: string
@@ -407,6 +410,90 @@ export type Database = {
           serial_no?: string | null
         }
         Relationships: []
+      }
+      inspection_edits: {
+        Row: {
+          assignment_id: string
+          diff: Json
+          edited_at: string
+          edited_by: string
+          id: string
+          inspection_id: string | null
+          job_id: string
+          new_observations: string | null
+          new_readings: Json
+          old_observations: string | null
+          old_readings: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+        }
+        Insert: {
+          assignment_id: string
+          diff?: Json
+          edited_at?: string
+          edited_by: string
+          id?: string
+          inspection_id?: string | null
+          job_id: string
+          new_observations?: string | null
+          new_readings?: Json
+          old_observations?: string | null
+          old_readings?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          diff?: Json
+          edited_at?: string
+          edited_by?: string
+          id?: string
+          inspection_id?: string | null
+          job_id?: string
+          new_observations?: string | null
+          new_readings?: Json
+          old_observations?: string | null
+          old_readings?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_edits_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_edits_edited_by_fkey"
+            columns: ["edited_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_edits_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_edits_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_edits_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inspections: {
         Row: {

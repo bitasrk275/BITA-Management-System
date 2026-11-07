@@ -11,7 +11,8 @@ export type EquipmentItem = {
 export type InspectionStatus = {
   id: string;
   method: TestMethod;
-  status: "draft" | "submitted";
+  status: "draft" | "submitted" | "approved";
+  isApproved?: boolean;
   missingFields: string[];
   observations: string | null;
   readings: Record<string, unknown>;

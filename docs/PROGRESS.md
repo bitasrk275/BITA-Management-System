@@ -67,6 +67,13 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-07 17:20 – Naveen – Antigravity
+Task: A1 Technician edits after submit + office report photo selection (Phase 2)
+Done: Replaced 409 lock on submitted field inspections with approval-based locking: technicians can edit and resubmit from the phone until technical reviewer approves the report. Every resubmission logs diff and old/new readings to `inspection_edits` and `audit_log`, and notifies the office via the dashboard "Report edits" attention item and dedicated diff view list. Added `include_in_report` boolean flag to `attachments` with migration `20261107000000_report_edits_and_photos.sql` and RLS; added photo inclusion review controls in `/review/[reportId]` so office can select/unselect which photos and drawings appear in the final report; updated Word (.docx) and PDF report generators to include only chosen photos. Updated Expo app `ReportScreen` to keep submitted reports editable until reviewer approval with clear status banners, and lock read-only upon approval. Verified unlinking phones remains accessible via register actions. 257 tests green, ESLint clean, tsc clean, and production build clean.
+Files changed: supabase/migrations/20261107000000_report_edits_and_photos.sql, lib/db/types.ts, lib/field/assignments.ts, lib/field/field.test.ts, lib/reports/docx.ts, lib/reports/review.ts, templates/reports/types.ts, app/(office)/dashboard/page.tsx, app/(office)/review/[reportId]/page.tsx, app/(office)/review/actions.ts, app/(office)/review/[reportId]/docx/route.ts, app/(office)/review/[reportId]/pdf/route.ts, apps/technician/src/screens/ReportScreen.tsx, apps/technician/src/types.ts, tests/field-api.test.ts, docs/PROGRESS.md
+Next: Open PR on bitasrk275/BITA-Management-System with base feature/naveen-integration.
+Blockers / questions: none.
+
 ### 2026-11-07 17:20 – Naveen – Claude
 Task: P2 Customer PO on quotation accept + jobs.po_value + PO link & warning on invoices
 Done: Added migration `supabase/migrations/20261107020000_customer_po_value.sql` (`po_value numeric(14,2) check (po_value is null or po_value >= 0)` on `public.jobs`) and updated `lib/db/types.ts` and `app/(office)/invoices/db.ts`. Built `lib/modules/po/` (`schema.ts`, `service.ts`, `po.test.ts`) and `/api/v1/quotations/[id]/accept` and `/api/v1/jobs/[id]/po`. Updated `/quotations/[id]` so "Accepted by customer" allows recording PO number, PO date, PO value, PO file, and creating the linked job in one step (while keeping PO optional so work can start before the PO arrives). Updated `/jobs/[id]`, `JobForm`, `/invoices/[id]`, and `InvoiceDraftEditor` to display `po_value`, prefill the job PO on invoices (editable), and warn whenever invoices against one PO total more than its value.
@@ -80,7 +87,6 @@ Done: Added `docs/ARCHITECTURE.md` defining the modular, API-first pattern (`lib
 Files changed: supabase/migrations/20261107010000_phase2_foundation.sql, lib/db/types.ts, lib/api/v1.ts, lib/modules/customers/, lib/modules/recycle-bin/, lib/modules/settings/, app/api/v1/, app/(office)/customers/, app/(office)/recycle-bin/, app/(office)/settings/, docs/ARCHITECTURE.md, supabase/tests/phase2-foundation.test.ts, docs/PROGRESS.md
 Next: Merge P1 into `feature/naveen-integration` and start P2 (Customer PO on accept + po_value + PO warning).
 Blockers / questions: none.
-
 ### 2026-11-07 16:37 – Naveen – Claude
 Task: T41 Deployment readiness for either host (.env.example, lib/env.ts, docs/DEPLOY.md, .github/workflows/reminders.yml)
 Done: Updated `.env.example` with every environment variable read across the codebase (names only, one-line comments, marking `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` required, plus `REMINDERS_CRON_SECRET` and `EXPO_PUBLIC_API_URL`). Added `lib/env.ts` and unit tests (`lib/env.test.ts`) for server-side required variable checks and wired them into `lib/field/service.ts`, `app/api/reminders/plan/route.ts`, and `lib/ai/extract-enquiry.ts`. Added `docs/DEPLOY.md` covering Netlify Free, Vercel Hobby (noting non-commercial terms), Supabase production checklist, daily payment reminders via n8n or free cron, and building the technician APK against the live URL. Added `.github/workflows/reminders.yml` (`workflow_dispatch` by default with commented daily cron).
