@@ -28,6 +28,7 @@ import {
   formatPlaceOfSupply,
 } from "@/lib/invoices";
 import { checkPoUtilization } from "@/lib/modules/po/service";
+import { listPriceItems } from "@/lib/modules/price-items/service";
 import { validUuid } from "@/lib/reports/review";
 import { homeFor } from "@/lib/roles";
 import { formatINR } from "../../jobs/labels";
@@ -77,7 +78,7 @@ export default async function InvoiceDetailPage({
     redirect(homeFor(person?.roles));
   }
 
-  const [invoiceRes, linesRes, paymentsRes, remindersRes] = await Promise.all([
+  const [invoiceRes, linesRes, paymentsRes, remindersRes, priceItemsRes] = await Promise.all([
     invoicesTable(supabase)
       .select(
         "*, jobs(id, job_no, po_number, po_date, po_value, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), quotations(id, ref_no, status)",
@@ -97,6 +98,7 @@ export default async function InvoiceDetailPage({
       .select("*")
       .eq("invoice_id", id)
       .order("scheduled_for", { ascending: false }) as Promise<{ data: PaymentReminderRow[] | null }>,
+    listPriceItems(supabase, { activeOnly: true }),
   ]);
 
   const invoice = invoiceRes.data;
@@ -105,6 +107,7 @@ export default async function InvoiceDetailPage({
   const lines = linesRes.data ?? [];
   const payments = paymentsRes.data ?? [];
   const reminders = remindersRes.data ?? [];
+  const priceItems = priceItemsRes.data ?? [];
   const job = invoice.jobs;
   const customer = job?.customers;
   const report = invoice.reports;
@@ -179,6 +182,9 @@ export default async function InvoiceDetailPage({
           <>
             <ButtonLink href="/invoices" variant="secondary" size="sm">
               All invoices
+            </ButtonLink>
+            <ButtonLink href="/price-list" variant="secondary" size="sm">
+              Price list
             </ButtonLink>
             {job && (
               <ButtonLink href={`/jobs/${job.id}`} variant="secondary" size="sm">
@@ -342,6 +348,7 @@ export default async function InvoiceDetailPage({
             customerGstin={customer?.gstin}
             customerAddress={customer?.billing_address}
             initialLines={lines}
+            priceItems={priceItems}
           />
         </Card>
       )}

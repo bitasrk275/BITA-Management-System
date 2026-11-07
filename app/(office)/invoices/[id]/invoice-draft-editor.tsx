@@ -22,8 +22,18 @@ import { evaluatePoValueWarning } from "@/lib/modules/po/schema";
 import { formatINR } from "../../jobs/labels";
 import type { InvoiceLineRow } from "../db";
 
+export type PriceItemOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  sac: string | null;
+  unit: string;
+  default_rate: number;
+};
+
 type EditableLine = {
   key: string;
+  priceItemId: string;
   description: string;
   sac: string;
   qty: string;
@@ -44,6 +54,7 @@ export function InvoiceDraftEditor({
   customerGstin,
   customerAddress,
   initialLines,
+  priceItems = [],
 }: {
   action: (formData: FormData) => void | Promise<void>;
   invoiceDate: string;
@@ -56,17 +67,30 @@ export function InvoiceDraftEditor({
   customerGstin?: string | null;
   customerAddress?: string | null;
   initialLines: InvoiceLineRow[];
+  priceItems?: PriceItemOption[];
 }) {
   const [selectedState, setSelectedState] = useState(placeOfSupply || "29");
   const [poNumber, setPoNumber] = useState(customerPoNumber || "");
-  const [defaultSac, setDefaultSac] = useState(initialLines[0]?.sac ?? "");
+  const [defaultSac, setDefaultSac] = useState(initialLines[0]?.sac ?? "998346");
+  const [availablePriceItems, setAvailablePriceItems] = useState<PriceItemOption[]>(priceItems);
+  const [showAddPriceItem, setShowAddPriceItem] = useState(false);
+  const [targetLineForNewItem, setTargetLineForNewItem] = useState<number | null>(null);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemDesc, setNewItemDesc] = useState("");
+  const [newItemRate, setNewItemRate] = useState("");
+  const [newItemUnit, setNewItemUnit] = useState("nos");
+  const [newItemSac, setNewItemSac] = useState("998346");
+  const [savingNewItem, setSavingNewItem] = useState(false);
+  const [newItemError, setNewItemError] = useState<string | null>(null);
+
   const [lines, setLines] = useState<EditableLine[]>(() => {
     if (initialLines.length === 0) {
       return [
         {
           key: "line-0",
+          priceItemId: "",
           description: "",
-          sac: "",
+          sac: "998346",
           qty: "1",
           unit: "nos",
           rate: "0",
@@ -80,8 +104,14 @@ export function InvoiceDraftEditor({
       const amount = Number(l.amount) || 0;
       const raw = Math.round(qty * rate * 100) / 100;
       const inferredMin = amount > raw && amount > 0 ? String(amount) : "";
+      const matched = priceItems.find(
+        (pi) =>
+          pi.name.toLowerCase() === l.description.toLowerCase() ||
+          (pi.description && l.description.toLowerCase().startsWith(pi.description.toLowerCase())),
+      );
       return {
         key: l.id || `line-${idx}`,
+        priceItemId: matched?.id ?? "",
         description: l.description,
         sac: l.sac ?? "",
         qty: String(qty),
@@ -96,16 +126,44 @@ export function InvoiceDraftEditor({
     setLines((prev) => prev.map((row, idx) => (idx === index ? { ...row, ...patch } : row)));
   }
 
-  function addLine() {
+  function applyPriceItemToLine(index: number, item: PriceItemOption) {
+    updateLine(index, {
+      priceItemId: item.id,
+      description: item.description?.trim() || item.name,
+      sac: item.sac || defaultSac,
+      unit: item.unit || "nos",
+      rate: String(Number(item.default_rate) || 0),
+    });
+  }
+
+  function handlePriceItemSelect(index: number, selectedValue: string) {
+    if (selectedValue === "__add_new__") {
+      setTargetLineForNewItem(index);
+      setShowAddPriceItem(true);
+      setNewItemError(null);
+      return;
+    }
+    if (!selectedValue) {
+      updateLine(index, { priceItemId: "" });
+      return;
+    }
+    const found = availablePriceItems.find((item) => item.id === selectedValue);
+    if (found) {
+      applyPriceItemToLine(index, found);
+    }
+  }
+
+  function addLine(item?: PriceItemOption) {
     setLines((prev) => [
       ...prev,
       {
         key: `line-${Date.now()}-${prev.length}`,
-        description: "",
-        sac: defaultSac,
+        priceItemId: item?.id ?? "",
+        description: item ? item.description?.trim() || item.name : "",
+        sac: item?.sac || defaultSac,
         qty: "1",
-        unit: "nos",
-        rate: "0",
+        unit: item?.unit || "nos",
+        rate: item ? String(Number(item.default_rate) || 0) : "0",
         minCharge: "",
       },
     ]);
@@ -113,6 +171,69 @@ export function InvoiceDraftEditor({
 
   function removeLine(index: number) {
     setLines((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== index)));
+  }
+
+  async function handleCreateNewPriceItem() {
+    if (!newItemName.trim()) {
+      setNewItemError("Enter a service or item name.");
+      return;
+    }
+    const rateNum = newItemRate.trim() ? Number(newItemRate) : 0;
+    if (!Number.isFinite(rateNum) || rateNum < 0) {
+      setNewItemError("Enter a valid non-negative default rate.");
+      return;
+    }
+
+    setSavingNewItem(true);
+    setNewItemError(null);
+
+    try {
+      const response = await fetch("/api/v1/price-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newItemName.trim(),
+          description: newItemDesc.trim() || newItemName.trim(),
+          default_rate: rateNum,
+          unit: newItemUnit.trim() || "nos",
+          sac: newItemSac.trim() || defaultSac || "998346",
+          active: true,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        data?: PriceItemOption;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.data) {
+        setNewItemError(payload.error ?? "Could not add price item.");
+        setSavingNewItem(false);
+        return;
+      }
+
+      const created = payload.data;
+      setAvailablePriceItems((prev) =>
+        [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+
+      if (targetLineForNewItem !== null && targetLineForNewItem < lines.length) {
+        applyPriceItemToLine(targetLineForNewItem, created);
+      } else {
+        addLine(created);
+      }
+
+      setNewItemName("");
+      setNewItemDesc("");
+      setNewItemRate("");
+      setNewItemUnit("nos");
+      setShowAddPriceItem(false);
+      setTargetLineForNewItem(null);
+    } catch {
+      setNewItemError("Network error while saving price item.");
+    } finally {
+      setSavingNewItem(false);
+    }
   }
 
   const computedLines = lines.map((l) => {
@@ -205,15 +326,94 @@ export function InvoiceDraftEditor({
       <div className="space-y-3 border-t border-line pt-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <SectionTitle>Invoice lines</SectionTitle>
+            <SectionTitle>Invoice lines (from Price list)</SectionTitle>
             <p className="text-[12px] text-ink-3">
-              Prefilled from the accepted quotation and approved report. If a minimum charge exceeds Qty × Rate, the minimum charge is applied automatically.
+              Select services and charges from the price list dropdown or click <strong>+ Add new item</strong>. Rates can be adjusted per invoice without changing past invoices.
             </p>
           </div>
-          <SecondaryButton type="button" onClick={addLine}>
-            + Add line
-          </SecondaryButton>
+          <div className="flex flex-wrap gap-2">
+            <SecondaryButton
+              type="button"
+              onClick={() => {
+                setTargetLineForNewItem(null);
+                setShowAddPriceItem((prev) => !prev);
+                setNewItemError(null);
+              }}
+            >
+              + Add new item
+            </SecondaryButton>
+            <SecondaryButton type="button" onClick={() => addLine()}>
+              + Add line
+            </SecondaryButton>
+          </div>
         </div>
+
+        {showAddPriceItem && (
+          <div className="rounded-lg border border-line bg-surface-2 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-ink">
+                Add new service / charge to Price list
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAddPriceItem(false)}
+                className="text-xs text-ink-3 underline"
+              >
+                Cancel
+              </button>
+            </div>
+            {newItemError && <Status tone="bad">{newItemError}</Status>}
+            <div className="grid gap-3 sm:grid-cols-4">
+              <Field label="Service name">
+                <Input
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="e.g. UT service"
+                />
+              </Field>
+              <Field label="Default rate (₹)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newItemRate}
+                  onChange={(e) => setNewItemRate(e.target.value)}
+                  placeholder="7500"
+                />
+              </Field>
+              <Field label="Unit">
+                <Input
+                  value={newItemUnit}
+                  onChange={(e) => setNewItemUnit(e.target.value)}
+                  placeholder="nos / visit"
+                />
+              </Field>
+              <Field label="SAC">
+                <Input
+                  value={newItemSac}
+                  onChange={(e) => setNewItemSac(e.target.value)}
+                  placeholder="998346"
+                />
+              </Field>
+            </div>
+            <Field label="Description on invoice line (optional)">
+              <Input
+                value={newItemDesc}
+                onChange={(e) => setNewItemDesc(e.target.value)}
+                placeholder="Defaults to service name if left blank"
+              />
+            </Field>
+            <div className="flex items-center gap-2">
+              <SecondaryButton
+                type="button"
+                disabled={savingNewItem}
+                onClick={handleCreateNewPriceItem}
+              >
+                {savingNewItem ? "Adding to price list…" : "Save to price list & use on invoice"}
+              </SecondaryButton>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3">
           {lines.map((line, index) => {
@@ -249,8 +449,24 @@ export function InvoiceDraftEditor({
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-12">
-                  <div className="sm:col-span-5">
-                    <Field label="Description">
+                  <div className="sm:col-span-4">
+                    <Field label="Price list item">
+                      <Select
+                        value={line.priceItemId}
+                        onChange={(e) => handlePriceItemSelect(index, e.target.value)}
+                      >
+                        <option value="">Choose from price list…</option>
+                        {availablePriceItems.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} — {formatINR(Number(item.default_rate) || 0)} / {item.unit}
+                          </option>
+                        ))}
+                        <option value="__add_new__">+ Add new item to price list…</option>
+                      </Select>
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-8">
+                    <Field label="Description on invoice">
                       <Input
                         name="line_description"
                         value={line.description}
@@ -260,7 +476,10 @@ export function InvoiceDraftEditor({
                       />
                     </Field>
                   </div>
-                  <div className="sm:col-span-2">
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-12">
+                  <div className="sm:col-span-3">
                     <Field label="SAC">
                       <Input
                         name="line_sac"
@@ -270,7 +489,7 @@ export function InvoiceDraftEditor({
                       />
                     </Field>
                   </div>
-                  <div className="sm:col-span-1">
+                  <div className="sm:col-span-2">
                     <Field label="Qty">
                       <Input
                         type="number"
@@ -283,7 +502,7 @@ export function InvoiceDraftEditor({
                       />
                     </Field>
                   </div>
-                  <div className="sm:col-span-1">
+                  <div className="sm:col-span-2">
                     <Field label="Unit">
                       <Input
                         name="line_unit"
@@ -293,8 +512,8 @@ export function InvoiceDraftEditor({
                       />
                     </Field>
                   </div>
-                  <div className="sm:col-span-1">
-                    <Field label="Rate (INR)">
+                  <div className="sm:col-span-3">
+                    <Field label="Rate (INR, editable)">
                       <Input
                         type="number"
                         step="0.01"

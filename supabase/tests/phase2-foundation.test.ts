@@ -284,4 +284,59 @@ describe("Phase 2 Foundation (P1): soft delete, recycle bin, settings, and permi
       ),
     ).rejects.toThrow(/check/i);
   });
+
+  it("manages price_items with RLS, soft delete, and recycle bin restoration (P3)", async () => {
+    // 1. Default seeded items are visible to staff
+    const seededRes = await ctx.as<{ name: string; default_rate: string }>(
+      OFFICE_USER,
+      `select name, default_rate::text as default_rate from public.price_items order by name`,
+    );
+    expect(seededRes.rows.some((r) => r.name === "UT service" && Number(r.default_rate) === 7500)).toBe(
+      true,
+    );
+    expect(seededRes.rows.some((r) => r.name === "Conveyance" && Number(r.default_rate) === 4000)).toBe(
+      true,
+    );
+
+    // 2. Technician cannot see price items
+    const techRes = await ctx.as(TECH_USER, `select id from public.price_items`);
+    expect(techRes.rows).toHaveLength(0);
+
+    // 3. Office can add and edit a price item
+    const createdRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.price_items (name, description, sac, unit, default_rate)
+       values ('RLA assessment', 'Remaining Life Assessment charges', '998346', 'job', 25000)
+       returning id`,
+    );
+    const priceItemId = createdRes.rows[0]!.id;
+
+    // 4. Management soft-deletes the price item; it disappears from normal SELECTs and appears in list_recycle_bin
+    await ctx.as(MGMT_USER, `select public.soft_delete_record('price_items', $1::uuid)`, [priceItemId]);
+
+    const afterDelete = await ctx.as(
+      OFFICE_USER,
+      `select id from public.price_items where id = $1`,
+      [priceItemId],
+    );
+    expect(afterDelete.rows).toHaveLength(0);
+
+    const binRes = await ctx.as<{ table_name: string; record_id: string; label: string }>(
+      MGMT_USER,
+      `select table_name, record_id, label from public.list_recycle_bin() where table_name = 'price_items'`,
+    );
+    expect(binRes.rows.some((r) => r.record_id === priceItemId && r.label === "RLA assessment")).toBe(
+      true,
+    );
+
+    // 5. Management restores the price item
+    await ctx.as(MGMT_USER, `select public.restore_record('price_items', $1::uuid)`, [priceItemId]);
+
+    const afterRestore = await ctx.as(
+      OFFICE_USER,
+      `select id, name from public.price_items where id = $1`,
+      [priceItemId],
+    );
+    expect(afterRestore.rows).toHaveLength(1);
+  });
 });

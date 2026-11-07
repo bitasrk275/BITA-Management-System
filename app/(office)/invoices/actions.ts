@@ -6,14 +6,15 @@ import { requireStaff } from "@/lib/auth";
 import { todayIST } from "@/lib/dates";
 import { text as str } from "@/lib/forms";
 import {
-  buildInvoiceLines,
   calculateInvoiceGst,
   computeLineAmount,
-  extractReportItems,
   roundPaise,
   sumTaxableValue,
-  type QuotationItemSource,
 } from "@/lib/invoices";
+import {
+  buildDraftInvoiceLinesFromPriceList,
+  listPriceItems,
+} from "@/lib/modules/price-items/service";
 import { validUuid } from "@/lib/reports/review";
 import { homeFor } from "@/lib/roles";
 import {
@@ -58,7 +59,7 @@ async function createDraftInvoiceForJobAndReport(
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, job_no, customer_id, enquiry_id, quotation_id, po_number, po_date, scope, customers(id, name, gstin, billing_address, payment_terms_days)",
+      "id, job_no, customer_id, enquiry_id, quotation_id, po_number, po_date, scope, test_methods, customers(id, name, gstin, billing_address, payment_terms_days)",
     )
     .eq("id", jobId)
     .maybeSingle();
@@ -86,43 +87,16 @@ async function createDraftInvoiceForJobAndReport(
     return { error: "Report must be approved by a technical reviewer before generating an invoice." };
   }
 
-  // 4. Load inspection readings if report has an inspection_id
-  let inspectionReadings: Record<string, unknown> | null = null;
-  if (report?.inspection_id) {
-    const { data: insp } = await supabase
-      .from("inspections")
-      .select("readings")
-      .eq("id", report.inspection_id)
-      .maybeSingle();
-    if (insp?.readings && typeof insp.readings === "object" && !Array.isArray(insp.readings)) {
-      inspectionReadings = insp.readings as Record<string, unknown>;
-    }
-  }
-
-  // 5. Load this job's quotation & its items. No guessing from other quotes of the same customer:
-  // without one, the draft starts from the fallback line and the office fills in the rates.
+  // 4. Phase 2 (P3 / Map Change 3): Fill initial draft line from the price list (never from quotation rates).
+  // The office picks services from the price list dropdown and can adjust rates per invoice.
   const quotationId = job.quotation_id;
-
-  let quotationItems: QuotationItemSource[] = [];
-  if (quotationId) {
-    const { data: qItems } = await supabase
-      .from("quotation_items")
-      .select("id, position, description, basis, rate, minimum_charge, notes")
-      .eq("quotation_id", quotationId)
-      .order("position", { ascending: true });
-    quotationItems = qItems ?? [];
-  }
-
-  const reportContent =
-    report?.content && typeof report.content === "object" && !Array.isArray(report.content)
-      ? (report.content as Record<string, unknown>)
-      : null;
-
-  const reportItems = extractReportItems(reportContent, inspectionReadings);
-  const builtLines = buildInvoiceLines({
-    quotationItems,
-    reportItems,
-    fallbackDescription: job.scope || (report ? `${report.method} Inspection (${report.report_no})` : "NDT Inspection Services"),
+  const { data: priceItems } = await listPriceItems(supabase, { activeOnly: true });
+  const builtLines = buildDraftInvoiceLinesFromPriceList({
+    priceItems,
+    method: report?.method ?? job.test_methods?.[0] ?? null,
+    reportNo: report?.report_no ?? null,
+    fallbackDescription:
+      job.scope || (report ? `${report.method} Inspection (${report.report_no})` : "NDT Inspection Services"),
   });
 
   const taxableValue = sumTaxableValue(builtLines);
