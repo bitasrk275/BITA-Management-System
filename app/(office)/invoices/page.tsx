@@ -97,9 +97,14 @@ export default async function InvoicesListPage({
         title="Invoices & Payments"
         subtitle="Generate GST invoices from approved reports, issue BITA/YY-YY/INV-xxxx numbers, download PDF & Word, and record payments."
         action={
-          <ButtonLink href="/jobs" variant="secondary" size="sm">
-            Generate from a job
-          </ButtonLink>
+          <>
+            <ButtonLink href="/invoices/export" variant="secondary" size="sm">
+              CA GST export (GSTR-1)
+            </ButtonLink>
+            <ButtonLink href="/jobs" variant="secondary" size="sm">
+              Generate from a job
+            </ButtonLink>
+          </>
         }
       />
 
