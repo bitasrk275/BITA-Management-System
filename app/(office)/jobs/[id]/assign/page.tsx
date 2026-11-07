@@ -107,7 +107,12 @@ export default async function AssignTechnicianPage({
     <>
       <PageHeader
         title={`Assign technician · ${job.job_no}`}
-        action={<ButtonLink href={`/jobs/${job.id}`}>Back to job</ButtonLink>}
+        action={
+          <div className="flex items-center gap-2">
+            <ButtonLink href={`/calendar?jobId=${job.id}`}>Open in Calendar →</ButtonLink>
+            <ButtonLink href={`/jobs/${job.id}`} variant="secondary">Back to job</ButtonLink>
+          </div>
+        }
       />
       <ErrorNote message={error} />
       {saved && <p className="mb-4 text-sm font-medium">Saved.</p>}
