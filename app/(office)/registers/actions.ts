@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { friendlyError } from "@/lib/forms";
 import { createPairingCode } from "../../../lib/field/pairing";
+import { getSupabaseAdmin } from "../../../lib/field/service";
 import { equipmentFields, isId, isRegister, personFields, qualificationFields, type Register } from "./fields";
 
 function fail(path: string, message: string): never {
@@ -69,11 +70,12 @@ export async function saveRegister(register: Register, recordId: string, fd: For
 }
 
 export async function createPhonePairingCode(personId: string) {
-  const { supabase, person } = await requireStaff();
+  const { person } = await requireStaff();
   if (!person?.roles.includes("management")) {
     fail(`/registers/people/${personId}`, "Only management can link phones.");
   }
-  const result = await createPairingCode(supabase, {
+  // pairing_codes is written only by the server (service role); RLS lets staff read, not insert.
+  const result = await createPairingCode(getSupabaseAdmin(), {
     personId,
     createdBy: person.id,
   });

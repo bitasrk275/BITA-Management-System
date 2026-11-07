@@ -7,12 +7,11 @@ import type { Database } from "../db/types";
  */
 export function getSupabaseAdmin(): SupabaseClient<Database> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // No fallback to the anon key: it would hit RLS and fail with a misleading error.
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceKey) {
-    throw new Error("Missing Supabase credentials for field service client.");
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env.local.");
   }
 
   return createClient<Database>(url, serviceKey, {

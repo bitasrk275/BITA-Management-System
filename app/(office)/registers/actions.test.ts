@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ requireStaff: vi.fn(), revalidatePath: vi.fn() }));
+const mocks = vi.hoisted(() => ({ requireStaff: vi.fn(), revalidatePath: vi.fn(), admin: { current: null as unknown } }));
 vi.mock("@/lib/auth", () => ({ requireStaff: mocks.requireStaff }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error(`REDIRECT ${url}`); } }));
 vi.mock("@/lib/forms", async () => await import("../../../lib/forms"));
+vi.mock("../../../lib/field/service", () => ({ getSupabaseAdmin: () => mocks.admin.current }));
 
 import { createPhonePairingCode, revokeTechnicianDevice, saveRegister } from "./actions";
 
@@ -21,6 +22,8 @@ function database(roles = ["management"]) {
   const upload = vi.fn().mockResolvedValue({ error: null });
   const supabase = { from: vi.fn().mockReturnValue(query), storage: { from: vi.fn().mockReturnValue({ upload }) } };
   mocks.requireStaff.mockResolvedValue({ supabase, person: { id: PERSON, roles } });
+  // Pairing codes are written with the service-role client; the test uses the same fake.
+  mocks.admin.current = supabase;
   return { query, supabase, upload };
 }
 
