@@ -1,58 +1,18 @@
 // Runs the migrations in an in-memory Postgres (PGlite) with a minimal stand-in for Supabase's auth schema,
 // then checks the business rules the database enforces. Test data only.
-import { PGlite } from "@electric-sql/pglite";
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import type { PGlite, Results } from "@electric-sql/pglite";
 import { beforeAll, describe, expect, it } from "vitest";
-
-const MIGRATIONS = join(__dirname, "..", "migrations");
-
-const SUPABASE_STANDIN = `
-  create role anon nologin;
-  create role authenticated nologin;
-  create role service_role nologin bypassrls;
-  create schema auth;
-  create table auth.users (id uuid primary key);
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  create schema storage;
-  create table storage.buckets (id text primary key, name text not null, public boolean default false);
-  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text, owner uuid);
-  alter table storage.objects enable row level security;
-  grant usage on schema storage to anon, authenticated, service_role;
-  grant all on storage.objects to authenticated, service_role;
-  grant usage on schema public, auth to anon, authenticated, service_role;
-  grant execute on function auth.uid() to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
-`;
+import { createTestDb } from "./setup";
 
 const OFFICE = "00000000-0000-0000-0000-00000000000a";
 const REVIEWER = "00000000-0000-0000-0000-00000000000b";
 const OUTSIDER = "00000000-0000-0000-0000-00000000000c";
 
 let db: PGlite;
-
-// Run SQL as a logged-in Supabase user (RLS applies), or as the server's service role.
-async function as<T>(userId: string | "service", sql: string, params: unknown[] = []) {
-  await db.exec(
-    userId === "service"
-      ? "set role service_role; select set_config('request.jwt.claim.sub', '', false);"
-      : `set role authenticated; select set_config('request.jwt.claim.sub', '${userId}', false);`,
-  );
-  try {
-    return await db.query<T>(sql, params);
-  } finally {
-    await db.exec("reset role; select set_config('request.jwt.claim.sub', '', false);");
-  }
-}
+let as: <T>(userId: string | "service", sql: string, params?: unknown[]) => Promise<Results<T>>;
 
 beforeAll(async () => {
-  db = new PGlite();
-  await db.exec(SUPABASE_STANDIN);
-  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort()) {
-    await db.exec(readFileSync(join(MIGRATIONS, file), "utf8"));
-  }
+  ({ db, as } = await createTestDb());
   await db.exec(`
     insert into auth.users (id) values ('${OFFICE}'), ('${REVIEWER}'), ('${OUTSIDER}');
     insert into people (id, full_name, user_id, roles) values
