@@ -25,7 +25,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Test data | Krishna | Not started | | |
 | Client inputs tracker | Krishna | Not started | | See `docs/CLIENT_INPUTS.md` |
 | Excel import | Naveen | Not started | | Needs BITA lists |
-| Smoke tests | Naveen | Not started | | |
+| Smoke tests | Naveen | In review | feature/naveen-e2e-flow | T40 PGlite end-to-end job lifecycle test (tests/e2e-flow.test.ts) + idempotent demo in-app invoices (draft, issued, partly_paid, paid) in supabase/seed/demo.sql |
 | User guide | Krishna | Not started | | |
 
 Status values: Not started · In progress · In review · Done · Blocked
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-07 13:34 – Naveen – Claude
+Task: T40 End-to-end PGlite flow test plus demo in-app invoices
+Done: Added shared PGlite test harness (`supabase/tests/setup.ts`) and full end-to-end lifecycle test (`tests/e2e-flow.test.ts`) covering one fake job from customer enquiry -> uploaded quotation & items -> management approval & acceptance -> job creation -> qualification/equipment registers & technician assignment -> service-role device pairing -> field inspection submission (with mandatory reading guard) -> report drafting -> reviewer approval & freeze -> in-app GST invoice generation & issue (`BITA/YY-YY/INV-xxxx`) -> partial & full payments -> job closure, asserting status and role-based refusals at each step. Updated `supabase/seed/demo.sql` with idempotent in-app tax invoices (`draft`, `issued`, `partly_paid`, `paid`), lines, and payments.
+Files changed: supabase/tests/setup.ts, supabase/tests/schema.test.ts, tests/e2e-flow.test.ts, supabase/seed/demo.sql, docs/PROGRESS.md
+Next: Merge PR into `feature/naveen-integration`.
+Blockers / questions: none.
 
 ### 2026-11-07 11:18 – Naveen – Antigravity
 Task: T38 Retire technician web screens (APK only, D-016) + apps/technician fixes & README
