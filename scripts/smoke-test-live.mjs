@@ -7,19 +7,34 @@
  *   node scripts/smoke-test-live.mjs [https://bita-management-system.vercel.app]
  */
 
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
 const BASE_URL = (process.argv[2] || process.env.BITA_LIVE_URL || "https://bita-management-system.vercel.app").replace(/\/+$/, "");
 
 console.log(`\n🔍 Starting live smoke test against: ${BASE_URL}\n`);
 
 async function fetchWithRetry(url, options = {}, retries = 3) {
+  let lastErr;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await fetch(url, options);
+      const opts = {
+        ...options,
+        headers: {
+          Connection: "close",
+          ...(options.headers || {}),
+        },
+        signal: options.signal || AbortSignal.timeout(15000),
+      };
+      return await fetch(url, opts);
     } catch (err) {
-      if (attempt === retries) throw err;
-      await new Promise((r) => setTimeout(r, 1000));
+      lastErr = err;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
     }
   }
+  throw lastErr;
 }
 
 const tests = [
@@ -93,7 +108,7 @@ const tests = [
     validate: (res, body) => {
       try {
         const json = JSON.parse(body);
-        return json.error && json.error.includes("authorization header");
+        return Boolean(json.error && json.error.includes("authorization header"));
       } catch {
         return false;
       }
@@ -107,7 +122,7 @@ const tests = [
     validate: (res, body) => {
       try {
         const json = JSON.parse(body);
-        return json.error && json.error.includes("authorization header");
+        return Boolean(json.error && json.error.includes("authorization header"));
       } catch {
         return false;
       }
@@ -121,7 +136,7 @@ const tests = [
     validate: (res, body) => {
       try {
         const json = JSON.parse(body);
-        return json.error && json.error.includes("authorization header");
+        return Boolean(json.error && json.error.includes("authorization header"));
       } catch {
         return false;
       }
