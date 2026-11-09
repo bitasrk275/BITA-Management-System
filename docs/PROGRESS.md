@@ -67,6 +67,18 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-09 18:50 – Naveen – Claude
+Task: Live Vercel + Mumbai region optimization, Telegram Executive Bot live pairing, Android APK release build (`BITA-Technician.apk`), interactive `/field-app` web companion, and end-to-end testing setup
+Done:
+- Merged PR #21 (54-screen QA audit + `tests/phase2-audit.test.ts`) and PR #22 (`tests/ut-fields-and-telegram.test.ts` + `scripts/smoke-test-live.mjs`); all 43 test files (349 tests) and 8/8 live smoke tests pass.
+- Registered live Telegram webhook (`https://bita-management-system.vercel.app/api/telegram/webhook`) with `@bita_executive_bot`, sanitized secret token handling, and verified live pairing and executive summary push.
+- Pinned Vercel serverless execution to `bom1` (Mumbai, India) in `vercel.json` co-located with Supabase (`ap-south-1`), deduplicated `fetchAuthContext` with `React.cache()`, skipped cookie auth on token-authenticated API routes in `middleware.ts`, and added `app/(office)/loading.tsx` + inline button spinners (`components/form-button.tsx`).
+- Built standalone Android release APK (`C:\BITA\BITA-Technician.apk`, 25.99 MB) and added an interactive browser/PWA Technician Field App at `/field-app` and `/technician`.
+- Populated `test_methods` automatically when converting a quotation to a job (`lib/modules/po/service.ts`) and added scope-based fallback in `lib/field/assignments.ts` so the mobile app always displays the `"Enter UT inspection report"` button.
+Files changed: vercel.json, lib/auth.ts, middleware.ts, app/(office)/loading.tsx, components/form-button.tsx, components/ui.tsx, components/app-shell.tsx, components/technician-web-app.tsx, app/field-app/page.tsx, app/(field)/layout.tsx, app/(field)/technician/page.tsx, lib/field/assignments.ts, lib/modules/po/service.ts, app/api/telegram/webhook/route.ts, app/(office)/settings/actions.ts, tests/phase2-audit.test.ts, tests/ut-fields-and-telegram.test.ts, scripts/smoke-test-live.mjs, docs/PROGRESS.md, docs/HANDOFF.md
+Next: Continue hands-on end-to-end testing tomorrow starting from submitting the 29-field UT report on `BITA/26-27/0002` in the mobile app → technical review & approval → invoice & payment → Telegram bot checks.
+Blockers / questions: none.
+
 ### 2026-11-09 12:08 – Naveen – Claude
 Task: Phase 2 Complete (P4d, P5, P6, P7 Telegram Executive Bot, A4 Log book, A5 Employee register, A6 Equipment report guard, A7 Dashboard/Sidebar v2, A8 Mobile App v2, BITA Reference Invoice 5387 layout, and BITA UT Report Fields 1–29 spec)
 Done:

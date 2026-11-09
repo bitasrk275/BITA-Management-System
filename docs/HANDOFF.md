@@ -107,6 +107,20 @@ Decisions made in this session: <or "none">
 
 ## Handoff entries (newest first)
 
+### 2026-11-09 18:50 – Naveen – full system E2E testing – from Claude to next session
+Branch: main / feature/naveen-integration (pushed: yes)
+Task: End-to-end live verification across Office Dashboard, Android Technician App (`BITA-Technician.apk`), and Telegram Executive Bot (`@bita_executive_bot`)
+Stopped at:
+- Production app is live at `https://bita-management-system.vercel.app` (pinned to `bom1` Mumbai region).
+- Database (`bita-dev`) is clean of dummy data and loaded with starting master records (9 customers & 32 contacts, 5 people & 16 qualifications, 4 UT flaw detectors, 9 price list items, sample quotation `027-2026`, and active job `BITA/26-27/0002` assigned with `USM GO+` `10020054` and `test_methods = ['UT']`).
+- Standalone Android APK is compiled at `C:\BITA\BITA-Technician.apk` (25.99 MB) and installed on phone; interactive browser companion is also live at `/field-app`.
+- User paired the mobile app, started work on `BITA/26-27/0002`, and verified `Test methods: UT` fix (`ff44534`) so `"Enter UT inspection report"` button is ready.
+Next step: Tomorrow, open `BITA/26-27/0002` on the phone app (pull to refresh), tap `"Enter UT inspection report"`, submit the 29-field UT report, approve it in `/review`, generate the invoice in `/invoices`, and test `@bita_executive_bot` commands.
+Files touched: vercel.json, lib/auth.ts, middleware.ts, app/(office)/loading.tsx, components/form-button.tsx, components/technician-web-app.tsx, app/field-app/page.tsx, lib/field/assignments.ts, lib/modules/po/service.ts, docs/PROGRESS.md, docs/HANDOFF.md
+How to run / test: `npm test`; `node scripts/smoke-test-live.mjs`; open `https://bita-management-system.vercel.app` and `C:\BITA\BITA-Technician.apk`.
+Known problems: none.
+Decisions made in this session: none.
+
 ### 2026-11-06 11:54 – Naveen – report templates – from Codex to review and T7
 Branch: feature/naveen-report-templates (base feature/naveen-technician-access; pushed at step end)
 Task: T8a typed readings and paper report layouts
