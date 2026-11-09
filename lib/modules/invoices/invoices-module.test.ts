@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseCreateInvoiceFromReportsInput } from "./schema";
+import {
+  parseCreateCreditNoteInput,
+  parseCreateInvoiceFromReportsInput,
+  parseRecordPaymentInput,
+} from "./schema";
 import {
   collectDistinctPoNumbers,
   isReportInvoicePending,
@@ -124,6 +128,50 @@ describe("P4a: Invoice pending status & multi-report invoice validation", () => 
     expect(defaultTaxParsed.ok).toBe(true);
     if (defaultTaxParsed.ok) {
       expect(defaultTaxParsed.value.kind).toBe("tax_invoice");
+    }
+  });
+
+  it("validates payment + TDS and credit note inputs (P4c)", () => {
+    const payParsed = parseRecordPaymentInput(
+      {
+        amount: "9000",
+        tds_amount: "1000",
+        paid_on: "2026-11-07",
+        mode: "NEFT",
+        reference: "UTR-001",
+      },
+      "2026-11-07",
+    );
+    expect(payParsed.ok).toBe(true);
+    if (payParsed.ok) {
+      expect(payParsed.value.amount).toBe(9000);
+      expect(payParsed.value.tds_amount).toBe(1000);
+      expect(payParsed.value.total_settled).toBe(10000);
+    }
+
+    const zeroPayParsed = parseRecordPaymentInput(
+      {
+        amount: "0",
+        tds_amount: "0",
+        paid_on: "2026-11-07",
+      },
+      "2026-11-07",
+    );
+    expect(zeroPayParsed.ok).toBe(false);
+
+    const cnParsed = parseCreateCreditNoteInput(
+      {
+        invoice_id: "11111111-1111-4111-8111-111111111111",
+        taxable_value: "1500",
+        credit_date: "2026-11-07",
+        reason: "Rate adjustment agreed with customer",
+      },
+      "2026-11-07",
+    );
+    expect(cnParsed.ok).toBe(true);
+    if (cnParsed.ok) {
+      expect(cnParsed.value.taxable_value).toBe(1500);
+      expect(cnParsed.value.reason).toBe("Rate adjustment agreed with customer");
     }
   });
 });

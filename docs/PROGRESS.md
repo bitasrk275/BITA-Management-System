@@ -15,7 +15,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
 | Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
-| Payments, reminders, job closure | Naveen | In review | feature/naveen-p4b-proforma-tax | Phase 2 P4b: Proforma vs Tax invoice choice (`BITA/YY-YY/PI-0001`), Convert to tax invoice (`converted_from_id`), and tax numbering from `invoice_numbering` setting |
+| Payments, reminders, job closure | Naveen | In review | feature/naveen-p4c-credit-notes-tds | Phase 2 P4c: Credit notes (`BITA/YY-YY/CN-0001`) linked to issued tax invoices + TDS deducted on payments (`payments.tds_amount`) settling invoice balance |
 | Dashboard | Naveen | Not started | | |
 | WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
 | Financial reports from Zoho (X4) | Naveen | In review | feature/naveen-gst-export | T36 CA GST export (GSTR-1 B2B & B2C CSV + Excel XML workbook at /invoices/export) |
@@ -66,6 +66,13 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-09 10:43 – Naveen – Claude
+Task: P4c Credit notes (`BITA/YY-YY/CN-0001`) + TDS deducted on payments (`payments.tds_amount`)
+Done: Added migration `supabase/migrations/20261107061000_credit_notes_and_tds.sql` adding `tds_amount` on `public.payments` and creating `public.credit_notes` with RLS, `private.next_credit_note_no()` (`BITA/YY-YY/CN-0001` honoring `next_credit_note_no` in `public.settings`), `private.before_credit_note_write()`, `private.sync_invoice_credit_notes()`, and updated `private.before_invoice_write()` / `private.check_payment_write()` so both `(amount + tds_amount)` and issued `credit_notes.total` reduce `invoices.balance`. Added `recordInvoicePayment`, `createCreditNoteForInvoice`, and `cancelCreditNoteById` in `lib/modules/invoices/service.ts` and `/api/v1/invoices/[id]/{payments,credit-notes}`. Updated `/invoices/[id]` with TDS field on payment recording, TDS breakdown in payment history, and Credit Notes creation/cancellation UI.
+Files changed: supabase/migrations/20261107061000_credit_notes_and_tds.sql, lib/db/types.ts, lib/modules/invoices/, app/api/v1/invoices/[id]/, app/(office)/invoices/, supabase/tests/phase2-foundation.test.ts, docs/PROGRESS.md
+Next: Merge P4c and PR #20 (A3 Calendar) into `feature/naveen-integration`, apply migrations to `bita-dev`, deploy Phase 2 to `main` (Vercel), and proceed to P4d.
+Blockers / questions: none.
 
 ### 2026-11-07 18:19 – Naveen – Claude
 Task: P4b Proforma vs Tax invoice choice, proforma series (`BITA/YY-YY/PI-0001`), Convert to tax invoice, and tax numbering from `invoice_numbering` setting

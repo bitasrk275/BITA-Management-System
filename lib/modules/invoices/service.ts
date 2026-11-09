@@ -11,7 +11,11 @@ import {
   listPriceItems,
 } from "../price-items/service";
 import { METHOD_LABEL } from "../../../app/(office)/jobs/labels";
-import type { CreateInvoiceFromReportsInput } from "./schema";
+import type {
+  CreateCreditNoteInput,
+  CreateInvoiceFromReportsInput,
+  RecordPaymentInput,
+} from "./schema";
 
 type AppSupabase = SupabaseClient<Database>;
 
@@ -623,4 +627,114 @@ export async function convertProformaToTaxInvoice(
   }
 
   return { invoice_id: created.id, created: true };
+}
+
+/**
+ * Records a payment (including optional TDS deducted) against an issued invoice.
+ * The database trigger verifies (amount + tds_amount) <= balance and updates the invoice balance and status.
+ */
+export async function recordInvoicePayment(
+  supabase: AppSupabase,
+  invoiceId: string,
+  input: RecordPaymentInput,
+) {
+  const { data, error } = await supabase
+    .from("payments")
+    .insert({
+      invoice_id: invoiceId,
+      amount: input.amount,
+      tds_amount: input.tds_amount,
+      paid_on: input.paid_on,
+      mode: input.mode,
+      reference: input.reference,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Could not record payment.");
+  }
+  return data;
+}
+
+/**
+ * Creates (and optionally issues with BITA/YY-YY/CN-0001 number) a credit note against an issued tax invoice.
+ * Automatically calculates CGST/SGST or IGST matching the invoice's place of supply.
+ */
+export async function createCreditNoteForInvoice(
+  supabase: AppSupabase,
+  input: CreateCreditNoteInput,
+) {
+  const { data: invoice, error: invErr } = await supabase
+    .from("invoices")
+    .select(
+      "id, kind, status, balance, place_of_supply, jobs(customers(gstin, billing_address))",
+    )
+    .eq("id", input.invoice_id)
+    .maybeSingle();
+
+  if (invErr || !invoice) {
+    throw new Error(invErr?.message ?? "Target invoice not found.");
+  }
+  if (invoice.kind !== "tax_invoice") {
+    throw new Error("Credit notes can only be issued against a tax invoice.");
+  }
+  if (invoice.status === "draft" || invoice.status === "cancelled") {
+    throw new Error("Credit notes can only be created against an issued tax invoice.");
+  }
+
+  const customer = (
+    invoice.jobs as unknown as {
+      customers?: { gstin: string | null; billing_address: string | null } | null;
+    } | null
+  )?.customers;
+
+  const gst = calculateInvoiceGst(input.taxable_value, {
+    gstin: customer?.gstin,
+    billingAddress: customer?.billing_address,
+    placeOfSupply: invoice.place_of_supply,
+  });
+
+  const { data, error } = await supabase
+    .from("credit_notes")
+    .insert({
+      invoice_id: invoice.id,
+      credit_date: input.credit_date,
+      reason: input.reason,
+      taxable_value: gst.taxable_value,
+      cgst: gst.cgst,
+      sgst: gst.sgst,
+      igst: gst.igst,
+      round_off: gst.round_off,
+      total: gst.total,
+      status: input.issue_immediately ? "issued" : "draft",
+      notes: input.notes,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Could not create credit note.");
+  }
+  return data;
+}
+
+/**
+ * Cancels a credit note (restoring its amount to the linked invoice's balance).
+ */
+export async function cancelCreditNoteById(
+  supabase: AppSupabase,
+  creditNoteId: string,
+) {
+  const { data, error } = await supabase
+    .from("credit_notes")
+    .update({ status: "cancelled" })
+    .eq("id", creditNoteId)
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Could not cancel credit note.");
+  }
+  return data;
 }

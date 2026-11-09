@@ -580,4 +580,78 @@ describe("Phase 2 Foundation (P1): soft delete, recycle bin, settings, and permi
     );
     expect(settingAfter.rows[0]?.next_no).toBe(551);
   });
+
+  it("settles invoice balance with TDS on payments and credit notes (BITA/YY-YY/CN-0001) (P4c)", async () => {
+    const custRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.customers (name, code, gstin)
+       values ('Credit Note & TDS Hydraulics', 'CNTH', '29AABCC3333F1Z9')
+       returning id`,
+    );
+    const custId = custRes.rows[0]!.id;
+
+    const jobRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.jobs (customer_id, po_number) values ($1, 'PO-CNTH-01') returning id`,
+      [custId],
+    );
+    const jobId = jobRes.rows[0]!.id;
+
+    // Issue a tax invoice for Rs 11,800 (10,000 + 900 CGST + 900 SGST)
+    const invRes = await ctx.as<{ id: string }>(
+      OFFICE_USER,
+      `insert into public.invoices (job_id, kind, taxable_value, cgst, sgst, total)
+       values ($1, 'tax_invoice', 10000, 900, 900, 11800)
+       returning id`,
+      [jobId],
+    );
+    const invId = invRes.rows[0]!.id;
+
+    await ctx.as(
+      OFFICE_USER,
+      `insert into public.invoice_lines (invoice_id, position, description, sac, qty, unit, rate, amount)
+       values ($1, 1, 'UT testing of hydraulic cylinders', '998346', 1, 'job', 10000, 10000)`,
+      [invId],
+    );
+
+    await ctx.as(
+      OFFICE_USER,
+      `update public.invoices set status = 'issued' where id = $1`,
+      [invId],
+    );
+
+    // 1. Customer pays Rs 9,000 in bank + deducts Rs 1,000 TDS = Rs 10,000 settled -> balance becomes 1,800 (partly_paid)
+    await ctx.as(
+      OFFICE_USER,
+      `insert into public.payments (invoice_id, amount, tds_amount, paid_on, mode, reference)
+       values ($1, 9000, 1000, '2026-11-07', 'NEFT', 'UTR-TDS-9000')`,
+      [invId],
+    );
+
+    const afterPay = await ctx.as<{ balance: string; status: string }>(
+      OFFICE_USER,
+      `select balance::text as balance, status from public.invoices where id = $1`,
+      [invId],
+    );
+    expect(Number(afterPay.rows[0]?.balance)).toBe(1800);
+    expect(afterPay.rows[0]?.status).toBe("partly_paid");
+
+    // 2. Issue a Credit Note for the remaining Rs 1,800 (taxable 1,525.42 + CGST 137.29 + SGST 137.29 = 1,800)
+    const cnRes = await ctx.as<{ id: string; credit_note_no: string }>(
+      OFFICE_USER,
+      `insert into public.credit_notes (invoice_id, credit_date, reason, taxable_value, cgst, sgst, igst, round_off, total)
+       values ($1, '2026-11-07', 'Rate discount agreed', 1525.42, 137.29, 137.29, 0, 0, 1800)
+       returning id, credit_note_no`,
+      [invId],
+    );
+    expect(cnRes.rows[0]?.credit_note_no).toMatch(/^BITA\/\d{2}-\d{2}\/CN-0001$/);
+
+    const afterCn = await ctx.as<{ balance: string; status: string }>(
+      OFFICE_USER,
+      `select balance::text as balance, status from public.invoices where id = $1`,
+      [invId],
+    );
+    expect(Number(afterCn.rows[0]?.balance)).toBe(0);
+    expect(afterCn.rows[0]?.status).toBe("paid");
+  });
 });

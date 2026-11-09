@@ -209,6 +209,68 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_notes: {
+        Row: {
+          cgst: number
+          created_at: string
+          credit_date: string
+          credit_note_no: string | null
+          id: string
+          igst: number
+          invoice_id: string
+          issued_at: string | null
+          notes: string | null
+          reason: string
+          round_off: number
+          sgst: number
+          status: string
+          taxable_value: number
+          total: number
+        }
+        Insert: {
+          cgst?: number
+          created_at?: string
+          credit_date?: string
+          credit_note_no?: string | null
+          id?: string
+          igst?: number
+          invoice_id: string
+          issued_at?: string | null
+          notes?: string | null
+          reason: string
+          round_off?: number
+          sgst?: number
+          status?: string
+          taxable_value?: number
+          total?: number
+        }
+        Update: {
+          cgst?: number
+          created_at?: string
+          credit_date?: string
+          credit_note_no?: string | null
+          id?: string
+          igst?: number
+          invoice_id?: string
+          issued_at?: string | null
+          notes?: string | null
+          reason?: string
+          round_off?: number
+          sgst?: number
+          status?: string
+          taxable_value?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_notes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_contacts: {
         Row: {
           created_at: string
@@ -1071,6 +1133,7 @@ export type Database = {
           mode: string | null
           paid_on: string
           reference: string | null
+          tds_amount: number
         }
         Insert: {
           amount: number
@@ -1080,6 +1143,7 @@ export type Database = {
           mode?: string | null
           paid_on?: string
           reference?: string | null
+          tds_amount?: number
         }
         Update: {
           amount?: number
@@ -1089,6 +1153,7 @@ export type Database = {
           mode?: string | null
           paid_on?: string
           reference?: string | null
+          tds_amount?: number
         }
         Relationships: [
           {

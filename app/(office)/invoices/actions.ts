@@ -16,9 +16,16 @@ import {
   listPriceItems,
 } from "@/lib/modules/price-items/service";
 import {
+  cancelCreditNoteById,
   convertProformaToTaxInvoice,
+  createCreditNoteForInvoice,
   createDraftInvoiceFromReports,
+  recordInvoicePayment,
 } from "@/lib/modules/invoices/service";
+import {
+  parseCreateCreditNoteInput,
+  parseRecordPaymentInput,
+} from "@/lib/modules/invoices/schema";
 import { validUuid } from "@/lib/reports/review";
 import { homeFor } from "@/lib/roles";
 import {
@@ -486,27 +493,88 @@ export async function recordPayment(invoiceId: string, formData: FormData) {
   if (!validUuid(invoiceId)) redirect("/invoices");
   const { supabase } = await requireBillingStaff();
 
-  const amountRaw = Number(formData.get("amount"));
-  const paidOn = str(formData, "paid_on") ?? todayIST();
-  const mode = str(formData, "mode") ?? "NEFT";
-  const reference = str(formData, "reference");
+  const parsed = parseRecordPaymentInput(
+    {
+      amount: formData.get("amount"),
+      tds_amount: formData.get("tds_amount"),
+      paid_on: str(formData, "paid_on"),
+      mode: str(formData, "mode"),
+      reference: str(formData, "reference"),
+    },
+    todayIST(),
+  );
 
-  if (!Number.isFinite(amountRaw) || amountRaw <= 0) {
-    redirect(errUrl(`/invoices/${invoiceId}`, "Enter a valid payment amount greater than zero."));
+  if (!parsed.ok) {
+    redirect(errUrl(`/invoices/${invoiceId}`, parsed.error));
   }
 
-  const amount = roundPaise(amountRaw);
+  try {
+    await recordInvoicePayment(supabase, invoiceId, parsed.value);
+  } catch (err) {
+    redirect(
+      errUrl(
+        `/invoices/${invoiceId}`,
+        err instanceof Error ? err.message : "Could not record payment.",
+      ),
+    );
+  }
 
-  const { error } = await paymentsTable(supabase).insert({
-    invoice_id: invoiceId,
-    amount,
-    paid_on: paidOn,
-    mode,
-    reference,
-  });
+  revalidatePath("/invoices");
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/dashboard");
+  redirect(`/invoices/${invoiceId}?saved=1`);
+}
 
-  if (error) {
-    redirect(errUrl(`/invoices/${invoiceId}`, error.message));
+export async function issueCreditNoteAction(invoiceId: string, formData: FormData) {
+  if (!validUuid(invoiceId)) redirect("/invoices");
+  const { supabase } = await requireBillingStaff();
+
+  const parsed = parseCreateCreditNoteInput(
+    {
+      invoice_id: invoiceId,
+      reason: str(formData, "reason"),
+      taxable_value: formData.get("taxable_value"),
+      credit_date: str(formData, "credit_date"),
+      notes: str(formData, "notes"),
+      issue_immediately: true,
+    },
+    todayIST(),
+  );
+
+  if (!parsed.ok) {
+    redirect(errUrl(`/invoices/${invoiceId}`, parsed.error));
+  }
+
+  try {
+    await createCreditNoteForInvoice(supabase, parsed.value);
+  } catch (err) {
+    redirect(
+      errUrl(
+        `/invoices/${invoiceId}`,
+        err instanceof Error ? err.message : "Could not issue credit note.",
+      ),
+    );
+  }
+
+  revalidatePath("/invoices");
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/dashboard");
+  redirect(`/invoices/${invoiceId}?saved=1`);
+}
+
+export async function cancelCreditNoteAction(invoiceId: string, creditNoteId: string) {
+  if (!validUuid(invoiceId) || !validUuid(creditNoteId)) redirect("/invoices");
+  const { supabase } = await requireBillingStaff();
+
+  try {
+    await cancelCreditNoteById(supabase, creditNoteId);
+  } catch (err) {
+    redirect(
+      errUrl(
+        `/invoices/${invoiceId}`,
+        err instanceof Error ? err.message : "Could not cancel credit note.",
+      ),
+    );
   }
 
   revalidatePath("/invoices");

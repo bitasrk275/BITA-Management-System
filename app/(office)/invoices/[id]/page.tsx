@@ -34,18 +34,22 @@ import { validUuid } from "@/lib/reports/review";
 import { homeFor } from "@/lib/roles";
 import { formatINR } from "../../jobs/labels";
 import {
+  cancelCreditNoteAction,
   cancelInvoice,
   convertProformaAction,
+  issueCreditNoteAction,
   issueInvoice,
   recordPayment,
   toggleInvoiceReminders,
   updateDraftInvoice,
 } from "../actions";
 import {
+  creditNotesTable,
   invoiceLinesTable,
   invoicesTable,
   paymentRemindersTable,
   paymentsTable,
+  type CreditNoteRow,
   type InvoiceLineRow,
   type InvoiceWithRelations,
   type PaymentReminderRow,
@@ -80,34 +84,41 @@ export default async function InvoiceDetailPage({
     redirect(homeFor(person?.roles));
   }
 
-  const [invoiceRes, linesRes, paymentsRes, remindersRes, priceItemsRes] = await Promise.all([
-    invoicesTable(supabase)
-      .select(
-        "*, jobs(id, job_no, po_number, po_date, po_value, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), invoice_reports(report_id, reports(id, report_no, method, status, job_id, jobs(id, job_no, po_number))), quotations(id, ref_no, status)",
-      )
-      .eq("id", id)
-      .maybeSingle() as Promise<{ data: InvoiceWithRelations | null }>,
-    invoiceLinesTable(supabase)
-      .select("*")
-      .eq("invoice_id", id)
-      .order("position", { ascending: true }) as Promise<{ data: InvoiceLineRow[] | null }>,
-    paymentsTable(supabase)
-      .select("*")
-      .eq("invoice_id", id)
-      .order("paid_on", { ascending: false })
-      .order("created_at", { ascending: false }) as Promise<{ data: PaymentRow[] | null }>,
-    paymentRemindersTable(supabase)
-      .select("*")
-      .eq("invoice_id", id)
-      .order("scheduled_for", { ascending: false }) as Promise<{ data: PaymentReminderRow[] | null }>,
-    listPriceItems(supabase, { activeOnly: true }),
-  ]);
+  const [invoiceRes, linesRes, paymentsRes, creditNotesRes, remindersRes, priceItemsRes] =
+    await Promise.all([
+      invoicesTable(supabase)
+        .select(
+          "*, jobs(id, job_no, po_number, po_date, po_value, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), invoice_reports(report_id, reports(id, report_no, method, status, job_id, jobs(id, job_no, po_number))), quotations(id, ref_no, status)",
+        )
+        .eq("id", id)
+        .maybeSingle() as Promise<{ data: InvoiceWithRelations | null }>,
+      invoiceLinesTable(supabase)
+        .select("*")
+        .eq("invoice_id", id)
+        .order("position", { ascending: true }) as Promise<{ data: InvoiceLineRow[] | null }>,
+      paymentsTable(supabase)
+        .select("*")
+        .eq("invoice_id", id)
+        .order("paid_on", { ascending: false })
+        .order("created_at", { ascending: false }) as Promise<{ data: PaymentRow[] | null }>,
+      creditNotesTable(supabase)
+        .select("*")
+        .eq("invoice_id", id)
+        .order("credit_date", { ascending: false })
+        .order("created_at", { ascending: false }) as Promise<{ data: CreditNoteRow[] | null }>,
+      paymentRemindersTable(supabase)
+        .select("*")
+        .eq("invoice_id", id)
+        .order("scheduled_for", { ascending: false }) as Promise<{ data: PaymentReminderRow[] | null }>,
+      listPriceItems(supabase, { activeOnly: true }),
+    ]);
 
   const invoice = invoiceRes.data;
   if (!invoice) notFound();
 
   const lines = linesRes.data ?? [];
   const payments = paymentsRes.data ?? [];
+  const creditNotes = creditNotesRes.data ?? [];
   const reminders = remindersRes.data ?? [];
   const priceItems = priceItemsRes.data ?? [];
   const job = invoice.jobs;
@@ -226,6 +237,11 @@ export default async function InvoiceDetailPage({
   });
 
   const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalTds = payments.reduce((sum, p) => sum + (Number(p.tds_amount) || 0), 0);
+  const totalCredited = creditNotes
+    .filter((cn) => cn.status === "issued")
+    .reduce((sum, cn) => sum + (Number(cn.total) || 0), 0);
+  const totalSettled = totalPaid + totalTds + totalCredited;
   const remainingBalance = Number(invoice.balance) || 0;
 
   return (
@@ -348,8 +364,17 @@ export default async function InvoiceDetailPage({
                 <dd className="font-semibold text-ink tabular-nums">{formatINR(Number(invoice.total) || 0)}</dd>
               </div>
               <div>
-                <dt className="text-ink-3">Received</dt>
-                <dd className="font-medium text-ok tabular-nums">{formatINR(totalPaid)}</dd>
+                <dt className="text-ink-3">Settled (Bank / TDS / CN)</dt>
+                <dd className="font-medium text-ok tabular-nums">
+                  {formatINR(totalSettled)}
+                  {(totalTds > 0 || totalCredited > 0) && (
+                    <span className="block text-[11px] font-normal text-ink-3">
+                      Bank {formatINR(totalPaid)}
+                      {totalTds > 0 ? ` · TDS ${formatINR(totalTds)}` : ""}
+                      {totalCredited > 0 ? ` · CN ${formatINR(totalCredited)}` : ""}
+                    </span>
+                  )}
+                </dd>
               </div>
               <div>
                 <dt className="text-ink-3">Balance Due</dt>
@@ -374,7 +399,7 @@ export default async function InvoiceDetailPage({
                   </SecondaryButton>
                 </form>
               )}
-              {totalPaid === 0 && (
+              {totalSettled === 0 && (
                 <form action={cancelInvoice.bind(null, invoice.id)}>
                   <SecondaryButton type="submit">
                     Cancel {isProforma ? "proforma" : "invoice"}
@@ -387,21 +412,31 @@ export default async function InvoiceDetailPage({
 
         {isIssued && remainingBalance > 0 && (
           <Card className="space-y-4">
-            <SectionTitle>2. Record payment</SectionTitle>
+            <SectionTitle>2. Record payment &amp; TDS</SectionTitle>
             <p className="text-[13px] text-ink-2">
-              Record a customer payment against this invoice. Recording the full remaining balance ({formatINR(remainingBalance)}) automatically marks the invoice <strong className="font-medium text-ink">Paid</strong>.
+              Record a customer payment against this invoice. Both the bank receipt and any TDS deducted by the customer settle the remaining balance ({formatINR(remainingBalance)}).
             </p>
             <form action={recordPayment.bind(null, invoice.id)} className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Amount received (INR)">
+                <Field label="Amount received in bank (INR)">
                   <Input
                     type="number"
                     step="0.01"
-                    min="0.01"
+                    min="0"
                     max={remainingBalance}
                     name="amount"
                     defaultValue={String(remainingBalance)}
                     required
+                  />
+                </Field>
+                <Field label="TDS deducted by customer (INR)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={remainingBalance}
+                    name="tds_amount"
+                    defaultValue="0"
                   />
                 </Field>
                 <Field label="Payment date">
@@ -417,11 +452,49 @@ export default async function InvoiceDetailPage({
                     <option value="Bank Transfer">Bank Transfer</option>
                   </Select>
                 </Field>
-                <Field label="Reference / UTR / Cheque no.">
-                  <Input name="reference" placeholder="e.g. UTR-HDFC0001234" />
-                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Reference / UTR / Cheque no.">
+                    <Input name="reference" placeholder="e.g. UTR-HDFC0001234" />
+                  </Field>
+                </div>
               </div>
               <Button type="submit">Record payment</Button>
+            </form>
+          </Card>
+        )}
+
+        {!isProforma && isIssued && remainingBalance > 0 && (
+          <Card className="space-y-4">
+            <SectionTitle>3. Issue Credit Note (BITA/YY-YY/CN-0001)</SectionTitle>
+            <p className="text-[13px] text-ink-2">
+              Issue a credit note against this tax invoice for rate adjustments, short quantities or billing corrections. The credit note total reduces the invoice balance and is included in the CA GST export.
+            </p>
+            <form action={issueCreditNoteAction.bind(null, invoice.id)} className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Taxable credit amount (INR)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    name="taxable_value"
+                    placeholder="e.g. 1000.00"
+                    required
+                  />
+                </Field>
+                <Field label="Credit note date">
+                  <Input type="date" name="credit_date" defaultValue={todayIST()} required />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Reason for credit note">
+                    <Input
+                      name="reason"
+                      placeholder="e.g. Rate revision as per customer discussion"
+                      required
+                    />
+                  </Field>
+                </div>
+              </div>
+              <SecondaryButton type="submit">Issue credit note (18% GST auto-computed)</SecondaryButton>
             </form>
           </Card>
         )}
@@ -462,24 +535,90 @@ export default async function InvoiceDetailPage({
         <section>
           <SectionTitle>Payments received ({payments.length})</SectionTitle>
           <List>
-            {payments.map((p) => (
-              <ListRow
-                key={p.id}
-                tone="ok"
-                title={
-                  <span>
-                    <strong className="font-semibold text-ink tabular-nums">{formatINR(Number(p.amount) || 0)}</strong>
-                    <span className="ml-2.5 text-[13px] text-ink-2">
-                      via {p.mode || "Bank Transfer"}
-                      {p.reference ? ` · Ref: ${p.reference}` : ""}
+            {payments.map((p) => {
+              const bankAmt = Number(p.amount) || 0;
+              const tdsAmt = Number(p.tds_amount) || 0;
+              return (
+                <ListRow
+                  key={p.id}
+                  tone="ok"
+                  title={
+                    <span>
+                      <strong className="font-semibold text-ink tabular-nums">
+                        {formatINR(bankAmt)}
+                      </strong>
+                      {tdsAmt > 0 && (
+                        <span className="ml-2 font-medium text-ink-2 tabular-nums">
+                          + TDS {formatINR(tdsAmt)} (Total settled: {formatINR(bankAmt + tdsAmt)})
+                        </span>
+                      )}
+                      <span className="ml-2.5 text-[13px] text-ink-2">
+                        via {p.mode || "Bank Transfer"}
+                        {p.reference ? ` · Ref: ${p.reference}` : ""}
+                      </span>
                     </span>
-                  </span>
-                }
-                detail={`Paid on ${shortDate(p.paid_on)}`}
-              />
-            ))}
+                  }
+                  detail={`Paid on ${shortDate(p.paid_on)}`}
+                />
+              );
+            })}
             {payments.length === 0 && (
               <EmptyRow>No payments recorded against this invoice yet.</EmptyRow>
+            )}
+          </List>
+        </section>
+      )}
+
+      {/* Credit Notes History */}
+      {(!isProforma && (isIssued || creditNotes.length > 0)) && (
+        <section>
+          <SectionTitle>Credit notes ({creditNotes.length})</SectionTitle>
+          <List>
+            {creditNotes.map((cn) => (
+              <ListRow
+                key={cn.id}
+                tone={cn.status === "issued" ? "info" : "none"}
+                title={
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    <Mono>{cn.credit_note_no}</Mono>
+                    <strong className="font-semibold text-ink tabular-nums">
+                      {formatINR(Number(cn.total) || 0)}
+                    </strong>
+                    <span className="text-[12.5px] text-ink-2">
+                      (Taxable {formatINR(Number(cn.taxable_value) || 0)} + GST{" "}
+                      {formatINR(
+                        (Number(cn.cgst) || 0) +
+                          (Number(cn.sgst) || 0) +
+                          (Number(cn.igst) || 0),
+                      )}
+                      )
+                    </span>
+                    <Status tone={cn.status === "issued" ? "info" : "none"}>
+                      {cn.status === "issued" ? "Issued" : "Cancelled"}
+                    </Status>
+                  </span>
+                }
+                detail={
+                  <span className="inline-flex flex-wrap items-center gap-3">
+                    <span>
+                      {cn.reason} · Dated {shortDate(cn.credit_date)}
+                    </span>
+                    {cn.status === "issued" && (
+                      <form action={cancelCreditNoteAction.bind(null, invoice.id, cn.id)}>
+                        <button
+                          type="submit"
+                          className="text-[12px] font-medium text-ink-2 underline hover:text-ink"
+                        >
+                          Cancel credit note
+                        </button>
+                      </form>
+                    )}
+                  </span>
+                }
+              />
+            ))}
+            {creditNotes.length === 0 && (
+              <EmptyRow>No credit notes issued against this tax invoice.</EmptyRow>
             )}
           </List>
         </section>

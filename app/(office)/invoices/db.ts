@@ -51,9 +51,28 @@ export interface PaymentRow {
   id: string;
   invoice_id: string;
   amount: number;
+  tds_amount?: number;
   paid_on: string;
   mode: string | null;
   reference: string | null;
+  created_at: string;
+}
+
+export interface CreditNoteRow {
+  id: string;
+  invoice_id: string;
+  credit_note_no: string | null;
+  credit_date: string;
+  reason: string;
+  taxable_value: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  round_off: number;
+  total: number;
+  status: "draft" | "issued" | "cancelled" | string;
+  issued_at: string | null;
+  notes: string | null;
   created_at: string;
 }
 
@@ -134,4 +153,9 @@ export function paymentsTable(supabase: SupabaseClient<Database>): any {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function paymentRemindersTable(supabase: SupabaseClient<Database>): any {
   return supabase.from("payment_reminders" as never);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function creditNotesTable(supabase: SupabaseClient<Database>): any {
+  return supabase.from("credit_notes" as never);
 }
