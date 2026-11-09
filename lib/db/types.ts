@@ -50,6 +50,7 @@ export type Database = {
           acknowledged_at: string | null
           completed_at: string | null
           created_at: string
+          end_date: string | null
           id: string
           job_id: string
           notes: string | null
@@ -62,6 +63,7 @@ export type Database = {
           acknowledged_at?: string | null
           completed_at?: string | null
           created_at?: string
+          end_date?: string | null
           id?: string
           job_id: string
           notes?: string | null
@@ -74,6 +76,7 @@ export type Database = {
           acknowledged_at?: string | null
           completed_at?: string | null
           created_at?: string
+          end_date?: string | null
           id?: string
           job_id?: string
           notes?: string | null
@@ -1048,6 +1051,41 @@ export type Database = {
           },
         ]
       }
+      leave_days: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          leave_date: string
+          person_id: string
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          leave_date: string
+          person_id: string
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          leave_date?: string
+          person_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_days_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pairing_codes: {
         Row: {
           code_hash: string
@@ -1761,6 +1799,21 @@ export type Database = {
       }
     }
     Functions: {
+      check_equipment_conflict: {
+        Args: {
+          p_equipment_id: string
+          p_exclude_assignment_id?: string | null
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          conflict_assignment_id: string
+          conflict_job_id: string
+          conflict_job_no: string
+          conflict_start_date: string
+          conflict_end_date: string
+        }[]
+      }
       list_recycle_bin: {
         Args: Record<PropertyKey, never>
         Returns: {

@@ -10,7 +10,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Repo, schema, roles, security | Naveen | In review | feature/naveen-p1-foundation | Phase 2 Foundation (P1): modules + /api/v1, soft delete + recycle bin, settings & settings_options tables, docs/ARCHITECTURE.md |
 | Email intake + AI extraction | Naveen | Not started | | |
 | Customer and enquiry screens | Naveen | In review | feature/naveen-login-customers-enquiries | Login, customers with contacts, enquiries with customer link |
-| Jobs, quotations, POs, scheduling | Naveen | In review | feature/naveen-p2-customer-po | Phase 2 P2: Customer PO on quotation accept (PO number, date, value, file + 1-click job creation), jobs.po_value, PO link & over-PO invoice warning |
+| Jobs, quotations, POs, scheduling | Naveen | In review | PR 20, feature/naveen-calendar | Phase 2 A3: Interactive Calendar (/calendar week/month view), multi-day assignments (assignments.end_date), equipment conflict detection (check_equipment_conflict), technician leave days (leave_days), REST API v1 |
 | Technician field form | Naveen | Done | feature/naveen-retire-field-web | Web routes retired for Android APK (D-016); /technician notice; Expo app in apps/technician |
 | Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
 | AI report drafting | Naveen | Not started | | |
@@ -74,6 +74,12 @@ Files changed: supabase/migrations/20261107061000_credit_notes_and_tds.sql, lib/
 Next: Merge P4c and PR #20 (A3 Calendar) into `feature/naveen-integration`, apply migrations to `bita-dev`, deploy Phase 2 to `main` (Vercel), and proceed to P4d.
 Blockers / questions: none.
 
+### 2026-11-07 18:39 – Naveen – Antigravity
+Task: A3 Calendar (multi-day assignments, equipment scheduling, conflict checks, technician leave days, /calendar grid view, REST API v1)
+Done: Added migration `supabase/migrations/20261107060000_calendar_and_leave.sql` creating `public.leave_days` table with RLS, adding `end_date` to `public.assignments` with constraint `end_date >= work_date`, and creating `public.check_equipment_conflict` SQL function enforcing one active job assignment per equipment per day. Created calendar module `lib/modules/calendar/` (`schema.ts`, `service.ts`, `calendar.test.ts`), REST API routes at `/api/v1/calendar/*`, responsive calendar UI at `/calendar` (week & month view, assignment modal, conflict indicators, leave drawer), linked job assign screen to calendar, and updated sidebar navigation in `components/app-shell.tsx`. 37 test files / 311 tests, tsc, lint, and build all green.
+Files changed: supabase/migrations/20261107060000_calendar_and_leave.sql, lib/db/types.ts, lib/modules/calendar/, app/api/v1/calendar/, app/(office)/calendar/, app/(office)/jobs/[id]/assign/page.tsx, components/app-shell.tsx, supabase/tests/calendar.test.ts, docs/PROGRESS.md
+Next: Cross-review and merge PR #20 into `feature/naveen-integration`, then proceed to Task A4 (Log Book: `/log-book`, `job_expenses`, per-job and monthly totals) on `feature/naveen-log-book`.
+Blockers / questions: none.
 ### 2026-11-07 18:19 – Naveen – Claude
 Task: P4b Proforma vs Tax invoice choice, proforma series (`BITA/YY-YY/PI-0001`), Convert to tax invoice, and tax numbering from `invoice_numbering` setting
 Done: Added migration `supabase/migrations/20261107050000_proforma_and_tax_numbering.sql` adding `converted_from_id` on `public.invoices`, updating `private.next_invoice_no(p_kind)` to assign `BITA/YY-YY/PI-0001` for proforma invoices and `BITA/YY-YY/INV-0001` for tax invoices while honoring `next_tax_invoice_no` / `next_proforma_no` from `public.settings` (`key = 'invoice_numbering'`), and updating `private.check_invoice_report()` so converting a proforma to a tax invoice links the same approved reports cleanly. Added `convertProformaToTaxInvoice` in `lib/modules/invoices/service.ts` and `POST /api/v1/invoices/[id]/convert-to-tax`. Updated `/invoices`, `/review`, `/review/[reportId]`, and `/invoices/[id]` so the office can choose **Tax invoice** or **Proforma**, filter proforma invoices, and click **Convert to tax invoice**.
