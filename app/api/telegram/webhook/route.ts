@@ -62,18 +62,46 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, configured: false });
     }
 
+    const existingChat = links.chats.find((c) => c.chat_id === chatId && c.active);
+
     // Handle /start <6-digit-code>
-    const startMatch = /^\/start\s+(\d{6})$/i.exec(text);
+    const startMatch = /^\/start(?:\s+(\d{6}))?$/i.exec(text);
     if (startMatch) {
       const code = startMatch[1];
-      const redeemed = await redeemTelegramLinkCode(
-        supabase,
-        code,
-        chatId,
-        msg?.from?.username ?? msg?.from?.first_name ?? null,
-      );
+      if (code) {
+        const redeemed = await redeemTelegramLinkCode(
+          supabase,
+          code,
+          chatId,
+          msg?.from?.username ?? msg?.from?.first_name ?? null,
+        );
 
-      if (!redeemed.ok) {
+        if (redeemed.ok) {
+          const [welcome, statusMsg] = await Promise.all([
+            answerTelegramExecutiveQuery(supabase, "/help"),
+            answerTelegramExecutiveQuery(supabase, "/status"),
+          ]);
+          await sendTelegramMessage(
+            config.bot_token,
+            chatId,
+            `✅ *Connected to BITA Executive Bot as ${redeemed.personName}!*\n\n${statusMsg}\n\n${welcome}`,
+          );
+          return NextResponse.json({ ok: true, paired: true });
+        }
+
+        if (existingChat) {
+          const [welcome, statusMsg] = await Promise.all([
+            answerTelegramExecutiveQuery(supabase, "/help"),
+            answerTelegramExecutiveQuery(supabase, "/status"),
+          ]);
+          await sendTelegramMessage(
+            config.bot_token,
+            chatId,
+            `✅ *Already connected to BITA Executive Bot as ${existingChat.person_name}!*\n\n${statusMsg}\n\n${welcome}`,
+          );
+          return NextResponse.json({ ok: true, paired: true, alreadyLinked: true });
+        }
+
         await sendTelegramMessage(
           config.bot_token,
           chatId,
@@ -82,16 +110,21 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, paired: false });
       }
 
-      const welcome = await answerTelegramExecutiveQuery(supabase, "/help");
-      await sendTelegramMessage(
-        config.bot_token,
-        chatId,
-        `✅ *Connected to BITA Executive Bot as ${redeemed.personName}!*\n\n${welcome}`,
-      );
-      return NextResponse.json({ ok: true, paired: true });
+      if (existingChat) {
+        const [welcome, statusMsg] = await Promise.all([
+          answerTelegramExecutiveQuery(supabase, "/help"),
+          answerTelegramExecutiveQuery(supabase, "/status"),
+        ]);
+        await sendTelegramMessage(
+          config.bot_token,
+          chatId,
+          `✅ *Connected to BITA Executive Bot as ${existingChat.person_name}!*\n\n${statusMsg}\n\n${welcome}`,
+        );
+        return NextResponse.json({ ok: true, paired: true, alreadyLinked: true });
+      }
     }
 
-    const isLinked = links.chats.some((c) => c.chat_id === chatId && c.active);
+    const isLinked = Boolean(existingChat);
     if (!isLinked) {
       await sendTelegramMessage(
         config.bot_token,
@@ -164,6 +197,37 @@ export async function GET(req: Request) {
     } catch (err) {
       return NextResponse.json(
         { ok: false, error: err instanceof Error ? err.message : "Failed to register webhook" },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (url.searchParams.get("send_welcome") === "1") {
+    try {
+      const supabase = getSupabaseAdmin();
+      const [config, links, statusMsg, helpMsg] = await Promise.all([
+        getTelegramConfig(supabase),
+        getTelegramLinksState(supabase),
+        answerTelegramExecutiveQuery(supabase, "/status"),
+        answerTelegramExecutiveQuery(supabase, "/help"),
+      ]);
+      if (!config.bot_token) {
+        return NextResponse.json({ ok: false, error: "No bot token" }, { status: 400 });
+      }
+      const activeChats = links.chats.filter((c) => c.active);
+      let sent = 0;
+      for (const chat of activeChats) {
+        const res = await sendTelegramMessage(
+          config.bot_token,
+          chat.chat_id,
+          `✅ *Connected to BITA Executive Bot as ${chat.person_name}!*\n\n${statusMsg}\n\n${helpMsg}`,
+        );
+        if (res.ok) sent++;
+      }
+      return NextResponse.json({ ok: true, sent, activeChats: activeChats.length });
+    } catch (err) {
+      return NextResponse.json(
+        { ok: false, error: err instanceof Error ? err.message : "Failed" },
         { status: 500 },
       );
     }
