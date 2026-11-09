@@ -261,7 +261,6 @@ describe("Telegram Executive Bot Service & Webhook Integration", () => {
             return await executeQuery();
           },
           upsert: async (data: Record<string, unknown>) => {
-            upsertData = data;
             const keys = Object.keys(data);
             const cols = keys.map((k) => `"${k}"`).join(", ");
             const placeholders = keys.map((k, i) => {
