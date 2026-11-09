@@ -44,9 +44,11 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/jobs", label: "Jobs", icon: "jobs", count: c.jobs },
         { href: "/review", label: "Reports", icon: "reports", count: c.reports },
         { href: "/invoices", label: "Invoices & payments", icon: "money" },
+        { href: "/log-book", label: "Log book", icon: "reports" },
       ],
       records: [
         { href: "/price-list", label: "Price list", icon: "money" },
+        { href: "/employees", label: "Employees", icon: "people" },
         { href: "/customers", label: "Customers", icon: "customers" },
         { href: "/equipment", label: "Equipment", icon: "equipment" },
         { href: "/registers", label: "People & qualifications", icon: "people" },
@@ -67,9 +69,11 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/jobs", label: "Jobs", icon: "jobs", count: c.jobs },
         { href: "/review", label: "Reports", icon: "reports" as const, count: c.reports },
         { href: "/invoices", label: "Invoices & payments", icon: "money" },
+        { href: "/log-book", label: "Log book", icon: "reports" },
       ],
       records: [
         { href: "/price-list", label: "Price list", icon: "money" },
+        { href: "/employees", label: "Employees", icon: "people" },
         { href: "/customers", label: "Customers", icon: "customers" },
         { href: "/equipment", label: "Equipment", icon: "equipment" },
         { href: "/registers", label: "People & qualifications", icon: "people" },
@@ -85,6 +89,7 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/jobs", label: "Jobs", icon: "jobs" },
       ],
       records: [
+        { href: "/employees", label: "Employees", icon: "people" },
         { href: "/equipment", label: "Equipment", icon: "equipment" },
         { href: "/registers", label: "People & qualifications", icon: "people" },
       ],

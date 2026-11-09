@@ -28,6 +28,7 @@ export type JobAssignment = {
   scope: string | null;
   testMethods: TestMethod[];
   workDate: string;
+  endDate?: string | null;
   notes: string | null;
   acknowledgedAt: string | null;
   startedAt: string | null;

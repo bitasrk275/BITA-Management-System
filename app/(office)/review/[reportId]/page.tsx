@@ -27,9 +27,11 @@ import {
 } from "@/lib/reports/fields";
 import { loadReportApprovalAssets } from "@/lib/reports/branding.server";
 import {
+  type BookedJobEquipmentItem,
   checkReportReadiness,
   extractReadings,
   fieldLabelFor,
+  prefillReadingsFromBookedEquipment,
   supportedMethod,
   validUuid,
 } from "@/lib/reports/review";
@@ -87,7 +89,7 @@ export default async function ReportReviewPage({
 
   if (!report) notFound();
 
-  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes, activeInvoiceMap] =
+  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes, activeInvoiceMap, bookedAssignmentsRes] =
     await Promise.all([
       report.inspection_id
         ? supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
@@ -112,6 +114,22 @@ export default async function ReportReviewPage({
         .eq("job_id", report.job_id)
         .order("uploaded_at", { ascending: true }),
       loadActiveInvoiceReportMap(supabase),
+      supabase
+        .from("assignments")
+        .select(`
+          work_date,
+          assignment_equipment(
+            equipment:equipment!assignment_equipment_equipment_id_fkey(
+              id,
+              make,
+              model,
+              serial_no,
+              calibration_due
+            )
+          )
+        `)
+        .eq("job_id", report.job_id)
+        .order("work_date", { ascending: true }),
     ]);
 
   const inspection = inspectionRes.data;
@@ -122,7 +140,45 @@ export default async function ReportReviewPage({
   const activeInvoiceLink = activeInvoiceMap.get(report.id) ?? null;
   const isInvoicePending = isReportInvoicePending(report, activeInvoiceMap);
 
-  const readings = extractReadings(report.content, inspection?.readings);
+  type RawBookedAssign = {
+    work_date: string;
+    assignment_equipment: Array<{
+      equipment: {
+        id: string;
+        make: string | null;
+        model: string | null;
+        serial_no: string | null;
+        calibration_due: string | null;
+      } | null;
+    }>;
+  };
+
+  const bookedEquipment: BookedJobEquipmentItem[] = [];
+  const seenEqIds = new Set<string>();
+  for (const a of (bookedAssignmentsRes.data as unknown as RawBookedAssign[]) ?? []) {
+    for (const ae of a.assignment_equipment ?? []) {
+      const eq = ae.equipment;
+      if (!eq || seenEqIds.has(eq.id)) continue;
+      seenEqIds.add(eq.id);
+      bookedEquipment.push({
+        id: eq.id,
+        make: eq.make,
+        model: eq.model,
+        serial_no: eq.serial_no,
+        calibration_due: eq.calibration_due,
+        work_date: a.work_date,
+        is_expired_on_work_date: Boolean(
+          eq.calibration_due && eq.calibration_due < a.work_date
+        ),
+      });
+    }
+  }
+  const expiredBookedEquipment = bookedEquipment.filter((e) => e.is_expired_on_work_date);
+
+  const readings = prefillReadingsFromBookedEquipment(
+    extractReadings(report.content, inspection?.readings),
+    bookedEquipment
+  );
   const readiness = checkReportReadiness(report.method, inspection, readings);
   const isApproved = (report.status === "approved" || report.status === "sent") && !!report.approved_at;
   const isReviewer = person.roles.includes("reviewer");
@@ -228,6 +284,51 @@ export default async function ReportReviewPage({
           </Card>
         )}
 
+        {/* Booked Equipment & Calibration Check (A6) */}
+        {bookedEquipment.length > 0 && (
+          <Card className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <SectionTitle>Booked equipment for this job (A6)</SectionTitle>
+              {expiredBookedEquipment.length > 0 ? (
+                <Status tone="bad">
+                  {expiredBookedEquipment.length} expired calibration on job date
+                </Status>
+              ) : (
+                <Status tone="ok">All booked equipment in calibration</Status>
+              )}
+            </div>
+            <p className="text-xs text-ink-2">
+              Equipment booked on the calendar automatically fills into the report readings when blank. If any booked instrument had expired calibration on the job date, approval requires an override note.
+            </p>
+            <List>
+              {bookedEquipment.map((eq) => (
+                <ListRow
+                  key={eq.id}
+                  tone={eq.is_expired_on_work_date ? "bad" : "ok"}
+                  title={
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span>{[eq.make, eq.model].filter(Boolean).join(" ") || "Instrument"}</span>
+                      {eq.serial_no && (
+                        <Badge>
+                          <Mono>{eq.serial_no}</Mono>
+                        </Badge>
+                      )}
+                    </span>
+                  }
+                  detail={`Work date: ${shortDate(eq.work_date)} · Calibration due: ${
+                    eq.calibration_due ? shortDate(eq.calibration_due) : "Not recorded"
+                  }`}
+                  action={
+                    <Status tone={eq.is_expired_on_work_date ? "bad" : "ok"}>
+                      {eq.is_expired_on_work_date ? "Expired on work date" : "Valid"}
+                    </Status>
+                  }
+                />
+              ))}
+            </List>
+          </Card>
+        )}
+
         {/* Workflow Actions */}
         <div className="grid gap-5 lg:grid-cols-2">
           {["draft", "returned"].includes(report.status) && (
@@ -276,6 +377,30 @@ export default async function ReportReviewPage({
                     )}
                   </Select>
                 </Field>
+                {expiredBookedEquipment.length > 0 && (
+                  <div className="rounded-lg border border-bad/30 bg-bad/5 p-3 space-y-2">
+                    <div className="text-xs font-semibold text-bad">
+                      Expired calibration guard (A6): Booked equipment{" "}
+                      {expiredBookedEquipment
+                        .map((e) =>
+                          [e.make, e.model, e.serial_no].filter(Boolean).join(" ")
+                        )
+                        .join(", ")}{" "}
+                      had expired calibration on the job date.
+                    </div>
+                    <Field
+                      label="Calibration override reason *"
+                      hint="Required to approve a report that used equipment past its calibration due date."
+                    >
+                      <Input
+                        name="calibration_override_note"
+                        required
+                        defaultValue={report.calibration_override_note ?? ""}
+                        placeholder="e.g. Verified against master reference block V1 prior to inspection"
+                      />
+                    </Field>
+                  </div>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   {!isReviewer && (
                     <span className="text-xs text-bad">

@@ -18,7 +18,7 @@ import RegisterDetail from "./[register]/[id]/page";
 
 const person: Tables<"people"> = {
   id: "10000000-0000-0000-0000-000000000001", full_name: "FAKE TEST Technician", initials: "TT", position: "Test Inspector",
-  mobile: "+910000000001", email: "technician@example.test", user_id: null, roles: ["technician"], active: true, signature_path: null, created_at: "2026-11-06T00:00:00Z", deleted_at: null, deleted_by: null,
+  mobile: "+910000000001", email: "technician@example.test", user_id: null, roles: ["technician"], active: true, signature_path: null, created_at: "2026-11-06T00:00:00Z", deleted_at: null, deleted_by: null, monthly_salary: null, per_job_allowance: null,
 };
 const qualification: Tables<"qualifications"> = {
   id: "20000000-0000-0000-0000-000000000001", person_id: person.id, method: "UT", level: "Level II", scheme: "Test scheme", certifying_body: "Fake Certification Body", certificate_no: "FAKE-CERT-001", issued_on: "2025-01-01", valid_until: "2026-01-01", certificate_path: null, created_at: "2026-11-06T00:00:00Z",

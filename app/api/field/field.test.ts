@@ -147,6 +147,7 @@ describe("Field API routes", () => {
           scope: "Testing",
           testMethods: ["UT"],
           workDate: "2026-11-06",
+          endDate: null,
           notes: null,
           acknowledgedAt: null,
           startedAt: null,
