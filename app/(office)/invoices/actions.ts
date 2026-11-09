@@ -452,6 +452,17 @@ export async function issueInvoice(invoiceId: string) {
     await supabase.from("jobs").update({ status: "invoiced" }).eq("id", invoice.job_id);
   }
 
+  try {
+    const { broadcastTelegramNotification } = await import("@/lib/modules/telegram/service");
+    await broadcastTelegramNotification(
+      supabase,
+      "invoice",
+      `🧾 *Invoice Issued*\n• *Amount:* ₹${Math.round(gst.total).toLocaleString("en-IN")}\n• *Status:* Issued`,
+    );
+  } catch {
+    // Non-blocking
+  }
+
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath(`/jobs/${invoice.job_id}`);
@@ -516,6 +527,19 @@ export async function recordPayment(invoiceId: string, formData: FormData) {
         err instanceof Error ? err.message : "Could not record payment.",
       ),
     );
+  }
+
+  try {
+    const { broadcastTelegramNotification } = await import("@/lib/modules/telegram/service");
+    await broadcastTelegramNotification(
+      supabase,
+      "payment",
+      `💰 *Payment Recorded*\n• *Received:* ₹${Math.round(parsed.value.amount).toLocaleString("en-IN")}${
+        parsed.value.tds_amount ? ` (+ ₹${Math.round(parsed.value.tds_amount).toLocaleString("en-IN")} TDS)` : ""
+      }\n• *Mode:* ${parsed.value.mode ?? "bank_transfer"}`,
+    );
+  } catch {
+    // Non-blocking
   }
 
   revalidatePath("/invoices");

@@ -13,7 +13,47 @@ function date(reading: ReadingValue | undefined): string {
 }
 
 function equipment(readings: ReportReadings) {
-  return <>{value(readings.equipment)}<br />S.No. {value(readings.equipment_serial)}</>;
+  return (
+    <>
+      {value(readings.equipment)}
+      <br />
+      S.No. {value(readings.equipment_serial)}
+      {readings.equipment_calibration && String(readings.equipment_calibration).trim() ? (
+        <>
+          <br />
+          <span className="text-[10px]">{String(readings.equipment_calibration).trim()}</span>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function referenceBlocksCell(readings: ReportReadings) {
+  const blocks = value(readings.reference_blocks);
+  const calMethod =
+    readings.calibration_method && String(readings.calibration_method).trim()
+      ? String(readings.calibration_method).trim()
+      : null;
+  if (!calMethod) return blocks;
+  return (
+    <>
+      {blocks}
+      <br />
+      {calMethod}
+    </>
+  );
+}
+
+function resolveHeaderComponentId(readings: ReportReadings): string | null {
+  if (readings.component_header_id && String(readings.component_header_id).trim()) {
+    return String(readings.component_header_id).trim();
+  }
+  const items = readings.items ?? [];
+  if (items.length === 1 && items[0]?.identification_no && String(items[0].identification_no).trim()) {
+    const firstLine = String(items[0].identification_no).trim().split(/\r?\n|,/)[0]?.trim();
+    if (firstLine) return firstLine;
+  }
+  return null;
 }
 
 // Native images retain their specified size in print and work with private, short-lived URLs.
@@ -34,7 +74,7 @@ export function ReportTemplate({ method: input, document }: { method: ReportMeth
   const technicians = r.technicians?.length ? r.technicians : [{}];
   const items = r.items?.length ? r.items : [{}];
   const pairs: [string, ReactNode, string, ReactNode][] = method === "UT" ? [
-    ["Equipment Used", equipment(r), "Reference Blocks", value(r.reference_blocks)],
+    ["Equipment Used", equipment(r), "Reference Blocks", referenceBlocksCell(r)],
     ["Probe Used", value(r.probes), "Screen Range", value(r.screen_range)],
     ["Sensitivity Level", value(r.sensitivity), "Couplant", value(r.couplant)],
     ["Scanning Level", value(r.scanning_level), "Surface condition", value(r.surface_condition)],
@@ -61,7 +101,18 @@ export function ReportTemplate({ method: input, document }: { method: ReportMeth
           <td colSpan={layout.header[1]} rowSpan={method === "MPT" ? 2 : undefined} className="report-logo-cell">
             {document.letterhead.logoUrl && <PrintImage src={document.letterhead.logoUrl} alt="Company logo" className="report-logo" />}
           </td>
-          <td colSpan={layout.header[2]} className="report-number">REPORT NO.<br /><strong>{document.reportNumber}</strong><br /><br />DATE: {date(document.reportDate)}</td>
+          <td colSpan={layout.header[2]} className="report-number">
+            REPORT NO.<br />
+            <strong>{document.reportNumber}</strong>
+            {resolveHeaderComponentId(r) ? (
+              <>
+                <br />
+                <span>{resolveHeaderComponentId(r)}</span>
+              </>
+            ) : null}
+            <br />
+            DATE: {date(document.reportDate)}
+          </td>
         </tr>
         {method === "MPT" && <tr className="report-mt-header-gap"><td colSpan={layout.header[2]} /></tr>}
         <tr><th colSpan={columns} className="report-title">{layout.title}</th></tr>
@@ -90,9 +141,28 @@ export function ReportTemplate({ method: input, document }: { method: ReportMeth
       <tbody><tr className="report-item-heading"><th scope="col" colSpan={layout.items[0]}>Description</th><th scope="col" colSpan={layout.items[1]}>Qty.</th><th scope="col" colSpan={layout.items[2]}>Observations/Remarks</th></tr></tbody>
       <tbody className="report-item-body">
         {items.map((item, index) => <tr key={index} className="report-item-row">
-          <td colSpan={layout.items[0]}>{method === "DPT" && index === 0 && r.component_description && !String(item.description ?? "").startsWith(String(r.component_description)) && <>{value(r.component_description)}<br /><br /></>}{value(item.description)}</td>
-          <td colSpan={layout.items[1]} className="report-quantity">{value(item.quantity)}</td>
-          <td colSpan={layout.items[2]}>{value(item.observations)}</td>
+          <td colSpan={layout.items[0]}>
+            {method === "DPT" && index === 0 && r.component_description && !String(item.description ?? "").startsWith(String(r.component_description)) && <>{value(r.component_description)}<br /><br /></>}
+            <div>{value(item.description)}</div>
+            {item.identification_no && String(item.identification_no).trim() ? (
+              <div style={{ marginTop: "6px", whiteSpace: "pre-line" }}>
+                {String(item.identification_no).trim()}
+              </div>
+            ) : null}
+            {item.size && String(item.size).trim() ? (
+              <div style={{ marginTop: "4px" }}>{String(item.size).trim()}</div>
+            ) : null}
+          </td>
+          <td colSpan={layout.items[1]} className="report-quantity">
+            {value(item.quantity)}
+            {item.qty_unit && String(item.qty_unit).trim() ? ` ${String(item.qty_unit).trim()}` : ""}
+          </td>
+          <td colSpan={layout.items[2]}>
+            <div style={{ whiteSpace: "pre-line" }}>{value(item.observations)}</div>
+            {item.result && String(item.result).trim() ? (
+              <div style={{ marginTop: "8px", fontWeight: 600 }}>{String(item.result).trim()}</div>
+            ) : null}
+          </td>
         </tr>)}
       </tbody>
     </table>

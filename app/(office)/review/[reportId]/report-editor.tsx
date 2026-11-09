@@ -289,19 +289,29 @@ export function ReportEditor({
                     </button>
                   )}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
-                  <Field label="Item description *">
-                    <Textarea
+                <div className="grid gap-3 sm:grid-cols-[1fr_7rem_7rem]">
+                  <Field label="Component description (#22) *">
+                    <Input
                       name={`items.${idx}.description`}
+                      list={`item_desc_list_${idx}`}
                       defaultValue={
                         row.description === null || row.description === undefined
                           ? ""
                           : String(row.description)
                       }
+                      placeholder="e.g. Proof Machined Shaft Forging"
                       disabled={isApproved}
                     />
+                    <datalist id={`item_desc_list_${idx}`}>
+                      <option value="Proof Machined Shaft Forging" />
+                      <option value="Shaft forging" />
+                      <option value="Rotor forging" />
+                      <option value="Casting" />
+                      <option value="Weld joint" />
+                      <option value="Plate" />
+                    </datalist>
                   </Field>
-                  <Field label="Quantity *">
+                  <Field label="Qty. (#25) *">
                     <Input
                       name={`items.${idx}.quantity`}
                       type="number"
@@ -314,8 +324,67 @@ export function ReportEditor({
                       disabled={isApproved}
                     />
                   </Field>
+                  <Field label="Unit">
+                    <Select
+                      name={`items.${idx}.qty_unit`}
+                      defaultValue={
+                        row.qty_unit === null || row.qty_unit === undefined
+                          ? "No."
+                          : String(row.qty_unit)
+                      }
+                      disabled={isApproved}
+                    >
+                      <option value="No.">No.</option>
+                      <option value="Nos.">Nos.</option>
+                      <option value="Sets">Sets</option>
+                    </Select>
+                  </Field>
                 </div>
-                <Field label="Observations / remarks *">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Identification numbers (#23 — SR No. / H No. / Mat Code)">
+                    <Textarea
+                      name={`items.${idx}.identification_no`}
+                      defaultValue={
+                        row.identification_no === null || row.identification_no === undefined
+                          ? ""
+                          : String(row.identification_no)
+                      }
+                      placeholder={"SR No: 258\nH No: P 15747\nMat Code: 18756140"}
+                      disabled={isApproved}
+                    />
+                  </Field>
+                  <div className="space-y-3">
+                    <Field label="Size (#24 — Ø / thickness × length mm)">
+                      <Input
+                        name={`items.${idx}.size`}
+                        defaultValue={
+                          row.size === null || row.size === undefined
+                            ? ""
+                            : String(row.size)
+                        }
+                        placeholder="e.g. Ø 265 X 3500 Lg."
+                        disabled={isApproved}
+                      />
+                    </Field>
+                    <Field label="Result (#27)">
+                      <Select
+                        name={`items.${idx}.result`}
+                        defaultValue={
+                          row.result === null || row.result === undefined
+                            ? "Accepted"
+                            : String(row.result)
+                        }
+                        disabled={isApproved}
+                      >
+                        <option value="">—</option>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Rejected">Rejected</option>
+                        <option value="Accepted with remarks">Accepted with remarks</option>
+                      </Select>
+                    </Field>
+                  </div>
+                </div>
+                <Field label="Observations / remarks (#26) *">
                   <Textarea
                     name={`items.${idx}.observations`}
                     defaultValue={
@@ -323,6 +392,7 @@ export function ReportEditor({
                         ? ""
                         : String(row.observations)
                     }
+                    placeholder="e.g. Forging scanned with normal probe all round and no significant indications observed."
                     disabled={isApproved}
                   />
                 </Field>

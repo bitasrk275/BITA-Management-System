@@ -28,9 +28,29 @@ export async function loadBitaInvoiceProfile(
   if (typeof v.email === "string" && v.email.trim()) profile.email = v.email.trim();
   if (typeof v.pan === "string" && v.pan.trim()) profile.pan = v.pan.trim();
   if (typeof v.gstin === "string" && v.gstin.trim()) profile.gstin = v.gstin.trim();
-  if (typeof v.defaultSac === "string" && v.defaultSac.trim()) profile.defaultSac = v.defaultSac.trim();
+  const sac =
+    typeof v.defaultSac === "string" && v.defaultSac.trim()
+      ? v.defaultSac.trim()
+      : typeof v.default_sac === "string" && v.default_sac.trim()
+        ? v.default_sac.trim()
+        : "";
+  if (sac) profile.defaultSac = sac;
   if (typeof v.bankDetails === "string" && v.bankDetails.trim()) {
     profile.bankDetailsPlaceholder = v.bankDetails.trim();
+  } else if (
+    typeof v.bank_name === "string" &&
+    v.bank_name.trim()
+  ) {
+    const parts = [
+      `${v.bank_name.trim()}${typeof v.bank_branch === "string" && v.bank_branch.trim() ? `, ${v.bank_branch.trim()}` : ""}`,
+      typeof v.bank_account_no === "string" && v.bank_account_no.trim()
+        ? `A/C No. : ${v.bank_account_no.trim()}`
+        : "",
+      typeof v.bank_ifsc === "string" && v.bank_ifsc.trim()
+        ? `IFSC Code: ${v.bank_ifsc.trim()}`
+        : "",
+    ].filter(Boolean);
+    profile.bankDetailsPlaceholder = parts.join(" · ");
   }
   if (typeof v.terms === "string" && v.terms.trim()) {
     profile.termsPlaceholder = v.terms.trim();

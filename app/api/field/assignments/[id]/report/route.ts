@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "../../../../../../lib/field/service";
 import { authenticateDevice } from "../../../../../../lib/field/auth";
 import { submitInspectionReport } from "../../../../../../lib/field/assignments";
+import { broadcastTelegramNotification } from "../../../../../../lib/modules/telegram/service";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,18 @@ export async function POST(
 
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    if (!draft && typeof (supabase as { from?: unknown })?.from === "function") {
+      try {
+        await broadcastTelegramNotification(
+          supabase,
+          "report",
+          `📝 *Field Report Submitted*\n• *Technician:* ${authResult.auth.technician.name}\n• *Method:* ${method}\n• *Status:* Ready for Technical Review`,
+        );
+      } catch {
+        // Non-blocking notification
+      }
     }
 
     return NextResponse.json(result);

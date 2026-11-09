@@ -4,6 +4,7 @@ import {
   toB2bCsv,
   toB2cCsv,
   toCombinedGstCsv,
+  toCreditNotesCsv,
   toGstExcelXml,
 } from "@/lib/invoices";
 import { loadGstExportData } from "../load";
@@ -45,6 +46,18 @@ export async function GET(req: Request) {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="BITA-GSTR1-B2C-${fromDate}-to-${toDate}.csv"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+
+  if (format === "credit_notes" || format === "cn") {
+    const csv = toCreditNotesCsv(report);
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="BITA-GSTR1-CreditNotes-${fromDate}-to-${toDate}.csv"`,
         "Cache-Control": "private, no-store",
       },
     });

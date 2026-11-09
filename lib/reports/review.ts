@@ -365,7 +365,12 @@ export function parseEditedReportReadings(
       const row: Record<string, string | number | null> = {};
       let hasAnyValue = false;
       for (const fieldDef of group.fields) {
-        const cellRaw = fd.get(`${group.key}.${i}.${fieldDef.key}`);
+        const rawCell = fd.get(`${group.key}.${i}.${fieldDef.key}`);
+        const otherCell = fd.get(`${group.key}.${i}.${fieldDef.key}__other`);
+        const cellRaw =
+          typeof rawCell === "string" && rawCell === "__OTHER__" && typeof otherCell === "string"
+            ? otherCell
+            : rawCell;
         if (typeof cellRaw !== "string") {
           row[fieldDef.key] = null;
           continue;

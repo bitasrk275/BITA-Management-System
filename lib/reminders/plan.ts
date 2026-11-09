@@ -2,10 +2,13 @@ import { todayIST } from "../dates";
 import type { Database } from "../db/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  DEFAULT_REMINDER_TIMINGS,
   ELIGIBLE_REMINDER_STATUSES,
   getReminderKindForInvoice,
+  normalizeReminderTimings,
   type InvoiceReminderCandidate,
   type ReminderKind,
+  type ReminderTimings,
 } from "./schedule";
 import {
   buildReminderEmailContent,
@@ -14,6 +17,21 @@ import {
   type ReminderContact,
   type ReminderCustomer,
 } from "./sender";
+
+export async function loadReminderTimings(
+  supabase: SupabaseClient<Database>,
+): Promise<ReminderTimings> {
+  try {
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "reminder_timings")
+      .maybeSingle();
+    return normalizeReminderTimings(data?.value);
+  } catch {
+    return { ...DEFAULT_REMINDER_TIMINGS };
+  }
+}
 
 export interface InvoiceForPlanning extends InvoiceReminderCandidate {
   id: string;
@@ -137,6 +155,7 @@ export function planPaymentReminders(
   invoices: Array<InvoiceForPlanning | Record<string, unknown>>,
   existingReminders: ExistingReminderKey[] | Set<string> = [],
   today: string = todayIST(),
+  timings?: Partial<ReminderTimings>,
 ): PlannedPaymentReminder[] {
   const existingSet =
     existingReminders instanceof Set
@@ -154,7 +173,7 @@ export function planPaymentReminders(
       ? raw
       : normalizeInvoiceForPlanning(raw as Record<string, unknown>);
 
-    const kind = getReminderKindForInvoice(inv, today);
+    const kind = getReminderKindForInvoice(inv, today, timings);
     if (!kind) {
       continue;
     }
@@ -256,6 +275,8 @@ export async function planAndInsertReminders(
   records: PlannedPaymentReminder[];
   emails: PlannedReminderEmail[];
 }> {
+  const timings = await loadReminderTimings(supabase);
+
   // 1. Fetch in-app tax invoices with status issued/partly_paid, balance > 0, unpaused, due_date set
   const { data: invoices, error: invError } = await supabase
     .from("invoices")
@@ -276,7 +297,7 @@ export async function planAndInsertReminders(
 
   // Filter to invoices that match today's reminder schedule
   const candidates = invoiceList.filter((inv) =>
-    Boolean(getReminderKindForInvoice(inv, targetDate)),
+    Boolean(getReminderKindForInvoice(inv, targetDate, timings)),
   );
 
   if (candidates.length === 0) {
@@ -399,7 +420,7 @@ export async function planAndInsertReminders(
     };
   });
 
-  const planned = planPaymentReminders(fullInvoices, existingKeys, targetDate);
+  const planned = planPaymentReminders(fullInvoices, existingKeys, targetDate, timings);
 
   let insertedCount = 0;
   const reminderIdByInvoiceId = new Map<string, string>();

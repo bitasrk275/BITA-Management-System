@@ -12,7 +12,12 @@ import {
   Status,
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
-import { B2B_GST_COLUMNS, B2C_GST_COLUMNS, type GstExportRow } from "@/lib/invoices";
+import {
+  B2B_GST_COLUMNS,
+  B2C_GST_COLUMNS,
+  CREDIT_NOTE_GST_COLUMNS,
+  type GstExportRow,
+} from "@/lib/invoices";
 import { homeFor } from "@/lib/roles";
 import { formatINR } from "../../jobs/labels";
 import { loadGstExportData } from "./load";
@@ -97,7 +102,9 @@ export default async function GstExportPage({
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-[12.5px] text-ink-2">
           <span>
             Showing <strong className="text-ink">{report.grand_totals.count}</strong> invoice(s) ({report.b2b.length} B2B, {report.b2c.length} B2C
-            {report.grand_totals.cancelled_count > 0 ? `, ${report.grand_totals.cancelled_count} cancelled` : ""}).
+            {report.grand_totals.cancelled_count > 0 ? `, ${report.grand_totals.cancelled_count} cancelled` : ""})
+            {report.credit_notes.length > 0 ? `, ${report.credit_notes.length} credit note(s)` : ""}
+            {report.tds_totals.total_tds > 0 ? ` · TDS deducted ${formatINR(report.tds_totals.total_tds)}` : ""}.
           </span>
           <div className="flex flex-wrap gap-2">
             <ButtonLink href={`/invoices/export/download?${queryBase}&format=b2b`} variant="secondary" size="sm">
@@ -105,6 +112,9 @@ export default async function GstExportPage({
             </ButtonLink>
             <ButtonLink href={`/invoices/export/download?${queryBase}&format=b2c`} variant="secondary" size="sm">
               B2C CSV ({report.b2c.length})
+            </ButtonLink>
+            <ButtonLink href={`/invoices/export/download?${queryBase}&format=credit_notes`} variant="secondary" size="sm">
+              Credit Notes CSV ({report.credit_notes.length})
             </ButtonLink>
           </div>
         </div>
@@ -298,6 +308,95 @@ export default async function GstExportPage({
                   <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(report.b2c_totals.sgst)}</td>
                   <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(report.b2c_totals.igst)}</td>
                   <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(report.b2c_totals.total)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </Card>
+
+      {/* Section 3: Credit Notes (CDNR / CDNUR) */}
+      <Card className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <SectionTitle>3. Credit Notes — CDNR / CDNUR ({report.credit_notes.length})</SectionTitle>
+            <p className="text-[12px] text-ink-3">
+              Credit notes issued against tax invoices in this period, plus total TDS deducted by customers: <strong className="text-ink">{formatINR(report.tds_totals.total_tds)}</strong> (B2B {formatINR(report.tds_totals.b2b_tds)} · B2C {formatINR(report.tds_totals.b2c_tds)}).
+            </p>
+          </div>
+          <ButtonLink href={`/invoices/export/download?${queryBase}&format=credit_notes`} variant="secondary" size="sm">
+            Download Credit Notes CSV
+          </ButtonLink>
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-line">
+          <table className="w-full border-collapse text-left text-[12.5px]">
+            <thead>
+              <tr className="border-b border-line bg-surface-2 text-[11.5px] font-medium text-ink-2">
+                {CREDIT_NOTE_GST_COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`px-2.5 py-2 whitespace-nowrap ${
+                      ["taxable_value", "cgst", "sgst", "igst", "total"].includes(col.key)
+                        ? "text-right"
+                        : ""
+                    }`}
+                  >
+                    {col.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {report.credit_notes.map((cn) => (
+                <tr key={`${cn.credit_note_no}-${cn.issued_on}`}>
+                  <td className="px-2.5 py-2 whitespace-nowrap">
+                    <Mono>{cn.category}</Mono>
+                  </td>
+                  <td className="px-2.5 py-2 whitespace-nowrap">
+                    <Mono>{cn.customer_gstin || "URP"}</Mono>
+                  </td>
+                  <td className="px-2.5 py-2 text-ink">{cn.customer_name}</td>
+                  <td className="px-2.5 py-2 whitespace-nowrap">
+                    <Mono>{cn.credit_note_no}</Mono>
+                  </td>
+                  <td className="px-2.5 py-2 whitespace-nowrap text-ink-2 tabular-nums">{cn.issued_on}</td>
+                  <td className="px-2.5 py-2 whitespace-nowrap">
+                    <Mono>{cn.invoice_no || "—"}</Mono>
+                  </td>
+                  <td className="px-2.5 py-2 whitespace-nowrap text-ink-2 tabular-nums">{cn.invoice_date || "—"}</td>
+                  <td className="px-2.5 py-2 whitespace-nowrap text-ink-2">{cn.place_of_supply}</td>
+                  <td className="px-2.5 py-2 text-ink-2">{cn.reason || "—"}</td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(cn.taxable_value)}</td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(cn.cgst)}</td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(cn.sgst)}</td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(cn.igst)}</td>
+                  <td className="px-2.5 py-2 text-right font-medium text-ink tabular-nums">
+                    {formatINR(cn.total)}
+                  </td>
+                </tr>
+              ))}
+              {report.credit_notes.length === 0 && (
+                <tr>
+                  <td colSpan={CREDIT_NOTE_GST_COLUMNS.length} className="px-3 py-6 text-center text-ink-3">
+                    No credit notes issued in this period.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            {report.credit_notes.length > 0 && (
+              <tfoot className="border-t border-line bg-surface-2/40 font-semibold text-ink">
+                <tr>
+                  <td colSpan={9} className="px-2.5 py-2 text-right">
+                    Credit Notes Total
+                  </td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">
+                    {formatINR(report.credit_note_totals.taxable_value)}
+                  </td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(report.credit_note_totals.cgst)}</td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(report.credit_note_totals.sgst)}</td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(report.credit_note_totals.igst)}</td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{formatINR(report.credit_note_totals.total)}</td>
                 </tr>
               </tfoot>
             )}

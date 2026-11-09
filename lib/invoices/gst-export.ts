@@ -30,6 +30,42 @@ export interface GstExportInvoiceInput {
   customer_address?: string | null;
   sac?: string | null;
   lines?: ReadonlyArray<{ sac?: string | null }> | null;
+  tds_deducted?: number | string | null;
+}
+
+export interface GstExportCreditNoteInput {
+  id?: string;
+  credit_note_no: string;
+  issued_on: string;
+  invoice_no?: string | null;
+  invoice_date?: string | null;
+  customer_name?: string | null;
+  customer_gstin?: string | null;
+  place_of_supply?: string | null;
+  reason?: string | null;
+  amount: number | string;
+  gst_amount?: number | string | null;
+  cgst?: number | string | null;
+  sgst?: number | string | null;
+  igst?: number | string | null;
+  total: number | string;
+}
+
+export interface GstExportCreditNoteRow {
+  category: "CDNR" | "CDNUR";
+  customer_gstin: string;
+  customer_name: string;
+  credit_note_no: string;
+  issued_on: string;
+  invoice_no: string;
+  invoice_date: string;
+  place_of_supply: string;
+  reason: string;
+  taxable_value: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  total: number;
 }
 
 export interface GstExportRow {
@@ -47,6 +83,7 @@ export interface GstExportRow {
   igst: number;
   round_off: number;
   total: number;
+  tds_deducted?: number;
 }
 
 export interface GstExportTotals {
@@ -59,6 +96,12 @@ export interface GstExportTotals {
   total: number;
 }
 
+export interface GstExportTdsTotals {
+  b2b_tds: number;
+  b2c_tds: number;
+  total_tds: number;
+}
+
 export interface GstExportReport {
   from_date: string;
   to_date: string;
@@ -67,6 +110,9 @@ export interface GstExportReport {
   b2b_totals: GstExportTotals;
   b2c_totals: GstExportTotals;
   grand_totals: GstExportTotals;
+  credit_notes: GstExportCreditNoteRow[];
+  credit_note_totals: GstExportTotals;
+  tds_totals: GstExportTdsTotals;
 }
 
 export interface GstColumnDef<R> {
@@ -98,6 +144,23 @@ export const B2B_GST_COLUMNS: ReadonlyArray<GstColumnDef<GstExportRow>> = [
 export const B2C_GST_COLUMNS: ReadonlyArray<GstColumnDef<GstExportRow>> = B2B_GST_COLUMNS.filter(
   (col) => col.key !== "customer_gstin",
 );
+
+export const CREDIT_NOTE_GST_COLUMNS: ReadonlyArray<GstColumnDef<GstExportCreditNoteRow>> = [
+  { key: "category", header: "Type", value: (r) => r.category },
+  { key: "customer_gstin", header: "Customer GSTIN", value: (r) => r.customer_gstin || "URP" },
+  { key: "customer_name", header: "Customer Name", value: (r) => r.customer_name },
+  { key: "credit_note_no", header: "Credit Note No", value: (r) => r.credit_note_no },
+  { key: "issued_on", header: "Credit Note Date", value: (r) => r.issued_on },
+  { key: "invoice_no", header: "Original Invoice No", value: (r) => r.invoice_no },
+  { key: "invoice_date", header: "Original Invoice Date", value: (r) => r.invoice_date },
+  { key: "place_of_supply", header: "Place of Supply", value: (r) => r.place_of_supply },
+  { key: "reason", header: "Reason", value: (r) => r.reason },
+  { key: "taxable_value", header: "Taxable Value", value: (r) => formatAmount(r.taxable_value) },
+  { key: "cgst", header: "CGST", value: (r) => formatAmount(r.cgst) },
+  { key: "sgst", header: "SGST", value: (r) => formatAmount(r.sgst) },
+  { key: "igst", header: "IGST", value: (r) => formatAmount(r.igst) },
+  { key: "total", header: "Total Credit", value: (r) => formatAmount(r.total) },
+];
 
 /**
  * Resolves a month ('YYYY-MM') or explicit date range ('from', 'to') into { fromDate, toDate, month }.
@@ -186,13 +249,18 @@ function summarizeRows(rows: ReadonlyArray<GstExportRow>): GstExportTotals {
  */
 export function buildGstExportReport(
   invoices: ReadonlyArray<GstExportInvoiceInput>,
-  options: { fromDate?: string; toDate?: string } = {},
+  options: {
+    fromDate?: string;
+    toDate?: string;
+    creditNotes?: ReadonlyArray<GstExportCreditNoteInput>;
+  } = {},
 ): GstExportReport {
   const fromDate = options.fromDate?.trim() || "0000-01-01";
   const toDate = options.toDate?.trim() || "9999-12-31";
 
   const b2b: GstExportRow[] = [];
   const b2c: GstExportRow[] = [];
+  const credit_notes: GstExportCreditNoteRow[] = [];
 
   const sorted = [...invoices].sort((a, b) => {
     const dateA = a.invoice_date ?? "";
@@ -233,6 +301,8 @@ export function buildGstExportReport(
       inv.place_of_supply ?? (gstin ? gstin.slice(0, 2) : inv.customer_address),
     );
 
+    const tdsDeducted = isCancelled ? 0 : roundPaise(Number(inv.tds_deducted) || 0);
+
     const row: GstExportRow = {
       category: isB2B ? "B2B" : "B2C",
       customer_gstin: gstin,
@@ -248,6 +318,7 @@ export function buildGstExportReport(
       igst: isCancelled ? 0 : roundPaise(Number(inv.igst) || 0),
       round_off: isCancelled ? 0 : roundPaise(Number(inv.round_off) || 0),
       total: isCancelled ? 0 : roundPaise(Number(inv.total) || 0),
+      ...(tdsDeducted > 0 ? { tds_deducted: tdsDeducted } : {}),
     };
 
     if (isB2B) {
@@ -257,9 +328,86 @@ export function buildGstExportReport(
     }
   }
 
+  const sortedCn = [...(options.creditNotes ?? [])].sort((a, b) => {
+    const dateA = a.issued_on ?? "";
+    const dateB = b.issued_on ?? "";
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    return (a.credit_note_no ?? "").localeCompare(b.credit_note_no ?? "");
+  });
+
+  let cnTaxable = 0;
+  let cnCgst = 0;
+  let cnSgst = 0;
+  let cnIgst = 0;
+  let cnTotal = 0;
+
+  for (const cn of sortedCn) {
+    const issuedOn = (cn.issued_on ?? "").trim();
+    if (issuedOn) {
+      if (issuedOn < fromDate || issuedOn > toDate) continue;
+    } else if (options.fromDate || options.toDate) {
+      continue;
+    }
+
+    const gstin = (cn.customer_gstin ?? "").trim().toUpperCase();
+    const isB2B = gstin.length > 0;
+    const placeDisplay = formatPlaceOfSupply(
+      cn.place_of_supply ?? (gstin ? gstin.slice(0, 2) : null),
+    );
+    const isIntra = placeDisplay.startsWith("29");
+    const taxable = roundPaise(Number(cn.amount) || 0);
+    const gstAmount = roundPaise(Number(cn.gst_amount) || 0);
+    const cgst =
+      cn.cgst !== undefined && cn.cgst !== null
+        ? roundPaise(Number(cn.cgst))
+        : isIntra
+          ? roundPaise(gstAmount / 2)
+          : 0;
+    const sgst =
+      cn.sgst !== undefined && cn.sgst !== null
+        ? roundPaise(Number(cn.sgst))
+        : isIntra
+          ? roundPaise(gstAmount - cgst)
+          : 0;
+    const igst =
+      cn.igst !== undefined && cn.igst !== null
+        ? roundPaise(Number(cn.igst))
+        : isIntra
+          ? 0
+          : gstAmount;
+    const total = roundPaise(Number(cn.total) || taxable + cgst + sgst + igst);
+
+    const cnRow: GstExportCreditNoteRow = {
+      category: isB2B ? "CDNR" : "CDNUR",
+      customer_gstin: gstin,
+      customer_name: (cn.customer_name ?? "Customer").trim() || "Customer",
+      credit_note_no: (cn.credit_note_no ?? "").trim() || "CN",
+      issued_on: issuedOn,
+      invoice_no: (cn.invoice_no ?? "").trim(),
+      invoice_date: (cn.invoice_date ?? "").trim(),
+      place_of_supply: placeDisplay,
+      reason: (cn.reason ?? "").trim(),
+      taxable_value: taxable,
+      cgst,
+      sgst,
+      igst,
+      total,
+    };
+
+    credit_notes.push(cnRow);
+    cnTaxable = roundPaise(cnTaxable + taxable);
+    cnCgst = roundPaise(cnCgst + cgst);
+    cnSgst = roundPaise(cnSgst + sgst);
+    cnIgst = roundPaise(cnIgst + igst);
+    cnTotal = roundPaise(cnTotal + total);
+  }
+
   const b2bTotals = summarizeRows(b2b);
   const b2cTotals = summarizeRows(b2c);
   const grandTotals = summarizeRows([...b2b, ...b2c]);
+
+  const b2bTds = b2b.reduce((acc, r) => roundPaise(acc + (r.tds_deducted ?? 0)), 0);
+  const b2cTds = b2c.reduce((acc, r) => roundPaise(acc + (r.tds_deducted ?? 0)), 0);
 
   return {
     from_date: fromDate,
@@ -269,6 +417,21 @@ export function buildGstExportReport(
     b2b_totals: b2bTotals,
     b2c_totals: b2cTotals,
     grand_totals: grandTotals,
+    credit_notes,
+    credit_note_totals: {
+      count: credit_notes.length,
+      cancelled_count: 0,
+      taxable_value: cnTaxable,
+      cgst: cnCgst,
+      sgst: cnSgst,
+      igst: cnIgst,
+      total: cnTotal,
+    },
+    tds_totals: {
+      b2b_tds: b2bTds,
+      b2c_tds: b2cTds,
+      total_tds: roundPaise(b2bTds + b2cTds),
+    },
   };
 }
 
@@ -285,9 +448,9 @@ export function csvEscapeCell(value: string | number | null | undefined): string
   return str;
 }
 
-function serializeTableToCsv(
-  rows: ReadonlyArray<GstExportRow>,
-  columns: ReadonlyArray<GstColumnDef<GstExportRow>>,
+function serializeTableToCsv<R>(
+  rows: ReadonlyArray<R>,
+  columns: ReadonlyArray<GstColumnDef<R>>,
   totals: GstExportTotals,
 ): string[] {
   const lines: string[] = [];
@@ -323,7 +486,14 @@ export function toB2cCsv(report: GstExportReport): string {
 }
 
 /**
- * Serializes the complete GSTR-1 CA export (both B2B and B2C sections + summary) to CSV.
+ * Serializes only the Credit Notes section to CSV (with UTF-8 BOM for Excel).
+ */
+export function toCreditNotesCsv(report: GstExportReport): string {
+  return `\uFEFF${serializeTableToCsv(report.credit_notes, CREDIT_NOTE_GST_COLUMNS, report.credit_note_totals).join("\r\n")}\r\n`;
+}
+
+/**
+ * Serializes the complete GSTR-1 CA export (B2B, B2C, Grand Summary, Credit Notes, TDS Summary) to CSV.
  */
 export function toCombinedGstCsv(report: GstExportReport): string {
   const lines: string[] = [
@@ -373,6 +543,19 @@ export function toCombinedGstCsv(report: GstExportReport): string {
     ]
       .map(csvEscapeCell)
       .join(","),
+    "",
+    "SECTION 4: CREDIT NOTES (CDNR / CDNUR)",
+    ...serializeTableToCsv(report.credit_notes, CREDIT_NOTE_GST_COLUMNS, report.credit_note_totals),
+    "",
+    "SECTION 5: TDS DEDUCTED BY CUSTOMERS",
+    "B2B TDS Deducted,B2C TDS Deducted,Total TDS Deducted",
+    [
+      formatAmount(report.tds_totals.b2b_tds),
+      formatAmount(report.tds_totals.b2c_tds),
+      formatAmount(report.tds_totals.total_tds),
+    ]
+      .map(csvEscapeCell)
+      .join(","),
   ];
 
   return `\uFEFF${lines.join("\r\n")}\r\n`;
@@ -387,10 +570,10 @@ function xmlEscape(value: string | number): string {
     .replace(/'/g, "&apos;");
 }
 
-function buildWorksheetXml(
+function buildWorksheetXml<R>(
   name: string,
-  rows: ReadonlyArray<GstExportRow>,
-  columns: ReadonlyArray<GstColumnDef<GstExportRow>>,
+  rows: ReadonlyArray<R>,
+  columns: ReadonlyArray<GstColumnDef<R>>,
   totals: GstExportTotals,
 ): string {
   const numericKeys = new Set(["taxable_value", "cgst", "sgst", "igst", "total"]);
@@ -432,18 +615,25 @@ function buildWorksheetXml(
 }
 
 /**
- * Generates a multi-sheet Excel 2003 XML Workbook (.xls) with B2B and B2C worksheets,
+ * Generates a multi-sheet Excel 2003 XML Workbook (.xls) with B2B, B2C, and Credit Notes worksheets,
  * requiring zero external npm packages.
  */
 export function toGstExcelXml(report: GstExportReport): string {
   const b2bSheet = buildWorksheetXml("B2B Invoices", report.b2b, B2B_GST_COLUMNS, report.b2b_totals);
   const b2cSheet = buildWorksheetXml("B2C Invoices", report.b2c, B2C_GST_COLUMNS, report.b2c_totals);
+  const cnSheet = buildWorksheetXml(
+    "Credit Notes",
+    report.credit_notes,
+    CREDIT_NOTE_GST_COLUMNS,
+    report.credit_note_totals,
+  );
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<?mso-application progid="Excel.Sheet"?>`,
     `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">`,
     b2bSheet,
     b2cSheet,
+    cnSheet,
     `</Workbook>`,
   ].join("\n");
 }

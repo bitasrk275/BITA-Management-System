@@ -220,7 +220,7 @@ describe("lib/invoices/gst-export", () => {
     const b2bCsv = toB2bCsv(report);
     expect(b2bCsv).toContain("Customer GSTIN,Customer Name,Invoice No,Invoice Date,Place of Supply,SAC,Status,Taxable Value,CGST,SGST,IGST,Total");
     expect(b2bCsv).toContain("29AAACT0000A1Z5,Test Turbines India Ltd,BITA/26-27/INV-0001,2026-11-06,29 - Karnataka,998346,issued,40000.00,3600.00,3600.00,0.00,47200.00");
-    expect(b2bCsv).toContain("29CCCCG2222C1Z9,Cancelled Gears Pvt Ltd,BITA/26-27/INV-0003,2026-11-12,29 - Karnataka,,cancelled,0.00,0.00,0.00,0.00,0.00");
+    expect(b2bCsv).toContain("29CCCCG2222C1Z9,Cancelled Gears Pvt Ltd,BITA/26-27/INV-0003,2026-11-12,29 - Karnataka,998393,cancelled,0.00,0.00,0.00,0.00,0.00");
 
     const b2cCsv = toB2cCsv(report);
     expect(b2cCsv).toContain("Customer Name,Invoice No,Invoice Date,Place of Supply,SAC,Status,Taxable Value,CGST,SGST,IGST,Total");
