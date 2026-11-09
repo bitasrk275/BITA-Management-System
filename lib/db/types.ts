@@ -969,6 +969,80 @@ export type Database = {
         }
         Relationships: []
       }
+      job_expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          expense_date: string
+          id: string
+          job_id: string
+          kind: string
+          log_book_id: string | null
+          note: string | null
+          person_id: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          expense_date?: string
+          id?: string
+          job_id: string
+          kind?: string
+          log_book_id?: string | null
+          note?: string | null
+          person_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          expense_date?: string
+          id?: string
+          job_id?: string
+          kind?: string
+          log_book_id?: string | null
+          note?: string | null
+          person_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_expenses_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_expenses_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_expenses_log_book_id_fkey"
+            columns: ["log_book_id"]
+            isOneToOne: false
+            referencedRelation: "log_book_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_expenses_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           closed_at: string | null
@@ -1079,6 +1153,80 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "leave_days_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      log_book_entries: {
+        Row: {
+          assignment_id: string | null
+          created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          end_date: string | null
+          id: string
+          job_id: string
+          notes: string | null
+          person_id: string | null
+          status: string
+          updated_at: string
+          work_date: string
+        }
+        Insert: {
+          assignment_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          end_date?: string | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          person_id?: string | null
+          status?: string
+          updated_at?: string
+          work_date: string
+        }
+        Update: {
+          assignment_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          end_date?: string | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          person_id?: string | null
+          status?: string
+          updated_at?: string
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "log_book_entries_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: true
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_book_entries_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_book_entries_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_book_entries_person_id_fkey"
             columns: ["person_id"]
             isOneToOne: false
             referencedRelation: "people"
@@ -1214,6 +1362,8 @@ export type Database = {
           id: string
           initials: string | null
           mobile: string | null
+          monthly_salary: number | null
+          per_job_allowance: number | null
           position: string | null
           roles: Database["public"]["Enums"]["app_role"][]
           signature_path: string | null
@@ -1229,6 +1379,8 @@ export type Database = {
           id?: string
           initials?: string | null
           mobile?: string | null
+          monthly_salary?: number | null
+          per_job_allowance?: number | null
           position?: string | null
           roles?: Database["public"]["Enums"]["app_role"][]
           signature_path?: string | null
@@ -1244,6 +1396,8 @@ export type Database = {
           id?: string
           initials?: string | null
           mobile?: string | null
+          monthly_salary?: number | null
+          per_job_allowance?: number | null
           position?: string | null
           roles?: Database["public"]["Enums"]["app_role"][]
           signature_path?: string | null
@@ -1432,6 +1586,8 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          calibration_override_by: string | null
+          calibration_override_note: string | null
           content: Json
           created_at: string
           id: string
@@ -1451,6 +1607,8 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          calibration_override_by?: string | null
+          calibration_override_note?: string | null
           content?: Json
           created_at?: string
           id?: string
@@ -1470,6 +1628,8 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          calibration_override_by?: string | null
+          calibration_override_note?: string | null
           content?: Json
           created_at?: string
           id?: string
@@ -1490,6 +1650,13 @@ export type Database = {
           {
             foreignKeyName: "reports_approved_by_fkey"
             columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_calibration_override_by_fkey"
+            columns: ["calibration_override_by"]
             isOneToOne: false
             referencedRelation: "people"
             referencedColumns: ["id"]

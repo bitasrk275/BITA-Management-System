@@ -9,6 +9,7 @@ import { text } from "@/lib/forms";
 import { loadReportApprovalAssets } from "@/lib/reports/branding.server";
 import { missingFields } from "@/lib/reports/fields";
 import {
+  type BookedJobEquipmentItem,
   buildReportContent,
   checkReportReadiness,
   extractReadings,
@@ -16,10 +17,68 @@ import {
   generateSignedReportPdfBytes,
   parseEditedReportReadings,
   parseRecipients,
+  prefillReadingsFromBookedEquipment,
   reportPdfStoragePath,
   supportedMethod,
   validUuid,
 } from "@/lib/reports/review";
+
+async function loadBookedJobEquipment(
+  supabase: Awaited<ReturnType<typeof requireStaff>>["supabase"],
+  jobId: string
+): Promise<BookedJobEquipmentItem[]> {
+  const { data: assigns } = await supabase
+    .from("assignments")
+    .select(`
+      work_date,
+      assignment_equipment(
+        equipment:equipment!assignment_equipment_equipment_id_fkey(
+          id,
+          make,
+          model,
+          serial_no,
+          calibration_due
+        )
+      )
+    `)
+    .eq("job_id", jobId)
+    .order("work_date", { ascending: true });
+
+  type AssignRow = {
+    work_date: string;
+    assignment_equipment: Array<{
+      equipment: {
+        id: string;
+        make: string | null;
+        model: string | null;
+        serial_no: string | null;
+        calibration_due: string | null;
+      } | null;
+    }>;
+  };
+
+  const seen = new Set<string>();
+  const items: BookedJobEquipmentItem[] = [];
+
+  for (const a of (assigns as unknown as AssignRow[]) ?? []) {
+    for (const ae of a.assignment_equipment ?? []) {
+      const eq = ae.equipment;
+      if (!eq || seen.has(eq.id)) continue;
+      seen.add(eq.id);
+      const isExpired = Boolean(eq.calibration_due && eq.calibration_due < a.work_date);
+      items.push({
+        id: eq.id,
+        make: eq.make,
+        model: eq.model,
+        serial_no: eq.serial_no,
+        calibration_due: eq.calibration_due,
+        work_date: a.work_date,
+        is_expired_on_work_date: isExpired,
+      });
+    }
+  }
+  return items;
+}
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -81,7 +140,11 @@ export async function prepareReport(fd: FormData) {
     redirectError("/review", err instanceof Error ? err.message : "Invalid report number.");
   }
 
-  const readings = extractReadings(inspection.readings);
+  const bookedEquipment = await loadBookedJobEquipment(supabase, inspection.job_id);
+  const readings = prefillReadingsFromBookedEquipment(
+    extractReadings(inspection.readings),
+    bookedEquipment
+  );
   const readiness = checkReportReadiness(inspection.method, inspection, readings);
   if (!readiness.ready) {
     redirectError("/review", readiness.blockers.join(" "));
@@ -143,7 +206,11 @@ export async function refreshReportFromInspection(reportId: string) {
     redirectError(path, "The linked field inspection could not be loaded.");
   }
 
-  const readings = extractReadings(inspection.readings);
+  const bookedEquipment = await loadBookedJobEquipment(supabase, report.job_id);
+  const readings = prefillReadingsFromBookedEquipment(
+    extractReadings(inspection.readings),
+    bookedEquipment
+  );
   const readiness = checkReportReadiness(report.method, inspection, readings);
   if (!readiness.ready) {
     redirectError(path, readiness.blockers.join(" "));
@@ -306,7 +373,7 @@ export async function approveReport(reportId: string, fd: FormData) {
     redirectError(path, "This report is not waiting for approval.");
   }
 
-  const [inspectionRes, jobRes] = await Promise.all([
+  const [inspectionRes, jobRes, bookedEquipment] = await Promise.all([
     report.inspection_id
       ? supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -315,14 +382,31 @@ export async function approveReport(reportId: string, fd: FormData) {
       .select("id, job_no, customers(name)")
       .eq("id", report.job_id)
       .maybeSingle(),
+    loadBookedJobEquipment(supabase, report.job_id),
   ]);
 
   const inspection = inspectionRes.data;
   const job = jobRes.data;
-  const readings = extractReadings(report.content, inspection?.readings);
+  const readings = prefillReadingsFromBookedEquipment(
+    extractReadings(report.content, inspection?.readings),
+    bookedEquipment
+  );
   const readiness = checkReportReadiness(report.method, inspection, readings);
   if (!readiness.ready) {
     redirectError(path, readiness.blockers.join(" "));
+  }
+
+  const expiredEquipment = bookedEquipment.filter((e) => e.is_expired_on_work_date);
+  const calibrationOverrideNote =
+    text(fd, "calibration_override_note") ?? report.calibration_override_note ?? null;
+
+  if (expiredEquipment.length > 0 && (!calibrationOverrideNote || !calibrationOverrideNote.trim())) {
+    const firstExp = expiredEquipment[0]!;
+    const label = [firstExp.make, firstExp.model, firstExp.serial_no].filter(Boolean).join(" ");
+    redirectError(
+      path,
+      `Booked equipment ${label} had expired calibration (due ${firstExp.calibration_due}) on work date ${firstExp.work_date}. Enter a calibration override reason to approve this report.`
+    );
   }
 
   const chosenSignatory = text(fd, "signatory_id") || report.signatory_id || person.id;
@@ -368,6 +452,12 @@ export async function approveReport(reportId: string, fd: FormData) {
       approved_at: approvedAt,
       signatory_id: chosenSignatory,
       pdf_path: storagePath,
+      ...(calibrationOverrideNote && calibrationOverrideNote.trim()
+        ? {
+            calibration_override_note: calibrationOverrideNote.trim(),
+            calibration_override_by: person.id,
+          }
+        : {}),
     })
     .eq("id", report.id);
 

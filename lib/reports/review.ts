@@ -67,6 +67,51 @@ export function extractReadings(
   return {};
 }
 
+export type BookedJobEquipmentItem = {
+  id: string;
+  make: string | null;
+  model: string | null;
+  serial_no: string | null;
+  calibration_due: string | null;
+  work_date: string;
+  is_expired_on_work_date: boolean;
+};
+
+/**
+ * Prefills `equipment` and `equipment_serial` on `ReportReadings` from the job's booked equipment
+ * when those fields are currently blank.
+ */
+export function prefillReadingsFromBookedEquipment(
+  readings: ReportReadings,
+  bookedEquipment: ReadonlyArray<{
+    make: string | null;
+    model: string | null;
+    serial_no: string | null;
+  }>
+): ReportReadings {
+  if (bookedEquipment.length === 0) return readings;
+
+  const first = bookedEquipment[0]!;
+  const label = [first.make, first.model].filter(Boolean).join(" ").trim();
+  const serials = bookedEquipment
+    .map((e) => e.serial_no)
+    .filter((s): s is string => Boolean(s && s.trim()))
+    .join(", ");
+
+  const curEq = readings.equipment;
+  const curSerial = readings.equipment_serial;
+  const hasEq = typeof curEq === "string" && curEq.trim().length > 0;
+  const hasSerial = typeof curSerial === "string" && curSerial.trim().length > 0;
+
+  if (hasEq && hasSerial) return readings;
+
+  return {
+    ...readings,
+    ...(!hasEq && label ? { equipment: label } : {}),
+    ...(!hasSerial && serials ? { equipment_serial: serials } : {}),
+  };
+}
+
 export function buildReportContent(
   readings: ReportReadings,
   observations?: string | null,

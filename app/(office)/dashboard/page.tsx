@@ -163,8 +163,8 @@ export default async function ManagementHome() {
       tone: c.tone,
       title: c.title,
       detail: c.detail,
-      href: "/registers?tab=qualifications",
-      label: "Registers",
+      href: "/employees",
+      label: "Employees",
     })),
     ...calAlerts.map((eq) => ({
       key: "cal" + eq.id,

@@ -35,6 +35,13 @@ export function JobDetailScreen({
   const isCompleted = Boolean(currentJob.completedAt);
   const isStarted = Boolean(currentJob.startedAt);
   const isAcknowledged = Boolean(currentJob.acknowledgedAt);
+  const isApproved = Boolean(
+    currentJob.inspection?.isApproved || currentJob.inspection?.status === "approved"
+  );
+  const scheduledDateRange =
+    currentJob.endDate && currentJob.endDate !== currentJob.workDate
+      ? `${currentJob.workDate} to ${currentJob.endDate}`
+      : currentJob.workDate;
 
   async function handleAcknowledge() {
     setLoadingAction(true);
@@ -96,7 +103,7 @@ export function JobDetailScreen({
           </Text>
           <Text style={styles.detailItem}>
             <Text style={styles.detailLabel}>Scheduled date: </Text>
-            {currentJob.workDate}
+            {scheduledDateRange}
           </Text>
 
           <View style={styles.methodRow}>
@@ -183,12 +190,18 @@ export function JobDetailScreen({
           {isCompleted && (
             <View style={styles.completedBox}>
               <Text style={styles.completedText}>
-                ✓ Field report submitted. Office review pending.
+                {isApproved
+                  ? "✓ Report approved by office — locked."
+                  : "✓ Field report submitted — editable until office approval."}
               </Text>
               {currentJob.testMethods.map((m) => (
                 <Button
                   key={m}
-                  title={`View ${m} report (submitted)`}
+                  title={
+                    isApproved
+                      ? `View ${m} report (approved · locked)`
+                      : `Edit ${m} report (submitted)`
+                  }
                   variant="secondary"
                   onPress={() => onOpenReport(m)}
                   style={styles.actionButton}

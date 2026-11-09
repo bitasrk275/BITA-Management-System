@@ -13,6 +13,7 @@ export type TechnicianJobItem = {
   scope: string | null;
   testMethods: Enums<"test_method">[];
   workDate: string;
+  endDate: string | null;
   notes: string | null;
   acknowledgedAt: string | null;
   startedAt: string | null;
@@ -57,6 +58,7 @@ export async function getTechnicianJobs(
       job_id,
       person_id,
       work_date,
+      end_date,
       notes,
       acknowledged_at,
       started_at,
@@ -209,6 +211,7 @@ export async function getTechnicianJobs(
       scope: job.scope,
       testMethods: job.test_methods || [],
       workDate: a.work_date,
+      endDate: a.end_date ?? null,
       notes: a.notes,
       acknowledgedAt: a.acknowledged_at,
       startedAt: a.started_at,
