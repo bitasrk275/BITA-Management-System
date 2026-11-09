@@ -78,12 +78,20 @@ export function ReportScreen({
         } else if (job.inspection?.readings) {
           setReadings((job.inspection.readings as Record<string, string>) || {});
         } else {
-          // Pre-fill default shared fields from job
+          // Pre-fill default shared fields, booked equipment, and remembered customer defaults (BITA UT Report Fields spec)
+          const firstEq = job.equipment?.[0];
+          const eqCalStr = firstEq?.calibrationDue
+            ? `Valid Upto ${firstEq.calibrationDue}`
+            : "";
           setReadings({
+            ...(tpl.rememberedDefaults || {}),
             client: job.customerName,
             project: job.scope || "",
-            inspection_site: job.site || "",
+            inspection_site: job.site || "Works",
             inspection_date: job.workDate,
+            ...(firstEq?.model ? { equipment: firstEq.model } : {}),
+            ...(firstEq?.serialNo ? { equipment_serial: firstEq.serialNo } : {}),
+            ...(eqCalStr ? { equipment_calibration: eqCalStr } : {}),
           });
         }
 
@@ -260,6 +268,12 @@ export function ReportScreen({
           {template?.fields.map((f) => {
             const isMissing = missingFields.includes(f.key);
             const val = readings[f.key] || "";
+            const options =
+              f.options && f.options.length > 0
+                ? f.options
+                : f.listKey && template?.dropdownOptions?.[f.listKey]
+                  ? template.dropdownOptions[f.listKey]
+                  : undefined;
 
             return (
               <View key={f.key} style={styles.fieldGroup}>
@@ -270,6 +284,43 @@ export function ReportScreen({
                   {isMissing && <Text style={styles.missingHint}>Required</Text>}
                 </View>
 
+                {options && options.length > 0 && !isApproved ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ marginBottom: 6 }}
+                  >
+                    {options.map((opt) => {
+                      const active = val === opt;
+                      return (
+                        <TouchableOpacity
+                          key={opt}
+                          onPress={() => handleFieldChange(f.key, opt)}
+                          style={{
+                            paddingHorizontal: 10,
+                            paddingVertical: 6,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: active ? colors.ink : colors.line,
+                            backgroundColor: active ? colors.ink : colors.surface,
+                            marginRight: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: active ? "#ffffff" : colors.ink,
+                              fontWeight: active ? "600" : "400",
+                            }}
+                          >
+                            {opt}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+
                 <TextInput
                   style={[
                     styles.textInput,
@@ -278,7 +329,13 @@ export function ReportScreen({
                     isApproved && styles.readOnlyInput,
                   ]}
                   value={val}
-                  placeholder={isApproved ? "Not specified" : `Enter ${f.label.toLowerCase()}`}
+                  placeholder={
+                    isApproved
+                      ? "Not specified"
+                      : options && options.length > 0
+                        ? `Tap an option above or type custom (Others)...`
+                        : `Enter ${f.label.toLowerCase()}`
+                  }
                   placeholderTextColor={colors.ink3}
                   multiline={f.input === "textarea"}
                   numberOfLines={f.input === "textarea" ? 3 : 1}

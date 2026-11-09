@@ -67,6 +67,18 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-09 12:08 – Naveen – Claude
+Task: Phase 2 Complete (P4d, P5, P6, P7 Telegram Executive Bot, A4 Log book, A5 Employee register, A6 Equipment report guard, A7 Dashboard/Sidebar v2, A8 Mobile App v2, BITA Reference Invoice 5387 layout, and BITA UT Report Fields 1–29 spec)
+Done:
+- Completed P4d: `lib/reminders/` reads `reminder_timings` from `public.settings`; `/invoices/export` includes Credit Notes (CDNR/CDNUR) and TDS deducted by customers in CSV, Excel XML workbook, and UI.
+- Completed P5 & P6: `/settings` editors for `company_profile` (invoice header, PAN, GSTIN, default SAC `998393`, bank details), `invoice_numbering` (`next_tax_no: 5388`), `reminder_timings`, `permissions` matrix, `report_templates`, `holidays`, and `settings_options`.
+- Completed P7: Built `lib/modules/telegram/`, `/api/telegram/webhook`, and `/api/telegram/notify` with 6-digit pairing in Settings, executive commands (`/status`, `/jobs`, `/invoices`, `/overdue`, `/reports`, `/equipment`, `/schedule`, `/job <job_no>`), natural-language Q&A, and proactive notifications on report submission, invoice issue, payment recording, and daily digest.
+- Merged A4 (`/log-book` + `job_expenses`), A5 (`/employees` + worked/idle/leave days + salaries), A6 (booked equipment prefill + expired calibration approval guard), A7 (Dashboard & sidebar v2), and A8 (Technician app v2), and applied migrations `20261107070000_log_book_employees_equipment_guard.sql` and `20261107080000_ut_report_dropdowns_and_settings.sql` to `bita-dev`.
+- Implemented BITA UT Report Fields (1–29) spec across `lib/reports/fields.ts`, `templates/reports/report.tsx`, `app/(office)/review/[reportId]/report-editor.tsx`, `/api/field/report-template/[method]`, and `apps/technician/src/screens/ReportScreen.tsx` (Fixed, Automatic, Dropdown with Others, Pick or type, Typed in, Remember per customer, and component identification/size/unit/result rows).
+Files changed: lib/reports/fields.ts, templates/reports/report.tsx, app/(office)/review/, app/api/field/report-template/[method]/route.ts, apps/technician/, lib/invoices/gst-export.ts, app/(office)/invoices/export/, lib/reminders/, app/(office)/settings/, lib/modules/telegram/, app/api/telegram/, lib/modules/log-book/, app/(office)/log-book/, lib/modules/employees/, app/(office)/employees/, supabase/migrations/
+Next: Push to `origin/feature/naveen-integration` and `origin/main` so Vercel deploys the complete Phase 2 system live.
+Blockers / questions: none.
+
 ### 2026-11-09 10:43 – Naveen – Claude
 Task: P4c Credit notes (`BITA/YY-YY/CN-0001`) + TDS deducted on payments (`payments.tds_amount`)
 Done: Added migration `supabase/migrations/20261107061000_credit_notes_and_tds.sql` adding `tds_amount` on `public.payments` and creating `public.credit_notes` with RLS, `private.next_credit_note_no()` (`BITA/YY-YY/CN-0001` honoring `next_credit_note_no` in `public.settings`), `private.before_credit_note_write()`, `private.sync_invoice_credit_notes()`, and updated `private.before_invoice_write()` / `private.check_payment_write()` so both `(amount + tds_amount)` and issued `credit_notes.total` reduce `invoices.balance`. Added `recordInvoicePayment`, `createCreditNoteForInvoice`, and `cancelCreditNoteById` in `lib/modules/invoices/service.ts` and `/api/v1/invoices/[id]/{payments,credit-notes}`. Updated `/invoices/[id]` with TDS field on payment recording, TDS breakdown in payment history, and Credit Notes creation/cancellation UI.

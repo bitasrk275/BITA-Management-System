@@ -42,6 +42,11 @@ export type FieldDefinition = {
   label: string;
   required: boolean;
   input: "text" | "date" | "number" | "textarea";
+  fieldType?: "fixed" | "automatic" | "dropdown" | "pick_or_type" | "typed";
+  listKey?: string;
+  options?: readonly string[];
+  readOnly?: boolean;
+  fixed?: boolean;
 };
 
 export type RepeatingGroupDefinition = {
@@ -55,6 +60,8 @@ export type ReportTemplate = {
   method: string;
   fields: FieldDefinition[];
   repeatingGroups: RepeatingGroupDefinition[];
+  dropdownOptions?: Record<string, string[]>;
+  rememberedDefaults?: Record<string, string>;
 };
 
 export type ProblemKind =
