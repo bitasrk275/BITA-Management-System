@@ -27,11 +27,17 @@ interface TelegramUpdate {
   };
 }
 
+function sanitizeTelegramSecret(raw: string | undefined): string {
+  return (raw ?? "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, 256);
+}
+
 export async function POST(req: Request) {
   try {
-    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+    const expectedSecret = sanitizeTelegramSecret(process.env.TELEGRAM_WEBHOOK_SECRET);
     if (expectedSecret) {
-      const provided = req.headers.get("x-telegram-bot-api-secret-token")?.trim();
+      const provided = sanitizeTelegramSecret(
+        req.headers.get("x-telegram-bot-api-secret-token") ?? undefined,
+      );
       if (provided !== expectedSecret) {
         return NextResponse.json({ error: "Forbidden." }, { status: 403 });
       }
@@ -126,7 +132,7 @@ export async function GET(req: Request) {
         );
       }
       const webhookUrl = `${url.origin}/api/telegram/webhook`;
-      const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+      const secretToken = sanitizeTelegramSecret(process.env.TELEGRAM_WEBHOOK_SECRET);
       const body: Record<string, string> = { url: webhookUrl };
       if (secretToken) body.secret_token = secretToken;
 

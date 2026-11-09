@@ -397,7 +397,10 @@ export async function registerTelegramWebhookAction() {
   }
 
   const webhookUrl = "https://bita-management-system.vercel.app/api/telegram/webhook";
-  const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  const secretToken = (process.env.TELEGRAM_WEBHOOK_SECRET ?? "")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, "")
+    .slice(0, 256);
   const body: Record<string, string> = { url: webhookUrl };
   if (secretToken) body.secret_token = secretToken;
 
