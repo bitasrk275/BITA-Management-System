@@ -110,9 +110,63 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const hasBotTokenEnv = Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim());
+  const hasWebhookSecretEnv = Boolean(process.env.TELEGRAM_WEBHOOK_SECRET?.trim());
+
+  if (url.searchParams.get("register") === "1") {
+    try {
+      const supabase = getSupabaseAdmin();
+      const config = await getTelegramConfig(supabase);
+      if (!config.bot_token) {
+        return NextResponse.json(
+          { ok: false, error: "No TELEGRAM_BOT_TOKEN configured." },
+          { status: 400 },
+        );
+      }
+      const webhookUrl = `${url.origin}/api/telegram/webhook`;
+      const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+      const body: Record<string, string> = { url: webhookUrl };
+      if (secretToken) body.secret_token = secretToken;
+
+      const [whRes, meRes] = await Promise.all([
+        fetch(`https://api.telegram.org/bot${config.bot_token}/setWebhook`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        fetch(`https://api.telegram.org/bot${config.bot_token}/getMe`),
+      ]);
+      const whData = (await whRes.json().catch(() => ({}))) as {
+        ok?: boolean;
+        description?: string;
+      };
+      const meData = (await meRes.json().catch(() => ({}))) as {
+        ok?: boolean;
+        result?: { username?: string; first_name?: string };
+      };
+      return NextResponse.json({
+        ok: Boolean(whData.ok),
+        webhookUrl,
+        description: whData.description ?? null,
+        botUsername: meData.result?.username ?? null,
+        botName: meData.result?.first_name ?? null,
+        hasBotTokenEnv,
+        hasWebhookSecretEnv,
+      });
+    } catch (err) {
+      return NextResponse.json(
+        { ok: false, error: err instanceof Error ? err.message : "Failed to register webhook" },
+        { status: 500 },
+      );
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     service: "BITA Telegram Executive Bot Webhook",
+    hasBotTokenEnv,
+    hasWebhookSecretEnv,
   });
 }

@@ -36,6 +36,7 @@ import {
   addHolidayAction,
   addReportTemplateFieldAction,
   createTelegramPairingCodeAction,
+  registerTelegramWebhookAction,
   removeDropdownOption,
   removeHolidayAction,
   removeReportTemplateFieldAction,
@@ -73,9 +74,10 @@ export default async function SettingsPage({
     saved?: string;
     list?: string;
     tg_code?: string;
+    tg_webhook?: string;
   }>;
 }) {
-  const { error, saved, list, tg_code } = await searchParams;
+  const { error, saved, list, tg_code, tg_webhook } = await searchParams;
   const { supabase, person } = await requireStaff();
   const isManagement = Boolean(person?.roles.includes("management"));
 
@@ -195,6 +197,20 @@ export default async function SettingsPage({
 
       <ErrorNote message={error ?? settingsErr ?? optionsErr ?? undefined} />
       {saved && <SavedNote />}
+
+      {tg_webhook && (
+        <div className="mb-5 rounded-lg border border-ok-line bg-ok-bg px-4 py-3 text-sm text-ink">
+          <p className="font-semibold">
+            Telegram Webhook Connected Successfully!
+          </p>
+          <p className="mt-1 text-xs text-ink-2">
+            Your bot is now live and connected to{" "}
+            <Mono>https://bita-management-system.vercel.app/api/telegram/webhook</Mono>. Click{" "}
+            <strong>Generate 6-Digit Link Code</strong> below and send{" "}
+            <Mono>/start &lt;code&gt;</Mono> to your bot in Telegram!
+          </p>
+        </div>
+      )}
 
       {tg_code && (
         <div className="mb-5 rounded-lg border border-ok-line bg-ok-bg px-4 py-3 text-sm text-ink">
@@ -499,6 +515,9 @@ export default async function SettingsPage({
                   Linked Executive Chats ({telegramLinks.chats.length})
                 </span>
                 <div className="flex flex-wrap gap-2">
+                  <form action={registerTelegramWebhookAction}>
+                    <SecondaryButton type="submit">Connect Webhook to Telegram</SecondaryButton>
+                  </form>
                   <form action={createTelegramPairingCodeAction}>
                     <SecondaryButton type="submit">Generate 6-Digit Link Code</SecondaryButton>
                   </form>

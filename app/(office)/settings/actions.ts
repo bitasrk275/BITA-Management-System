@@ -382,3 +382,69 @@ export async function sendTestTelegramDigestAction() {
   revalidatePath("/settings");
   redirect("/settings?saved=1");
 }
+
+export async function registerTelegramWebhookAction() {
+  const { supabase, person } = await requireStaff();
+  const config = await getTelegramConfig(supabase);
+  if (!config.bot_token) {
+    redirect(
+      "/settings?error=" +
+        encodeURIComponent(
+          "No Telegram Bot Token found. Add TELEGRAM_BOT_TOKEN in Vercel or paste it in Settings.",
+        ),
+    );
+  }
+
+  const webhookUrl = "https://bita-management-system.vercel.app/api/telegram/webhook";
+  const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  const body: Record<string, string> = { url: webhookUrl };
+  if (secretToken) body.secret_token = secretToken;
+
+  try {
+    const [whRes, meRes] = await Promise.all([
+      fetch(`https://api.telegram.org/bot${config.bot_token}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      fetch(`https://api.telegram.org/bot${config.bot_token}/getMe`),
+    ]);
+    const whData = (await whRes.json().catch(() => ({}))) as {
+      ok?: boolean;
+      description?: string;
+    };
+    const meData = (await meRes.json().catch(() => ({}))) as {
+      ok?: boolean;
+      result?: { username?: string };
+    };
+    if (!whData.ok) {
+      redirect(
+        "/settings?error=" +
+          encodeURIComponent(whData.description ?? "Telegram setWebhook call failed."),
+      );
+    }
+
+    const detectedUsername = meData.result?.username ?? config.bot_username;
+    await upsertSetting(
+      supabase,
+      "telegram_config",
+      {
+        ...config,
+        bot_username: detectedUsername,
+        enabled: true,
+      } as unknown as Json,
+      "Telegram Executive Bot configuration and notification preferences",
+      person?.id ?? null,
+    );
+  } catch (err) {
+    redirect(
+      "/settings?error=" +
+        encodeURIComponent(
+          err instanceof Error ? err.message : "Could not reach api.telegram.org.",
+        ),
+    );
+  }
+
+  revalidatePath("/settings");
+  redirect("/settings?saved=1&tg_webhook=1");
+}
