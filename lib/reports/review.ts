@@ -256,6 +256,21 @@ export function generateReportPdfBytes(input: {
   }
   lines.push("--------------------------------------------------------------------------------");
   lines.push(`REPORT NO: ${input.reportNo}    DATE: ${input.reportDate}    METHOD: ${input.method}`);
+  const headerItems = (r.items ?? []) as readonly ItemReadings[];
+  const headerComponentId =
+    r.component_header_id && String(r.component_header_id).trim()
+      ? String(r.component_header_id).trim()
+      : headerItems.length === 1 &&
+          headerItems[0]?.identification_no &&
+          String(headerItems[0].identification_no).trim()
+        ? String(headerItems[0].identification_no)
+            .trim()
+            .split(/\r?\n|,/)[0]
+            ?.trim() ?? null
+        : null;
+  if (headerComponentId) {
+    lines.push(`COMPONENT ID: ${headerComponentId}`);
+  }
   lines.push(`JOB ID:    ${input.jobNo}    CUSTOMER: ${input.customerName}`);
   lines.push("--------------------------------------------------------------------------------");
 
@@ -292,10 +307,20 @@ export function generateReportPdfBytes(input: {
     lines.push("  (None listed)");
   } else {
     items.forEach((item, idx) => {
+      const qtyStr = `${item.quantity ?? "-"}${item.qty_unit ? ` ${item.qty_unit}` : ""}`;
       lines.push(
-        `  Item ${idx + 1} (Qty: ${item.quantity ?? "-"}): ${String(item.description ?? "-").replace(/\s+/g, " ")}`
+        `  Item ${idx + 1} (Qty: ${qtyStr}): ${String(item.description ?? "-").replace(/\s+/g, " ")}`
       );
+      if (item.identification_no && String(item.identification_no).trim()) {
+        lines.push(`    Identification: ${String(item.identification_no).trim().replace(/\s+/g, " ")}`);
+      }
+      if (item.size && String(item.size).trim()) {
+        lines.push(`    Size: ${String(item.size).trim().replace(/\s+/g, " ")}`);
+      }
       lines.push(`    Observations: ${String(item.observations ?? "-").replace(/\s+/g, " ")}`);
+      if (item.result && String(item.result).trim()) {
+        lines.push(`    Result: ${String(item.result).trim().replace(/\s+/g, " ")}`);
+      }
     });
   }
 
@@ -417,7 +442,6 @@ export function parseEditedReportReadings(
             ? otherCell
             : rawCell;
         if (typeof cellRaw !== "string") {
-          row[fieldDef.key] = null;
           continue;
         }
         const trimmed = cellRaw.trim();
