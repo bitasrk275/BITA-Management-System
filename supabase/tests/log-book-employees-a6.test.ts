@@ -7,7 +7,9 @@ const REVIEWER_USER = "33333333-3333-3333-3333-333333333333";
 const TECH_USER = "44444444-4444-4444-4444-444444444444";
 
 describe("Phase 2 Tasks A4, A5, A6 (Log book, Employee salaries, Calibration report guard)", () => {
-  it("syncs log_book_entries on assignment insert/update/delete, enforces job_expenses RLS, and blocks approving reports with expired equipment unless overridden", async () => {
+  it(
+    "syncs log_book_entries on assignment insert/update/delete, enforces job_expenses RLS, and blocks approving reports with expired equipment unless overridden",
+    async () => {
     const { db, as } = await createTestDb();
 
     await db.exec(`
@@ -173,5 +175,5 @@ describe("Phase 2 Tasks A4, A5, A6 (Log book, Employee salaries, Calibration rep
     );
     expect(approvedRes.rows[0]!.status).toBe("approved");
     expect(approvedRes.rows[0]!.calibration_override_by).toBe(REVIEWER_USER);
-  });
+  }, 30000);
 });

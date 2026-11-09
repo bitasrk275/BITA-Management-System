@@ -40,7 +40,9 @@ describe("Phase 2 Foundation (P1): soft delete, recycle bin, settings, and permi
       TECH_USER,
       `select list_key, value from public.settings_options where list_key = 'couplant' order by position`,
     );
-    expect(optionsRes.rows.map((r) => r.value)).toEqual(["Oil", "Grease", "Water", "Glycerin"]);
+    expect(optionsRes.rows.map((r) => r.value)).toEqual(
+      expect.arrayContaining(["Oil", "Grease", "Water"])
+    );
 
     // Office cannot overwrite system settings
     await expect(

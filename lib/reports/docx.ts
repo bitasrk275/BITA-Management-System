@@ -35,7 +35,23 @@ function formatDate(reading: ReadingValue | undefined): string {
 }
 
 function formatEquipment(readings: ReportReadings): string {
-  return `${formatValue(readings.equipment)}\nS.No. ${formatValue(readings.equipment_serial)}`;
+  const base = `${formatValue(readings.equipment)}\nS.No. ${formatValue(readings.equipment_serial)}`;
+  if (readings.equipment_calibration && String(readings.equipment_calibration).trim()) {
+    return `${base}\n${String(readings.equipment_calibration).trim()}`;
+  }
+  return base;
+}
+
+function resolveHeaderComponentId(readings: ReportReadings): string | null {
+  if (readings.component_header_id && String(readings.component_header_id).trim()) {
+    return String(readings.component_header_id).trim();
+  }
+  const items = readings.items ?? [];
+  if (items.length === 1 && items[0]?.identification_no && String(items[0].identification_no).trim()) {
+    const firstLine = String(items[0].identification_no).trim().split(/\r?\n|,/)[0]?.trim();
+    if (firstLine) return firstLine;
+  }
+  return null;
 }
 
 export type ReportDocxDetailPair = {
@@ -69,6 +85,7 @@ export type ReportDocxSpec = {
     addressLines: readonly string[];
     contactLines: readonly string[];
     reportNumber: string;
+    componentHeaderId?: string | null;
     reportDateFormatted: string;
     columnSpans: readonly number[];
   };
@@ -120,7 +137,10 @@ export function buildReportDocxSpec(
             leftLabel: "Equipment Used",
             leftValue: formatEquipment(r),
             rightLabel: "Reference Blocks",
-            rightValue: formatValue(r.reference_blocks),
+            rightValue:
+              r.calibration_method && String(r.calibration_method).trim()
+                ? `${formatValue(r.reference_blocks)}\n${String(r.calibration_method).trim()}`
+                : formatValue(r.reference_blocks),
           },
           {
             leftLabel: "Probe Used",
@@ -212,10 +232,27 @@ export function buildReportDocxSpec(
       !String(item.description ?? "").startsWith(String(r.component_description))
         ? `${formatValue(r.component_description)}\n\n`
         : "";
+    const idNo =
+      item.identification_no && String(item.identification_no).trim()
+        ? `\n${String(item.identification_no).trim()}`
+        : "";
+    const size =
+      item.size && String(item.size).trim()
+        ? `\n${String(item.size).trim()}`
+        : "";
+    const qtyUnit =
+      item.qty_unit && String(item.qty_unit).trim()
+        ? ` ${String(item.qty_unit).trim()}`
+        : "";
+    const observations = formatValue(item.observations);
+    const result =
+      item.result && String(item.result).trim()
+        ? `\n\n${String(item.result).trim()}`
+        : "";
     return {
-      description: `${prefixComp}${rawDesc}`,
-      quantity: formatValue(item.quantity),
-      observations: formatValue(item.observations),
+      description: `${prefixComp}${rawDesc}${idNo}${size}`,
+      quantity: `${formatValue(item.quantity)}${qtyUnit}`,
+      observations: `${observations}${result}`,
     };
   });
 
@@ -229,6 +266,7 @@ export function buildReportDocxSpec(
       addressLines: document.letterhead.addressLines,
       contactLines: document.letterhead.contactLines ?? [],
       reportNumber: document.reportNumber,
+      componentHeaderId: resolveHeaderComponentId(r),
       reportDateFormatted: formatDate(document.reportDate),
       columnSpans: layout.header,
     },
@@ -336,7 +374,8 @@ export async function generateReportDocxBytes(
     ...spec.header.addressLines,
     ...spec.header.contactLines,
   ].join("\n");
-  const reportNoText = `REPORT NO.\n${spec.header.reportNumber}\n\nDATE: ${spec.header.reportDateFormatted}`;
+  const compIdText = spec.header.componentHeaderId ? `\n${spec.header.componentHeaderId}` : "";
+  const reportNoText = `REPORT NO.\n${spec.header.reportNumber}${compIdText}\n\nDATE: ${spec.header.reportDateFormatted}`;
 
   rows.push(
     new TableRow({
