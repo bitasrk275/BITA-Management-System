@@ -7,7 +7,7 @@
 
 export const BITA_STATE_CODE = "29";
 export const BITA_STATE_NAME = "Karnataka";
-export const DEFAULT_SAC_CODE = ""; // Configurable setting; empty until BITA confirms SAC (e.g. 998346).
+export const DEFAULT_SAC_CODE = "998393"; // Confirmed from BITA reference invoice (SAC No. : 998393).
 
 export const INDIAN_STATE_NAMES: Record<string, string> = {
   "01": "Jammu & Kashmir",

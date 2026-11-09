@@ -4,6 +4,7 @@ import {
   Button,
   ButtonLink,
   Card,
+  ErrorNote,
   Field,
   Input,
   List,
@@ -21,7 +22,7 @@ import { createEquipmentTypeAction, deleteEquipmentTypeAction } from "../actions
 export const dynamic = "force-dynamic";
 
 export default async function EquipmentTypesPage(props: {
-  searchParams: Promise<{ saved?: string; deleted?: string }>;
+  searchParams: Promise<{ saved?: string; deleted?: string; error?: string }>;
 }) {
   await requireStaff();
   const supabase = await createClient();
@@ -54,6 +55,7 @@ export default async function EquipmentTypesPage(props: {
         }
       />
 
+      <ErrorNote message={searchParams.error} />
       {searchParams.saved && <SavedNote />}
       {searchParams.deleted && (
         <Card className="border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
@@ -87,23 +89,19 @@ export default async function EquipmentTypesPage(props: {
                     ) : null
                   }
                   action={
-                    <form action={deleteEquipmentTypeAction.bind(null, t.id)}>
-                      <button
-                        type="submit"
-                        onClick={(e) => {
-                          if (
-                            !confirm(
-                              `Are you sure you want to delete type "${t.name}"? It will move to the recycle bin.`
-                            )
-                          ) {
-                            e.preventDefault();
-                          }
-                        }}
-                        className="rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-600 hover:text-red-700 hover:bg-red-50"
-                      >
+                    <details className="text-right">
+                      <summary className="cursor-pointer list-none rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-600 hover:text-red-700 hover:bg-red-50 inline-block">
                         Delete
-                      </button>
-                    </form>
+                      </summary>
+                      <form action={deleteEquipmentTypeAction.bind(null, t.id)} className="mt-1.5">
+                        <button
+                          type="submit"
+                          className="rounded bg-red-700 px-2 py-1 text-xs text-white hover:bg-red-800"
+                        >
+                          Confirm delete
+                        </button>
+                      </form>
+                    </details>
                   }
                 />
               );

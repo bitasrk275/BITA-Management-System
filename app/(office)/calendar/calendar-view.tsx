@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   Badge,
   Button,
   ButtonLink,
   Card,
+  ErrorNote,
   Field,
   Input,
   Mono,
@@ -18,11 +19,11 @@ import {
 import type { Enums } from "@/lib/db/types";
 import type { CalendarAssignment, CalendarViewData } from "@/lib/modules/calendar/schema";
 import {
-  assignJobFromCalendarAction,
-  deleteAssignmentAction,
   deleteLeaveAction,
-  moveAssignmentAction,
-  recordLeaveAction,
+  submitAssignJobModalAction,
+  submitDeleteAssignmentModalAction,
+  submitMoveAssignmentModalAction,
+  submitRecordLeaveModalAction,
 } from "./actions";
 
 type JobOption = {
@@ -67,6 +68,12 @@ export function CalendarInteractiveView({
   const [assignOpen, setAssignOpen] = useState(Boolean(selectedJobId));
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [activeAssignment, setActiveAssignment] = useState<CalendarAssignment | null>(null);
+  const [confirmUnassign, setConfirmUnassign] = useState(false);
+
+  // Submission / feedback states
+  const [submitting, setSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [bannerMessage, setBannerMessage] = useState<string | null>(null);
 
   // Form states for Assign
   const [targetJobId, setTargetJobId] = useState(selectedJobId || (jobs[0]?.id ?? ""));
@@ -75,6 +82,18 @@ export function CalendarInteractiveView({
   const [assignEndDate, setAssignEndDate] = useState("");
   const [assignEquipIds, setAssignEquipIds] = useState<string[]>([]);
   const [assignNotes, setAssignNotes] = useState("");
+  const [forceOverride, setForceOverride] = useState(false);
+
+  useEffect(() => {
+    if (selectedJobId) {
+      setTargetJobId(selectedJobId);
+      setAssignOpen(true);
+    }
+  }, [selectedJobId]);
+
+  useEffect(() => {
+    setAssignWorkDate(currentDate);
+  }, [currentDate]);
 
   // Navigation handlers
   const handleNav = (deltaDays: number) => {
@@ -93,6 +112,8 @@ export function CalendarInteractiveView({
   };
 
   const openAssignModal = (techId?: string, date?: string) => {
+    setModalError(null);
+    setForceOverride(false);
     if (techId) setTargetTechId(techId);
     if (date) {
       setAssignWorkDate(date);
@@ -107,8 +128,113 @@ export function CalendarInteractiveView({
     );
   };
 
+  async function handleAssignSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setModalError(null);
+    try {
+      const fd = new FormData(e.currentTarget);
+      const res = await submitAssignJobModalAction(fd);
+      if (!res.ok) {
+        setModalError(res.error);
+        return;
+      }
+      setAssignOpen(false);
+      setForceOverride(false);
+      setAssignNotes("");
+      setAssignEquipIds([]);
+      setBannerMessage(res.message);
+      router.push(`/calendar?saved=assigned&date=${res.date || assignWorkDate}&view=${viewMode}`);
+      router.refresh();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Failed to schedule job.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleMoveSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setModalError(null);
+    try {
+      const fd = new FormData(e.currentTarget);
+      const res = await submitMoveAssignmentModalAction(fd);
+      if (!res.ok) {
+        setModalError(res.error);
+        return;
+      }
+      setActiveAssignment(null);
+      setConfirmUnassign(false);
+      setBannerMessage(res.message);
+      router.push(`/calendar?saved=moved&date=${res.date || currentDate}&view=${viewMode}`);
+      router.refresh();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Failed to update assignment.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleUnassignConfirm() {
+    if (!activeAssignment) return;
+    setSubmitting(true);
+    setModalError(null);
+    try {
+      const res = await submitDeleteAssignmentModalAction(activeAssignment.id);
+      if (!res.ok) {
+        setModalError(res.error);
+        return;
+      }
+      setActiveAssignment(null);
+      setConfirmUnassign(false);
+      setBannerMessage(res.message);
+      router.push(`/calendar?saved=unassigned&date=${currentDate}&view=${viewMode}`);
+      router.refresh();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Failed to unassign job.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleLeaveSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setModalError(null);
+    try {
+      const fd = new FormData(e.currentTarget);
+      const res = await submitRecordLeaveModalAction(fd);
+      if (!res.ok) {
+        setModalError(res.error);
+        return;
+      }
+      setLeaveOpen(false);
+      setBannerMessage(res.message);
+      router.push(`/calendar?saved=leave&date=${res.date || currentDate}&view=${viewMode}`);
+      router.refresh();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Failed to record leave.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {bannerMessage && (
+        <div className="flex items-center justify-between rounded-lg border border-ok/25 bg-ok/5 px-3.5 py-2.5 text-[13px] text-ok">
+          <span>✓ {bannerMessage}</span>
+          <button
+            type="button"
+            onClick={() => setBannerMessage(null)}
+            className="text-xs text-ink-3 hover:text-ink"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Calendar Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white p-3.5">
         <div className="flex items-center gap-2">
@@ -149,7 +275,13 @@ export function CalendarInteractiveView({
             </button>
           </div>
 
-          <SecondaryButton type="button" onClick={() => setLeaveOpen(true)}>
+          <SecondaryButton
+            type="button"
+            onClick={() => {
+              setModalError(null);
+              setLeaveOpen(true);
+            }}
+          >
             + Record Leave
           </SecondaryButton>
 
@@ -265,7 +397,11 @@ export function CalendarInteractiveView({
                             {cell.assignments.map((a) => (
                               <div
                                 key={a.id}
-                                onClick={() => setActiveAssignment(a)}
+                                onClick={() => {
+                                  setModalError(null);
+                                  setConfirmUnassign(false);
+                                  setActiveAssignment(a);
+                                }}
                                 className="cursor-pointer rounded border border-line bg-white p-1.5 shadow-sm transition hover:border-ink hover:shadow"
                               >
                                 <div className="flex items-center justify-between font-mono font-medium text-ink">
@@ -300,6 +436,13 @@ export function CalendarInteractiveView({
                                 )}
                               </div>
                             ))}
+                            <button
+                              type="button"
+                              onClick={() => openAssignModal(tech.personId, d)}
+                              className="w-full rounded border border-dashed border-line py-0.5 text-[10px] text-ink-3 hover:border-ink hover:text-ink"
+                            >
+                              + Add job
+                            </button>
                           </div>
                         </td>
                       );
@@ -345,12 +488,18 @@ export function CalendarInteractiveView({
               </div>
               <button
                 type="button"
-                onClick={() => setActiveAssignment(null)}
+                onClick={() => {
+                  setActiveAssignment(null);
+                  setModalError(null);
+                  setConfirmUnassign(false);
+                }}
                 className="text-ink-3 hover:text-ink text-base"
               >
                 ✕
               </button>
             </div>
+
+            {modalError && <ErrorNote message={modalError} />}
 
             <div className="rounded-lg bg-side p-3 text-xs space-y-1">
               <div>
@@ -388,7 +537,7 @@ export function CalendarInteractiveView({
             </div>
 
             {/* Move Form */}
-            <form action={moveAssignmentAction} className="space-y-3 border-t border-line pt-3">
+            <form onSubmit={handleMoveSubmit} className="space-y-3 border-t border-line pt-3">
               <input type="hidden" name="assignment_id" value={activeAssignment.id} />
               <div className="font-semibold text-xs text-ink">Move or Reassign Job</div>
 
@@ -420,27 +569,49 @@ export function CalendarInteractiveView({
                 </Select>
               </Field>
 
+              {modalError && (
+                <label className="flex items-center gap-2 text-xs text-ink-2">
+                  <input type="checkbox" name="force" value="1" className="h-3.5 w-3.5 accent-ink" />
+                  <span>Override conflict and force move</span>
+                </label>
+              )}
+
               <div className="flex items-center justify-between pt-2">
-                <form action={deleteAssignmentAction} className="inline">
-                  <input type="hidden" name="assignment_id" value={activeAssignment.id} />
+                {!confirmUnassign ? (
                   <button
-                    type="submit"
+                    type="button"
                     className="text-xs text-bad hover:underline font-medium"
-                    onClick={(e) => {
-                      if (!confirm("Are you sure you want to unassign this job?")) {
-                        e.preventDefault();
-                      }
-                    }}
+                    onClick={() => setConfirmUnassign(true)}
                   >
                     Unassign Job
                   </button>
-                </form>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={handleUnassignConfirm}
+                      className="rounded bg-bad px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
+                    >
+                      {submitting ? "Removing…" : "Confirm Unassign"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmUnassign(false)}
+                      className="text-xs text-ink-3 hover:text-ink"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2">
                   <ButtonLink href={`/jobs/${activeAssignment.jobId}`} variant="secondary" size="sm">
                     Open Job →
                   </ButtonLink>
-                  <Button type="submit">Save Changes</Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? "Saving…" : "Save Changes"}
+                  </Button>
                 </div>
               </div>
             </form>
@@ -461,14 +632,19 @@ export function CalendarInteractiveView({
               </div>
               <button
                 type="button"
-                onClick={() => setAssignOpen(false)}
+                onClick={() => {
+                  setAssignOpen(false);
+                  setModalError(null);
+                }}
                 className="text-ink-3 hover:text-ink text-base"
               >
                 ✕
               </button>
             </div>
 
-            <form action={assignJobFromCalendarAction} className="space-y-3">
+            {modalError && <ErrorNote message={modalError} />}
+
+            <form onSubmit={handleAssignSubmit} className="space-y-3">
               <Field label="Select Job">
                 <Select
                   name="job_id"
@@ -569,11 +745,34 @@ export function CalendarInteractiveView({
                 />
               </Field>
 
+              {modalError && (
+                <label className="flex items-center gap-2 text-xs text-ink-2">
+                  <input
+                    type="checkbox"
+                    name="force"
+                    value="1"
+                    checked={forceOverride}
+                    onChange={(e) => setForceOverride(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-ink"
+                  />
+                  <span>Override conflict and force schedule anyway</span>
+                </label>
+              )}
+
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
-                <SecondaryButton type="button" onClick={() => setAssignOpen(false)}>
+                <SecondaryButton
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => {
+                    setAssignOpen(false);
+                    setModalError(null);
+                  }}
+                >
                   Cancel
                 </SecondaryButton>
-                <Button type="submit">Schedule & Notify</Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Scheduling…" : "Schedule & Notify"}
+                </Button>
               </div>
             </form>
           </Card>
@@ -593,14 +792,19 @@ export function CalendarInteractiveView({
               </div>
               <button
                 type="button"
-                onClick={() => setLeaveOpen(false)}
+                onClick={() => {
+                  setLeaveOpen(false);
+                  setModalError(null);
+                }}
                 className="text-ink-3 hover:text-ink text-base"
               >
                 ✕
               </button>
             </div>
 
-            <form action={recordLeaveAction} className="space-y-3">
+            {modalError && <ErrorNote message={modalError} />}
+
+            <form onSubmit={handleLeaveSubmit} className="space-y-3">
               <Field label="Technician">
                 <Select name="person_id" required defaultValue={data.technicians[0]?.personId}>
                   {data.technicians.map((t) => (
@@ -624,10 +828,19 @@ export function CalendarInteractiveView({
               </Field>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
-                <SecondaryButton type="button" onClick={() => setLeaveOpen(false)}>
+                <SecondaryButton
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => {
+                    setLeaveOpen(false);
+                    setModalError(null);
+                  }}
+                >
                   Cancel
                 </SecondaryButton>
-                <Button type="submit">Save Leave</Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Saving…" : "Save Leave"}
+                </Button>
               </div>
             </form>
           </Card>

@@ -13,7 +13,11 @@ import {
 } from "@/lib/modules/calendar/service";
 import { createClient } from "@/lib/supabase/server";
 
-export async function assignJobFromCalendarAction(formData: FormData) {
+export type CalendarModalResult =
+  | { ok: true; date?: string; message: string }
+  | { ok: false; error: string };
+
+export async function submitAssignJobModalAction(formData: FormData): Promise<CalendarModalResult> {
   await requireStaff();
   const supabase = await createClient();
 
@@ -22,13 +26,13 @@ export async function assignJobFromCalendarAction(formData: FormData) {
   const workDate = text(formData, "work_date");
   const endDate = text(formData, "end_date");
   const notes = text(formData, "notes");
-  const force = formData.get("force") === "1" || formData.get("force") === "true";
+  const force = formData.get("force") === "1" || formData.get("force") === "true" || formData.get("force") === "on";
 
   const rawEquip = formData.getAll("equipment_ids");
   const equipmentIds = rawEquip.map((v) => String(v).trim()).filter(Boolean);
 
   if (!jobId || !technicianId || !workDate) {
-    redirect("/calendar?error=" + encodeURIComponent("Job, technician, and work date are required."));
+    return { ok: false, error: "Job, technician, and work date are required." };
   }
 
   try {
@@ -43,16 +47,23 @@ export async function assignJobFromCalendarAction(formData: FormData) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to assign job";
-    redirect(`/calendar?error=${encodeURIComponent(msg)}&jobId=${jobId}&date=${workDate}`);
+    return { ok: false, error: msg };
   }
 
   revalidatePath("/calendar");
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/assign`);
   revalidatePath("/dashboard");
-  redirect(`/calendar?saved=assigned&date=${workDate}`);
+  revalidatePath("/office");
+
+  return {
+    ok: true,
+    date: workDate,
+    message: "Job scheduled and technician notified.",
+  };
 }
 
-export async function moveAssignmentAction(formData: FormData) {
+export async function submitMoveAssignmentModalAction(formData: FormData): Promise<CalendarModalResult> {
   await requireStaff();
   const supabase = await createClient();
 
@@ -60,10 +71,10 @@ export async function moveAssignmentAction(formData: FormData) {
   const newWorkDate = text(formData, "new_work_date");
   const newEndDate = text(formData, "new_end_date");
   const newTechnicianId = text(formData, "new_technician_id");
-  const force = formData.get("force") === "1" || formData.get("force") === "true";
+  const force = formData.get("force") === "1" || formData.get("force") === "true" || formData.get("force") === "on";
 
   if (!assignmentId || !newWorkDate) {
-    redirect("/calendar?error=" + encodeURIComponent("Assignment ID and new date are required."));
+    return { ok: false, error: "Assignment ID and new date are required." };
   }
 
   try {
@@ -76,36 +87,46 @@ export async function moveAssignmentAction(formData: FormData) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to move assignment";
-    redirect(`/calendar?error=${encodeURIComponent(msg)}`);
+    return { ok: false, error: msg };
   }
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
-  redirect(`/calendar?saved=moved&date=${newWorkDate}`);
+  revalidatePath("/office");
+
+  return {
+    ok: true,
+    date: newWorkDate,
+    message: "Assignment updated and technician notified.",
+  };
 }
 
-export async function deleteAssignmentAction(formData: FormData) {
+export async function submitDeleteAssignmentModalAction(assignmentId: string): Promise<CalendarModalResult> {
   await requireStaff();
   const supabase = await createClient();
 
-  const assignmentId = text(formData, "assignment_id");
   if (!assignmentId) {
-    redirect("/calendar?error=" + encodeURIComponent("Assignment ID is required."));
+    return { ok: false, error: "Assignment ID is required." };
   }
 
   try {
     await deleteCalendarAssignment(supabase, assignmentId);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to remove assignment";
-    redirect(`/calendar?error=${encodeURIComponent(msg)}`);
+    return { ok: false, error: msg };
   }
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
-  redirect("/calendar?saved=unassigned");
+  revalidatePath("/office");
+
+  return {
+    ok: true,
+    message: "Job unassigned from calendar.",
+  };
 }
 
-export async function recordLeaveAction(formData: FormData) {
+export async function submitRecordLeaveModalAction(formData: FormData): Promise<CalendarModalResult> {
   const { user } = await requireStaff();
   const supabase = await createClient();
 
@@ -114,7 +135,7 @@ export async function recordLeaveAction(formData: FormData) {
   const reason = text(formData, "reason");
 
   if (!personId || !leaveDate) {
-    redirect("/calendar?error=" + encodeURIComponent("Technician and leave date are required."));
+    return { ok: false, error: "Technician and leave date are required." };
   }
 
   try {
@@ -129,11 +150,53 @@ export async function recordLeaveAction(formData: FormData) {
     );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to record leave";
-    redirect(`/calendar?error=${encodeURIComponent(msg)}`);
+    return { ok: false, error: msg };
   }
 
   revalidatePath("/calendar");
-  redirect(`/calendar?saved=leave&date=${leaveDate}`);
+
+  return {
+    ok: true,
+    date: leaveDate,
+    message: "Technician leave recorded.",
+  };
+}
+
+export async function assignJobFromCalendarAction(formData: FormData) {
+  const res = await submitAssignJobModalAction(formData);
+  const workDate = text(formData, "work_date") ?? "";
+  const jobId = text(formData, "job_id") ?? "";
+  if (!res.ok) {
+    redirect(`/calendar?error=${encodeURIComponent(res.error)}&jobId=${jobId}&date=${workDate}`);
+  }
+  redirect(`/calendar?saved=assigned&date=${res.date ?? workDate}`);
+}
+
+export async function moveAssignmentAction(formData: FormData) {
+  const res = await submitMoveAssignmentModalAction(formData);
+  const newWorkDate = text(formData, "new_work_date") ?? "";
+  if (!res.ok) {
+    redirect(`/calendar?error=${encodeURIComponent(res.error)}`);
+  }
+  redirect(`/calendar?saved=moved&date=${res.date ?? newWorkDate}`);
+}
+
+export async function deleteAssignmentAction(formData: FormData) {
+  const assignmentId = text(formData, "assignment_id") ?? "";
+  const res = await submitDeleteAssignmentModalAction(assignmentId);
+  if (!res.ok) {
+    redirect(`/calendar?error=${encodeURIComponent(res.error)}`);
+  }
+  redirect("/calendar?saved=unassigned");
+}
+
+export async function recordLeaveAction(formData: FormData) {
+  const res = await submitRecordLeaveModalAction(formData);
+  const leaveDate = text(formData, "leave_date") ?? "";
+  if (!res.ok) {
+    redirect(`/calendar?error=${encodeURIComponent(res.error)}`);
+  }
+  redirect(`/calendar?saved=leave&date=${res.date ?? leaveDate}`);
 }
 
 export async function deleteLeaveAction(formData: FormData) {

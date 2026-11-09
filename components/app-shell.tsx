@@ -46,10 +46,14 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/invoices", label: "Invoices & payments", icon: "money" },
       ],
       records: [
+        { href: "/price-list", label: "Price list", icon: "money" },
         { href: "/customers", label: "Customers", icon: "customers" },
         { href: "/equipment", label: "Equipment", icon: "equipment" },
         { href: "/registers", label: "People & qualifications", icon: "people" },
+        { href: "/invoices/export", label: "CA GST files", icon: "chart" },
+        { href: "/settings", label: "Settings", icon: "jobs" },
         { href: "/settings/users", label: "Users & logins", icon: "people" },
+        { href: "/recycle-bin", label: "Recycle bin", icon: "reports" },
       ],
     };
   }
@@ -65,9 +69,12 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/invoices", label: "Invoices & payments", icon: "money" },
       ],
       records: [
+        { href: "/price-list", label: "Price list", icon: "money" },
         { href: "/customers", label: "Customers", icon: "customers" },
         { href: "/equipment", label: "Equipment", icon: "equipment" },
         { href: "/registers", label: "People & qualifications", icon: "people" },
+        { href: "/invoices/export", label: "CA GST files", icon: "chart" },
+        { href: "/settings", label: "Settings", icon: "jobs" },
       ],
     };
   }

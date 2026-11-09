@@ -3,6 +3,7 @@ import {
   Button,
   ButtonLink,
   Card,
+  ErrorNote,
   Field,
   Input,
   PageHeader,
@@ -16,9 +17,12 @@ import { createEquipmentAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewEquipmentPage() {
+export default async function NewEquipmentPage(props: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   await requireStaff();
   const supabase = await createClient();
+  const searchParams = await props.searchParams;
   const types = await listEquipmentTypes(supabase);
 
   return (
@@ -32,6 +36,8 @@ export default async function NewEquipmentPage() {
           </ButtonLink>
         }
       />
+
+      <ErrorNote message={searchParams.error} />
 
       <Card className="p-6">
         <form action={createEquipmentAction} className="space-y-4">

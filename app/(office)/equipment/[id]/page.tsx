@@ -5,6 +5,7 @@ import {
   Button,
   ButtonLink,
   Card,
+  ErrorNote,
   Field,
   Input,
   List,
@@ -35,7 +36,7 @@ export const dynamic = "force-dynamic";
 
 export default async function EquipmentDetailPage(props: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; moved?: string }>;
+  searchParams: Promise<{ saved?: string; moved?: string; error?: string }>;
 }) {
   await requireStaff();
   const supabase = await createClient();
@@ -144,6 +145,7 @@ export default async function EquipmentDetailPage(props: {
         }
       />
 
+      <ErrorNote message={searchParams.error} />
       {searchParams.saved && <SavedNote />}
       {searchParams.moved && (
         <Card className="border-green-200 bg-green-50 p-4 text-xs text-green-900">
@@ -255,24 +257,26 @@ export default async function EquipmentDetailPage(props: {
           </Card>
 
           {/* Delete Equipment Card */}
-          <Card className="p-4 border-red-100 bg-red-50/30 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-medium text-red-900">Delete this equipment</div>
-              <div className="text-[11px] text-red-700">Moves item to the recycle bin; can be restored later.</div>
+          <Card className="p-4 border-red-100 bg-red-50/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-medium text-red-900">Delete this equipment</div>
+                <div className="text-[11px] text-red-700">Moves item to the recycle bin; can be restored later.</div>
+              </div>
+              <details className="text-right">
+                <summary className="cursor-pointer list-none rounded border border-red-300 bg-white px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 font-medium inline-block">
+                  Delete
+                </summary>
+                <form action={deleteEquipmentAction.bind(null, equipment.id)} className="mt-2">
+                  <button
+                    type="submit"
+                    className="rounded bg-red-700 px-2.5 py-1 text-xs text-white hover:bg-red-800 font-medium"
+                  >
+                    Confirm move to recycle bin
+                  </button>
+                </form>
+              </details>
             </div>
-            <form action={deleteEquipmentAction.bind(null, equipment.id)}>
-              <button
-                type="submit"
-                onClick={(e) => {
-                  if (!confirm("Are you sure you want to move this equipment to the recycle bin?")) {
-                    e.preventDefault();
-                  }
-                }}
-                className="rounded border border-red-300 bg-white px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 font-medium"
-              >
-                Delete
-              </button>
-            </form>
           </Card>
         </div>
 

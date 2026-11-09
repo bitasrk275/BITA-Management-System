@@ -31,6 +31,9 @@ export interface BitaInvoiceProfile {
   name: string;
   subtitle: string;
   address: string;
+  phone?: string;
+  email?: string;
+  pan?: string;
   gstin: string;
   stateCode: string;
   stateName: string;
@@ -42,15 +45,18 @@ export interface BitaInvoiceProfile {
 export const DEFAULT_BITA_INVOICE_PROFILE: BitaInvoiceProfile = {
   name: "BANGALORE INSPECTION & TESTING AGENCY",
   subtitle: "Non-Destructive Testing & Inspection Engineers (Estd. 1987)",
-  address: "Bengaluru, Karnataka, India — [Office address placeholder pending BITA reference invoice]",
+  address: "Bengaluru, Karnataka, India — [Office address configured in Settings]",
+  phone: "[Office Phone / Cell configured in Settings]",
+  email: "[Office Email configured in Settings]",
+  pan: "[PAN configured in Settings]",
   gstin: "[BITA GSTIN placeholder · State Code 29 (Karnataka)]",
   stateCode: BITA_STATE_CODE,
   stateName: BITA_STATE_NAME,
   defaultSac: DEFAULT_SAC_CODE,
   bankDetailsPlaceholder:
-    "[BANK DETAILS PLACEHOLDER — Bank Name, Branch, Account Number & IFSC to be filled from BITA's reference invoice]",
+    "[BANK DETAILS PLACEHOLDER — Bank Name, Branch, Account Number & IFSC configured in Settings]",
   termsPlaceholder:
-    "[TERMS & CONDITIONS PLACEHOLDER — Payment terms & declaration to be filled from BITA's reference invoice]",
+    "[TERMS & CONDITIONS PLACEHOLDER — This is a digitally signed original document. No physical signature is required..]",
 };
 
 export interface InvoiceTemplateLine {
@@ -95,11 +101,14 @@ export interface InvoiceDocumentSpec {
   seller: BitaInvoiceProfile;
   invoiceNoDisplay: string;
   invoiceDateDisplay: string;
+  invoiceDateDotsDisplay: string;
   dueDateDisplay: string;
   jobNoDisplay: string;
   reportNoDisplay: string;
   quotationRefDisplay: string;
   poDisplay: string;
+  /** Top-right P.O. No. box content: filled when PO exists, empty string when invoice is without PO */
+  poBoxDisplay: string;
   customerName: string;
   customerAddress: string;
   customerGstin: string;
@@ -109,21 +118,47 @@ export interface InvoiceDocumentSpec {
   defaultSac: string;
   lines: Array<{
     slNo: number;
+    slNoPadded: string;
     description: string;
     sac: string;
     qty: string;
     unit: string;
     rate: string;
+    rateSlashDisplay: string;
     amount: string;
+    amountSlashDisplay: string;
   }>;
   taxableValueDisplay: string;
   cgstDisplay: string;
+  cgstSlashDisplay: string;
   sgstDisplay: string;
+  sgstSlashDisplay: string;
   igstDisplay: string;
+  igstSlashDisplay: string;
   roundOffDisplay: string;
   totalDisplay: string;
+  totalSlashDisplay: string;
   amountInWords: string;
   notes: string;
+}
+
+export function formatSlashRupees(value: number | string | null | undefined): string {
+  const num = roundPaise(Number(value) || 0);
+  if (num === 0) return "-";
+  if (Number.isInteger(num)) {
+    return `${num}/-`;
+  }
+  return `${num.toFixed(2)}/-`;
+}
+
+export function formatDateDots(isoDate?: string | null): string {
+  if (!isoDate) return "—";
+  const trimmed = isoDate.trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+  if (m) {
+    return `${m[3]}.${m[2]}.${m[1]}`;
+  }
+  return trimmed;
 }
 
 export function formatRupeeNumber(value: number | string | null | undefined): string {
@@ -161,24 +196,34 @@ export function buildInvoiceDocumentSpec(input: InvoiceTemplateInput): InvoiceDo
 
   const formattedLines = (input.lines.length > 0
     ? input.lines
-    : [{ description: "NDT Inspection Services", sac: seller.defaultSac, qty: 1, unit: "job", rate: 0, amount: 0 }]
+    : [{ description: "NDT Inspection Services", sac: seller.defaultSac, qty: 1, unit: "Visit", rate: 0, amount: 0 }]
   ).map((line, index) => {
     const sac = (line.sac ?? seller.defaultSac ?? "").trim();
     const qtyNum = Number(line.qty) || 0;
     const qtyStr = Number.isInteger(qtyNum) ? String(qtyNum) : qtyNum.toFixed(3).replace(/\.?0+$/, "");
+    const slNo = index + 1;
     return {
-      slNo: index + 1,
-      description: line.description.trim() || `Item ${index + 1}`,
-      sac: sac || "—",
+      slNo,
+      slNoPadded: `${String(slNo).padStart(2, "0")}.`,
+      description: line.description.trim() || `Item ${slNo}`,
+      sac: sac || DEFAULT_SAC_CODE || "—",
       qty: qtyStr,
-      unit: line.unit?.trim() || "nos",
+      unit: line.unit?.trim() || "Visit",
       rate: formatRupeeNumber(line.rate),
+      rateSlashDisplay: formatSlashRupees(line.rate),
       amount: formatRupeeNumber(line.amount),
+      amountSlashDisplay: formatSlashRupees(line.amount),
     };
   });
 
   const roundOffNum = roundPaise(input.roundOff);
   const roundOffPrefix = roundOffNum > 0 ? "+" : "";
+
+  const cleanPoNo = input.poNumber?.trim() || "";
+  const cleanPoDate = input.poDate?.trim() || "";
+  const poBoxDisplay = cleanPoNo
+    ? [cleanPoNo, cleanPoDate ? `dtd. ${formatDateDots(cleanPoDate)}` : null].filter(Boolean).join("\n")
+    : "";
 
   return {
     title,
@@ -186,30 +231,39 @@ export function buildInvoiceDocumentSpec(input: InvoiceTemplateInput): InvoiceDo
     seller,
     invoiceNoDisplay: input.invoiceNo?.trim() || "DRAFT (Unissued)",
     invoiceDateDisplay: input.invoiceDate?.trim() || "—",
+    invoiceDateDotsDisplay: formatDateDots(input.invoiceDate),
     dueDateDisplay: input.dueDate?.trim() || "—",
     jobNoDisplay: input.jobNo?.trim() || "—",
     reportNoDisplay: input.reportNo?.trim() || "—",
     quotationRefDisplay: input.quotationRef?.trim() || "—",
-    poDisplay: [input.poNumber?.trim(), input.poDate?.trim() ? `dt. ${input.poDate.trim()}` : null]
-      .filter(Boolean)
-      .join(" ") || "—",
+    poDisplay: [cleanPoNo, cleanPoDate ? `dt. ${cleanPoDate}` : null].filter(Boolean).join(" ") || "—",
+    poBoxDisplay,
     customerName: input.customerName.trim() || "—",
     customerAddress: input.customerAddress?.trim() || "—",
     customerGstin: input.customerGstin?.trim() || "Unregistered / Not provided",
     placeOfSupplyCode: placeCode,
     placeOfSupplyDisplay: formatPlaceOfSupply(placeCode),
     isIntraState,
-    defaultSac: seller.defaultSac || "—",
+    defaultSac: seller.defaultSac || DEFAULT_SAC_CODE || "—",
     lines: formattedLines,
     taxableValueDisplay: formatRupeeNumber(input.taxableValue),
     cgstDisplay: formatRupeeNumber(input.cgst),
+    cgstSlashDisplay: specAmountSlash(input.cgst, isIntraState),
     sgstDisplay: formatRupeeNumber(input.sgst),
+    sgstSlashDisplay: specAmountSlash(input.sgst, isIntraState),
     igstDisplay: formatRupeeNumber(input.igst),
+    igstSlashDisplay: specAmountSlash(input.igst, !isIntraState),
     roundOffDisplay: `${roundOffPrefix}${formatRupeeNumber(roundOffNum)}`,
     totalDisplay: formatRupeeNumber(input.total),
+    totalSlashDisplay: formatSlashRupees(input.total),
     amountInWords: amountInWordsINR(input.total),
     notes: input.notes?.trim() || "",
   };
+}
+
+function specAmountSlash(val: number, active: boolean): string {
+  if (!active) return "-";
+  return formatSlashRupees(val);
 }
 
 function pdfEscape(text: string): string {
@@ -410,13 +464,11 @@ export async function generateInvoiceDocxBytes(input: InvoiceTemplateInput): Pro
     new TableRow({
       children: [
         makeCell("Bill To (Customer)", { widthTwips: 2000, bold: true, shaded: true }),
-        makeCell(`${spec.customerName}\n${spec.customerAddress}`, { widthTwips: 8466, colSpan: 3 }),
-      ],
-    }),
-    new TableRow({
-      children: [
-        makeCell("Customer GSTIN", { widthTwips: 2000, bold: true, shaded: true }),
-        makeCell(spec.customerGstin, { widthTwips: 8466, colSpan: 3, bold: true }),
+        makeCell(`${spec.customerName}\n${spec.customerAddress}\nGSTIN: ${spec.customerGstin}`, {
+          widthTwips: 5233,
+        }),
+        makeCell("P.O. No. (Top-Right Box)", { widthTwips: 2000, bold: true, shaded: true }),
+        makeCell(spec.poBoxDisplay, { widthTwips: 3233, bold: true }),
       ],
     }),
   ];

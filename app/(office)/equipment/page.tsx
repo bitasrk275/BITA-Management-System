@@ -197,7 +197,7 @@ export default async function EquipmentPage(props: {
             </Link>
           </div>
 
-          <form method="GET" action="/equipment" className="flex items-center gap-2">
+          <form method="GET" action="/equipment" className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="status" value={currentStatus} />
             <select
               name="type_id"
@@ -218,9 +218,15 @@ export default async function EquipmentPage(props: {
               placeholder="Search serial, make, model..."
               className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none w-48 sm:w-64"
             />
-            {searchTerm && (
+            <button
+              type="submit"
+              className="rounded border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50"
+            >
+              Filter
+            </button>
+            {(searchTerm || typeId) && (
               <Link
-                href={`/equipment?status=${currentStatus}${typeId ? `&type_id=${typeId}` : ""}`}
+                href={`/equipment?status=${currentStatus}`}
                 className="text-xs text-neutral-500 hover:text-neutral-800 underline"
               >
                 Clear

@@ -24,7 +24,6 @@ import { requireStaff } from "@/lib/auth";
 import { shortDate, todayIST } from "@/lib/dates";
 import { formatIST } from "../../enquiries/labels";
 import {
-  amountInWordsINR,
   buildInvoiceDocumentSpec,
   formatPlaceOfSupply,
 } from "@/lib/invoices";
@@ -56,6 +55,7 @@ import {
   type PaymentRow,
 } from "../db";
 import { InvoiceDraftEditor } from "./invoice-draft-editor";
+import { loadBitaInvoiceProfile } from "./load-template-input";
 
 export const metadata = { title: "Invoice – BITA" };
 
@@ -194,14 +194,17 @@ export default async function InvoiceDetailPage({
     status: string;
   } | null;
 
-  const poCheck = await checkPoUtilization(supabase, {
-    jobId: invoice.job_id,
-    customerId: job?.customer_id,
-    poNumber: invoice.customer_po_number ?? job?.po_number,
-    poValue: job?.po_value,
-    excludeInvoiceId: invoice.id,
-    currentInvoiceTotal: isCancelled ? 0 : Number(invoice.total) || 0,
-  });
+  const [poCheck, companyProfile] = await Promise.all([
+    checkPoUtilization(supabase, {
+      jobId: invoice.job_id,
+      customerId: job?.customer_id,
+      poNumber: invoice.customer_po_number ?? job?.po_number,
+      poValue: job?.po_value,
+      excludeInvoiceId: invoice.id,
+      currentInvoiceTotal: isCancelled ? 0 : Number(invoice.total) || 0,
+    }),
+    loadBitaInvoiceProfile(supabase),
+  ]);
 
   const spec = buildInvoiceDocumentSpec({
     kind: invoice.kind,
@@ -234,6 +237,7 @@ export default async function InvoiceDetailPage({
     roundOff: Number(invoice.round_off) || 0,
     total: Number(invoice.total) || 0,
     notes: invoice.notes,
+    profile: companyProfile,
   });
 
   const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
@@ -671,231 +675,258 @@ export default async function InvoiceDetailPage({
         </section>
       )}
 
-      {/* Clean BITA Tax Invoice Preview Card */}
-      <Card className="space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-4">
-          <div>
-            <div className="text-[11px] font-semibold tracking-wider text-ink-3 uppercase">
-              {spec.title}
-            </div>
-            <h2 className="mt-0.5 text-lg font-bold text-ink">{spec.seller.name}</h2>
-            <p className="text-[12.5px] text-ink-2">{spec.seller.subtitle}</p>
-            <p className="text-[12px] text-ink-3">{spec.seller.address}</p>
-            <p className="mt-1 text-[12px] text-ink-2">
-              Supplier GSTIN: <Mono>{spec.seller.gstin}</Mono> · State: {spec.seller.stateCode} - {spec.seller.stateName}
-            </p>
-          </div>
-          <div className="text-left sm:text-right text-[12.5px] space-y-1">
-            <div>
-              <span className="text-ink-3">Invoice No: </span>
-              <strong className="text-ink">
-                <Mono>{spec.invoiceNoDisplay}</Mono>
-              </strong>
-            </div>
-            <div>
-              <span className="text-ink-3">Invoice Date: </span>
-              <span className="font-medium text-ink">{spec.invoiceDateDisplay}</span>
-            </div>
-            <div>
-              <span className="text-ink-3">Due Date: </span>
-              <span className="font-medium text-ink">{spec.dueDateDisplay}</span>
-            </div>
-            <div>
-              <span className="text-ink-3">Place of Supply: </span>
-              <span className="font-medium text-ink">{spec.placeOfSupplyDisplay}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 text-[13px]">
-          <div className="rounded-lg border border-line bg-surface-2/30 p-3.5 space-y-1">
-            <div className="text-[11px] font-semibold uppercase text-ink-3">Bill To (Customer)</div>
-            <div className="font-semibold text-ink">{spec.customerName}</div>
-            <div className="whitespace-pre-line text-[12.5px] text-ink-2">{spec.customerAddress}</div>
-            <div className="pt-1 text-[12.5px]">
-              <span className="text-ink-3">Customer GSTIN: </span>
-              <Mono>{spec.customerGstin}</Mono>
-            </div>
-          </div>
-          <div className="rounded-lg border border-line bg-surface-2/30 p-3.5 space-y-1.5 text-[12.5px]">
-            <div className="text-[11px] font-semibold uppercase text-ink-3">References</div>
-            <div className="flex justify-between">
-              <span className="text-ink-3">Job ID</span>
-              {job ? (
+      {/* BITA Boxed Tax Invoice Preview (matching Reference Invoice 5387) */}
+      <Card className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-ink-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-semibold uppercase tracking-wider text-ink-3">{spec.title}</span>
+            {job && (
+              <span>
+                Job:{" "}
                 <Link href={`/jobs/${job.id}`} className="font-medium text-ink underline">
                   <Mono>{job.job_no}</Mono>
                 </Link>
-              ) : (
-                <span>—</span>
-              )}
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-ink-3">
-                Approved Report{linkedReports.length > 1 ? "s" : ""}
               </span>
-              {linkedReports.length > 0 ? (
-                <span className="flex flex-wrap justify-end gap-1.5 text-right">
-                  {linkedReports.map((r) => (
-                    <Link
-                      key={r.id}
-                      href={`/review/${r.id}`}
-                      className="font-medium text-ink underline"
-                    >
+            )}
+            {linkedReports.length > 0 && (
+              <span>
+                Report{linkedReports.length > 1 ? "s" : ""}:{" "}
+                {linkedReports.map((r, idx) => (
+                  <span key={r.id}>
+                    {idx > 0 ? ", " : ""}
+                    <Link href={`/review/${r.id}`} className="font-medium text-ink underline">
                       <Mono>{r.report_no}</Mono>
                     </Link>
-                  ))}
-                </span>
-              ) : (
-                <span>—</span>
-              )}
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-3">Quotation Ref</span>
-              {quotation ? (
+                  </span>
+                ))}
+              </span>
+            )}
+            {quotation && (
+              <span>
+                Quote:{" "}
                 <Link href={`/quotations/${quotation.id}`} className="font-medium text-ink underline">
                   <Mono>{quotation.ref_no ?? "Quotation"}</Mono>
                 </Link>
-              ) : (
-                <span>—</span>
-              )}
-            </div>
+              </span>
+            )}
             {sourceProforma && (
-              <div className="flex justify-between">
-                <span className="text-ink-3">Converted from Proforma</span>
-                <Link
-                  href={`/invoices/${sourceProforma.id}`}
-                  className="font-medium text-ink underline"
-                >
+              <span>
+                From Proforma:{" "}
+                <Link href={`/invoices/${sourceProforma.id}`} className="font-medium text-ink underline">
                   <Mono>{sourceProforma.invoice_no ?? sourceProforma.number ?? "Proforma"}</Mono>
                 </Link>
-              </div>
+              </span>
             )}
             {convertedTaxInvoice && (
-              <div className="flex justify-between">
-                <span className="text-ink-3">Converted Tax Invoice</span>
-                <Link
-                  href={`/invoices/${convertedTaxInvoice.id}`}
-                  className="font-medium text-ink underline"
-                >
-                  <Mono>
-                    {convertedTaxInvoice.invoice_no ?? convertedTaxInvoice.number ?? "Draft Tax Invoice"}
-                  </Mono>
+              <span>
+                Tax Invoice:{" "}
+                <Link href={`/invoices/${convertedTaxInvoice.id}`} className="font-medium text-ink underline">
+                  <Mono>{convertedTaxInvoice.invoice_no ?? convertedTaxInvoice.number ?? "Tax Invoice"}</Mono>
                 </Link>
-              </div>
+              </span>
             )}
-            <div className="flex justify-between">
-              <span className="text-ink-3">Customer PO</span>
-              <span className="font-medium text-ink">{spec.poDisplay}</span>
-            </div>
           </div>
+          <div>Place of Supply: <strong>{spec.placeOfSupplyDisplay}</strong></div>
         </div>
 
-        {/* Invoice Lines Table */}
-        <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full border-collapse text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-line bg-surface-2 text-[12px] font-medium text-ink-2">
-                <th className="px-3 py-2 w-12">Sl.</th>
-                <th className="px-3 py-2">Description of Services</th>
-                <th className="px-3 py-2 w-24 text-center">SAC</th>
-                <th className="px-3 py-2 w-24 text-right">Qty</th>
-                <th className="px-3 py-2 w-28 text-right">Rate</th>
-                <th className="px-3 py-2 w-32 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {spec.lines.map((l) => (
-                <tr key={l.slNo}>
-                  <td className="px-3 py-2.5 text-ink-3 tabular-nums">{l.slNo}</td>
-                  <td className="px-3 py-2.5 text-ink">{l.description}</td>
-                  <td className="px-3 py-2.5 text-center text-ink-2">
-                    <Mono>{l.sac}</Mono>
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-ink-2 tabular-nums">
-                    {l.qty} {l.unit}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-ink-2 tabular-nums">{l.rate}</td>
-                  <td className="px-3 py-2.5 text-right font-medium text-ink tabular-nums">{l.amount}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="border-t border-line bg-surface-2/40 text-[13px]">
-              <tr>
-                <td colSpan={5} className="px-3 py-2 text-right font-medium text-ink-2">
-                  Taxable Value
-                </td>
-                <td className="px-3 py-2 text-right font-semibold text-ink tabular-nums">
-                  {formatINR(Number(invoice.taxable_value) || 0)}
-                </td>
-              </tr>
-              {spec.isIntraState ? (
-                <>
-                  <tr>
-                    <td colSpan={5} className="px-3 py-1.5 text-right text-ink-2">
-                      CGST @ 9% (Intra-state Karnataka)
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-ink tabular-nums">
-                      {formatINR(Number(invoice.cgst) || 0)}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colSpan={5} className="px-3 py-1.5 text-right text-ink-2">
-                      SGST @ 9% (Intra-state Karnataka)
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-ink tabular-nums">
-                      {formatINR(Number(invoice.sgst) || 0)}
-                    </td>
-                  </tr>
-                </>
-              ) : (
-                <tr>
-                  <td colSpan={5} className="px-3 py-1.5 text-right text-ink-2">
-                    IGST @ 18% (Inter-state Supply)
-                  </td>
-                  <td className="px-3 py-1.5 text-right text-ink tabular-nums">
-                    {formatINR(Number(invoice.igst) || 0)}
-                  </td>
-                </tr>
-              )}
-              <tr>
-                <td colSpan={5} className="px-3 py-1.5 text-right text-ink-2">
-                  Round-off
-                </td>
-                <td className="px-3 py-1.5 text-right text-ink tabular-nums">
-                  {(Number(invoice.round_off) || 0) > 0 ? "+" : ""}
-                  {formatINR(Number(invoice.round_off) || 0)}
-                </td>
-              </tr>
-              <tr className="border-t border-line text-[14px] font-semibold text-ink">
-                <td colSpan={5} className="px-3 py-2.5 text-right">
-                  Total Invoice Amount (INR)
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">
-                  {formatINR(Number(invoice.total) || 0)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        {/* Exact BITA Boxed Invoice Sheet */}
+        <div className="overflow-x-auto">
+          <div className="min-w-[680px] border border-neutral-800 bg-white text-[13px] text-neutral-900">
+            {/* Row 1: Agency Header + B [ITA] Logo + Invoice No. / Date Box */}
+            <div className="grid grid-cols-[1fr_140px_180px] border-b border-neutral-800">
+              <div className="border-r border-neutral-800 p-3 text-center leading-snug">
+                <div className="text-[15px] font-bold tracking-tight uppercase">
+                  {spec.seller.name}
+                </div>
+                <div className="mt-0.5 whitespace-pre-line text-[12.5px]">
+                  {spec.seller.address}
+                </div>
+                {spec.seller.phone && (
+                  <div className="text-[12.5px]">{spec.seller.phone}</div>
+                )}
+                {spec.seller.email && (
+                  <div className="text-[12.5px]">Email Id : {spec.seller.email}</div>
+                )}
+              </div>
 
-        <div className="space-y-2 border-t border-line pt-3 text-[12.5px]">
-          <div>
-            <span className="text-ink-3">Amount in words: </span>
-            <strong className="font-semibold text-ink">{amountInWordsINR(Number(invoice.total) || 0)}</strong>
+              {/* Middle B [ITA] Emblem Box */}
+              <div className="flex items-center justify-center border-r border-neutral-800 p-2">
+                <div className="relative flex h-20 w-20 items-center justify-center rounded border-2 border-neutral-900 font-serif text-4xl font-black tracking-tighter text-neutral-900">
+                  <span>B</span>
+                  <span className="ml-0.5 rounded bg-neutral-900 px-1 py-0.5 text-[11px] font-bold tracking-normal text-white">
+                    ITA
+                  </span>
+                </div>
+              </div>
+
+              {/* Top-Right Invoice No. & Date Stacked Boxes */}
+              <div className="flex flex-col">
+                <div className="flex-1 border-b border-neutral-800 p-2 text-center">
+                  <div className="text-[13px] font-medium">
+                    {isProforma ? "Proforma No." : "Invoice No."}
+                  </div>
+                  <div className="mt-0.5 font-mono text-[15px] font-bold">
+                    {spec.invoiceNoDisplay}
+                  </div>
+                </div>
+                <div className="p-2 text-center">
+                  <div className="text-[13px] font-medium">Date</div>
+                  <div className="mt-0.5 font-mono text-[14px] font-semibold">
+                    {spec.invoiceDateDotsDisplay}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Customer Address & GSTIN (Left) + Top-Right P.O. No. Box (Right) */}
+            <div className="grid grid-cols-[1fr_180px] border-b border-neutral-800">
+              <div className="border-r border-neutral-800 p-3 leading-relaxed">
+                <div className="text-[14px] font-semibold">{spec.customerName}</div>
+                <div className="whitespace-pre-line text-[13px]">{spec.customerAddress}</div>
+                <div className="mt-2 font-semibold text-[13px]">
+                  GSTIN: <span className="font-mono">{spec.customerGstin}</span>
+                </div>
+              </div>
+
+              {/* Top-Right P.O. No. Box — blank if without PO, filled if PO is present */}
+              <div className="p-2.5 text-center">
+                <div className="text-[13px] font-medium">P.O. No.</div>
+                {spec.poBoxDisplay ? (
+                  <div className="mt-2 whitespace-pre-line font-mono text-[13px] font-semibold text-neutral-900">
+                    {spec.poBoxDisplay}
+                  </div>
+                ) : (
+                  <div className="mt-6 text-[11px] text-neutral-400 select-none">&nbsp;</div>
+                )}
+              </div>
+            </div>
+
+            {/* Row 3: Line Items + Tax Rows + A/C Details & Total */}
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-neutral-800 text-center font-medium">
+                  <th className="w-16 border-r border-neutral-800 px-2 py-1.5">S.No.</th>
+                  <th className="border-r border-neutral-800 px-3 py-1.5 text-center">Description</th>
+                  <th colSpan={2} className="w-28 border-r border-neutral-800 px-2 py-1.5 text-center">
+                    Unit
+                  </th>
+                  <th className="w-28 border-r border-neutral-800 px-2 py-1.5 text-center">
+                    Rate in Rs.
+                  </th>
+                  <th className="w-36 px-2 py-1.5 text-center">Amount in Rs.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spec.lines.map((l, idx) => (
+                  <tr key={l.slNo} className="border-b border-neutral-800 align-top">
+                    <td className="border-r border-neutral-800 px-2 py-2.5 text-center font-medium">
+                      {l.slNoPadded}
+                    </td>
+                    <td className="border-r border-neutral-800 px-3 py-2.5 whitespace-pre-line leading-relaxed">
+                      <div>{l.description}</div>
+                      {idx === 0 && combinedReportNos && !l.description.includes(combinedReportNos) && (
+                        <div className="mt-1 text-[12px] text-neutral-800">
+                          As per Inspection Report{linkedReports.length > 1 ? "s" : ""} {combinedReportNos}
+                        </div>
+                      )}
+                    </td>
+                    <td className="w-12 border-r border-neutral-800 px-2 py-2.5 text-center align-middle">
+                      {l.qty}
+                    </td>
+                    <td className="w-16 border-r border-neutral-800 px-2 py-2.5 text-center align-middle">
+                      {l.unit}
+                    </td>
+                    <td className="border-r border-neutral-800 px-2 py-2.5 text-center align-middle font-mono">
+                      {l.rateSlashDisplay}
+                    </td>
+                    <td className="px-2 py-2.5 text-center align-middle font-mono font-semibold">
+                      {l.amountSlashDisplay}
+                    </td>
+                  </tr>
+                ))}
+
+                {/* Tax Row (SGST / CGST / IGST) */}
+                <tr className="border-b border-neutral-800">
+                  <td className="border-r border-neutral-800 px-2 py-2 text-center align-top font-medium">
+                    {String(spec.lines.length + 1).padStart(2, "0")}.
+                  </td>
+                  <td className="border-r border-neutral-800 px-4 py-2 text-right font-medium leading-relaxed">
+                    <div>SGST</div>
+                    <div>CGST</div>
+                    <div>IGST</div>
+                    {(Number(invoice.round_off) || 0) !== 0 && <div>Round-off</div>}
+                  </td>
+                  <td className="border-r border-neutral-800 px-2 py-2" />
+                  <td className="border-r border-neutral-800 px-2 py-2" />
+                  <td className="border-r border-neutral-800 px-2 py-2 text-center font-mono leading-relaxed">
+                    <div>9%</div>
+                    <div>9%</div>
+                    <div>18%</div>
+                    {(Number(invoice.round_off) || 0) !== 0 && <div>—</div>}
+                  </td>
+                  <td className="px-2 py-2 text-center font-mono leading-relaxed">
+                    <div>{spec.sgstSlashDisplay}</div>
+                    <div>{spec.cgstSlashDisplay}</div>
+                    <div>{spec.igstSlashDisplay}</div>
+                    {(Number(invoice.round_off) || 0) !== 0 && <div>{spec.roundOffDisplay}</div>}
+                  </td>
+                </tr>
+
+                {/* A/C Details + Total Row */}
+                <tr className="border-b border-neutral-800">
+                  <td className="border-r border-neutral-800 px-2 py-2.5 text-left align-top text-[12px] font-medium">
+                    A/C
+                    <br />
+                    Details
+                  </td>
+                  <td colSpan={3} className="border-r border-neutral-800 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="whitespace-pre-line text-[12.5px] leading-snug">
+                        {spec.seller.bankDetailsPlaceholder}
+                      </div>
+                      <div className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-emerald-700/70 text-[10px] font-bold text-emerald-800">
+                        BITA
+                      </div>
+                    </div>
+                  </td>
+                  <td className="border-r border-neutral-800 px-2 py-2.5 text-center align-bottom text-[14px] font-semibold">
+                    Total
+                  </td>
+                  <td className="px-2 py-2.5 text-center align-bottom font-mono text-[15px] font-bold">
+                    {spec.totalSlashDisplay}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Row 4: Footer (PAN/GSTIN/SAC + Amount in Words on Left, Signatory on Right) */}
+            <div className="grid grid-cols-2">
+              <div className="border-r border-neutral-800 flex flex-col">
+                <div className="border-b border-neutral-800 p-2.5 text-[12.5px] leading-snug space-y-0.5">
+                  {spec.seller.pan && <div>PAN : {spec.seller.pan}</div>}
+                  <div>GSTIN : {spec.seller.gstin}</div>
+                  <div>SAC No. : {spec.defaultSac}</div>
+                </div>
+                <div className="p-2.5 text-[13px] leading-snug flex-1">
+                  <div className="font-medium">Amount in Words : {spec.amountInWords}</div>
+                  {spec.notes && (
+                    <div className="mt-1.5 text-[12px] text-neutral-700">Note: {spec.notes}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 flex flex-col justify-between text-center">
+                <div className="text-[13.5px] font-semibold">
+                  For Bangalore Inspection &amp; Testing Agency
+                </div>
+                <div className="my-4 text-[11.5px] text-neutral-600 italic">
+                  Authorised Signatory
+                </div>
+              </div>
+            </div>
           </div>
-          {spec.notes && (
-            <div>
-              <span className="text-ink-3">Notes: </span>
-              <span className="text-ink-2">{spec.notes}</span>
-            </div>
-          )}
-          <div className="rounded border border-dashed border-line p-2.5 text-[11.5px] text-ink-3 space-y-1">
-            <div>
-              <strong className="font-medium text-ink-2">Bank details:</strong> {spec.seller.bankDetailsPlaceholder}
-            </div>
-            <div>
-              <strong className="font-medium text-ink-2">Terms:</strong> {spec.seller.termsPlaceholder}
-            </div>
+          <div className="mt-1.5 text-center text-[12px] text-ink-2">
+            This is a digitally signed original document. No physical signature is required..
           </div>
         </div>
       </Card>

@@ -31,7 +31,6 @@ import { homeFor } from "@/lib/roles";
 import {
   invoiceLinesTable,
   invoicesTable,
-  paymentsTable,
   type InvoiceLineRow,
   type InvoiceRow,
 } from "./db";

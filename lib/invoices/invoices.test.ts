@@ -244,14 +244,23 @@ describe("lib/invoices PDF and Word (.docx) template builder", () => {
     notes: "Test certificate enclosed.",
   };
 
-  it("builds a complete InvoiceDocumentSpec with amount in words and placeholders", () => {
+  it("builds a complete InvoiceDocumentSpec with amount in words, SAC 998393, and top-right PO box behavior", () => {
     const spec = buildInvoiceDocumentSpec(sampleInput);
     expect(spec.title).toBe("TAX INVOICE");
     expect(spec.isDraft).toBe(false);
     expect(spec.placeOfSupplyDisplay).toBe("29 - Karnataka");
+    expect(spec.defaultSac).toBe("998393");
+    expect(spec.poBoxDisplay).toBe("TTIL/PO/2026/104\ndtd. 29.10.2026");
     expect(spec.amountInWords).toBe("Rupees Forty-Seven Thousand Two Hundred only");
     expect(spec.seller.bankDetailsPlaceholder).toContain("BANK DETAILS PLACEHOLDER");
     expect(spec.seller.termsPlaceholder).toContain("TERMS & CONDITIONS PLACEHOLDER");
+
+    const withoutPo = buildInvoiceDocumentSpec({
+      ...sampleInput,
+      poNumber: null,
+      poDate: null,
+    });
+    expect(withoutPo.poBoxDisplay).toBe("");
   });
 
   it("generates valid PDF 1.4 bytes containing BITA tax invoice details", () => {

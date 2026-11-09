@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/types";
-import type { InvoiceTemplateInput } from "@/lib/invoices";
+import type { BitaInvoiceProfile, InvoiceTemplateInput } from "@/lib/invoices";
 import {
   invoiceLinesTable,
   invoicesTable,
@@ -8,11 +8,41 @@ import {
   type InvoiceWithRelations,
 } from "../db";
 
+export async function loadBitaInvoiceProfile(
+  supabase: SupabaseClient<Database>,
+): Promise<Partial<BitaInvoiceProfile> | undefined> {
+  const { data } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "company_profile")
+    .maybeSingle();
+  if (!data?.value || typeof data.value !== "object" || Array.isArray(data.value)) {
+    return undefined;
+  }
+  const v = data.value as Record<string, unknown>;
+  const profile: Partial<BitaInvoiceProfile> = {};
+  if (typeof v.name === "string" && v.name.trim()) profile.name = v.name.trim();
+  if (typeof v.subtitle === "string" && v.subtitle.trim()) profile.subtitle = v.subtitle.trim();
+  if (typeof v.address === "string" && v.address.trim()) profile.address = v.address.trim();
+  if (typeof v.phone === "string" && v.phone.trim()) profile.phone = v.phone.trim();
+  if (typeof v.email === "string" && v.email.trim()) profile.email = v.email.trim();
+  if (typeof v.pan === "string" && v.pan.trim()) profile.pan = v.pan.trim();
+  if (typeof v.gstin === "string" && v.gstin.trim()) profile.gstin = v.gstin.trim();
+  if (typeof v.defaultSac === "string" && v.defaultSac.trim()) profile.defaultSac = v.defaultSac.trim();
+  if (typeof v.bankDetails === "string" && v.bankDetails.trim()) {
+    profile.bankDetailsPlaceholder = v.bankDetails.trim();
+  }
+  if (typeof v.terms === "string" && v.terms.trim()) {
+    profile.termsPlaceholder = v.terms.trim();
+  }
+  return profile;
+}
+
 export async function loadInvoiceTemplateInput(
   supabase: SupabaseClient<Database>,
   invoiceId: string,
 ): Promise<{ input: InvoiceTemplateInput; filenameBase: string } | null> {
-  const [invoiceRes, linesRes] = await Promise.all([
+  const [invoiceRes, linesRes, profile] = await Promise.all([
     invoicesTable(supabase)
       .select(
         "*, jobs(id, job_no, po_number, po_date, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), quotations(id, ref_no, status)",
@@ -23,6 +53,7 @@ export async function loadInvoiceTemplateInput(
       .select("*")
       .eq("invoice_id", invoiceId)
       .order("position", { ascending: true }) as Promise<{ data: InvoiceLineRow[] | null }>,
+    loadBitaInvoiceProfile(supabase),
   ]);
 
   const invoice = invoiceRes.data;
@@ -68,6 +99,7 @@ export async function loadInvoiceTemplateInput(
     roundOff: Number(invoice.round_off) || 0,
     total: Number(invoice.total) || 0,
     notes: invoice.notes,
+    profile,
   };
 
   return { input, filenameBase };
