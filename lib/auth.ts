@@ -1,16 +1,15 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 const STAFF_ROLES = ["management", "office", "reviewer"] as const;
 
-// The logged-in user and their BITA person record.
-// Not logged in: go to /login. Logged in but not set up at BITA: person is null.
-export async function requireUser() {
+const fetchAuthContext = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) return { supabase, user: null, person: null };
 
   const { data: person } = await supabase
     .from("people")
@@ -18,6 +17,14 @@ export async function requireUser() {
     .eq("user_id", user.id)
     .maybeSingle();
 
+  return { supabase, user, person };
+});
+
+// The logged-in user and their BITA person record.
+// Not logged in: go to /login. Logged in but not set up at BITA: person is null.
+export async function requireUser() {
+  const { supabase, user, person } = await fetchAuthContext();
+  if (!user) redirect("/login");
   return { supabase, user, person };
 }
 

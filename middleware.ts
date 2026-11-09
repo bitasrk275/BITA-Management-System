@@ -7,13 +7,28 @@ export async function middleware(request: NextRequest) {
   // No Supabase project configured yet (fresh checkout without .env.local): nothing to refresh.
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return response;
 
+  // Token-authenticated API endpoints do not use browser session cookies.
+  const pathname = request.nextUrl.pathname;
+  if (
+    pathname.startsWith("/api/field") ||
+    pathname.startsWith("/api/telegram") ||
+    pathname.startsWith("/api/reminders")
+  ) {
+    return response;
+  }
+
+  // Only make a network call to Supabase Auth when an sb-* auth cookie exists.
+  const allCookies = request.cookies.getAll();
+  const hasAuthCookie = allCookies.some((c) => c.name.startsWith("sb-"));
+  if (!hasAuthCookie) return response;
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll();
+          return allCookies;
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));

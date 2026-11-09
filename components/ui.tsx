@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
+import { FormAwareButton } from "@/components/form-button";
 
 // Shared building blocks for every screen (DESIGN.md). Clean black and white; colour only for status.
 
@@ -29,11 +30,11 @@ export function ButtonLink({ href, children, variant = "primary", size }: { href
 }
 
 export function Button({ className = "", ...props }: ComponentProps<"button">) {
-  return <button className={`${buttonBase} ${primary} ${className}`} {...props} />;
+  return <FormAwareButton className={`${buttonBase} ${primary} ${className}`} {...props} />;
 }
 
 export function SecondaryButton({ className = "", ...props }: ComponentProps<"button">) {
-  return <button className={`${buttonBase} ${secondary} ${className}`} {...props} />;
+  return <FormAwareButton className={`${buttonBase} ${secondary} ${className}`} {...props} />;
 }
 
 const inputClass =

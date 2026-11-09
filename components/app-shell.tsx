@@ -106,16 +106,36 @@ function Icon({ name }: { name: keyof typeof ICONS }) {
   );
 }
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({
+  item,
+  active,
+  pending,
+  onSelect,
+}: {
+  item: NavItem;
+  active: boolean;
+  pending?: boolean;
+  onSelect?: (href: string) => void;
+}) {
   return (
     <Link
       href={item.href}
+      onClick={() => onSelect?.(item.href)}
       aria-current={active ? "page" : undefined}
       className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[13.5px] ${
-        active ? "bg-white font-medium text-ink shadow-[0_0_0_1px_var(--color-line)]" : "text-ink-2 hover:bg-white hover:text-ink"
+        active || pending
+          ? "bg-white font-medium text-ink shadow-[0_0_0_1px_var(--color-line)]"
+          : "text-ink-2 hover:bg-white hover:text-ink"
       }`}
     >
-      <Icon name={item.icon} />
+      {pending ? (
+        <span
+          aria-hidden
+          className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-ink-3 border-t-ink"
+        />
+      ) : (
+        <Icon name={item.icon} />
+      )}
       {item.label}
       {!!item.count && <span className="ml-auto pl-2 font-mono text-[11.5px] text-ink-3">{item.count}</span>}
     </Link>
@@ -318,11 +338,29 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { main, records } = menuFor(person.roles, counts);
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  const handleSelectNav = (href: string) => {
+    if (href !== pathname) {
+      setPendingHref(href);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white md:grid md:grid-cols-[232px_1fr]">
+      {pendingHref && (
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center bg-ink px-3 py-1 text-xs font-medium text-white shadow-sm">
+          <span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+          Loading…
+        </div>
+      )}
+
       {/* Phone: a top bar with the menu as a scrolling row. */}
       <div className="sticky top-0 z-10 border-b border-line bg-side md:hidden">
         <div className="flex items-center justify-between px-4 py-2.5">
@@ -336,7 +374,13 @@ export function AppShell({
         </div>
         <nav className="flex gap-1 overflow-x-auto px-2 pb-2">
           {[...main, ...records].map((item) => (
-            <NavLink key={item.href} item={item} active={isActive(item.href)} />
+            <NavLink
+              key={item.href}
+              item={item}
+              active={isActive(item.href)}
+              pending={pendingHref === item.href}
+              onSelect={handleSelectNav}
+            />
           ))}
         </nav>
       </div>
@@ -349,13 +393,25 @@ export function AppShell({
         <div className="px-1 pb-2.5">
           <GlobalSearchBox />
         </div>
-        <nav className="flex flex-col gap-0.5">
+        <nav className="flex flex-col gap-0.5 overflow-y-auto">
           {main.map((item) => (
-            <NavLink key={item.href} item={item} active={isActive(item.href)} />
+            <NavLink
+              key={item.href}
+              item={item}
+              active={isActive(item.href)}
+              pending={pendingHref === item.href}
+              onSelect={handleSelectNav}
+            />
           ))}
           {records.length > 0 && <div className="px-2.5 pb-1.5 pt-4 text-[11.5px] text-ink-3">Records</div>}
           {records.map((item) => (
-            <NavLink key={item.href} item={item} active={isActive(item.href)} />
+            <NavLink
+              key={item.href}
+              item={item}
+              active={isActive(item.href)}
+              pending={pendingHref === item.href}
+              onSelect={handleSelectNav}
+            />
           ))}
         </nav>
         <div className="mt-auto flex items-center gap-2.5 border-t border-line px-2 pt-3">
@@ -369,7 +425,25 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="min-w-0 px-4 py-6 md:px-9 md:py-7">{children}</main>
+      <main
+        className="min-w-0 px-4 py-6 md:px-9 md:py-7"
+        onClick={(e) => {
+          const anchor = (e.target as HTMLElement | null)?.closest("a");
+          const href = anchor?.getAttribute("href");
+          if (
+            href &&
+            href.startsWith("/") &&
+            !href.startsWith("//") &&
+            !anchor?.getAttribute("target") &&
+            !anchor?.hasAttribute("download") &&
+            href.split("?")[0] !== pathname
+          ) {
+            setPendingHref(href);
+          }
+        }}
+      >
+        {children}
+      </main>
     </div>
   );
 }
