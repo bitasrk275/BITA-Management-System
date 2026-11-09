@@ -40,6 +40,23 @@ export type TechnicianJobItem = {
 /**
  * Returns assignments for the technician: upcoming plus the last 14 days.
  */
+function inferTestMethods(
+  rawMethods: Enums<"test_method">[] | null | undefined,
+  scope: string | null | undefined,
+): Enums<"test_method">[] {
+  if (Array.isArray(rawMethods) && rawMethods.length > 0) {
+    return rawMethods;
+  }
+  const text = (scope || "").toUpperCase();
+  const inferred: Enums<"test_method">[] = [];
+  if (/\bUT\b|ULTRASONIC/.test(text)) inferred.push("UT");
+  if (/\bMPT\b|\bMT\b|\bMPI\b|MAGNETIC/.test(text)) inferred.push("MPT");
+  if (/\bDPT\b|\bPT\b|\bLPI\b|PENETRANT/.test(text)) inferred.push("DPT");
+  if (/\bRT\b|RADIOGRAPH/.test(text)) inferred.push("RT");
+  if (/\bVT\b|VISUAL/.test(text)) inferred.push("VT");
+  return inferred.length > 0 ? inferred : ["UT"];
+}
+
 export async function getTechnicianJobs(
   supabase: SupabaseClient<Database>,
   personId: string,
@@ -209,7 +226,7 @@ export async function getTechnicianJobs(
       customerName: job.customers?.name ?? "Customer",
       site: job.site,
       scope: job.scope,
-      testMethods: job.test_methods || [],
+      testMethods: inferTestMethods(job.test_methods, job.scope),
       workDate: a.work_date,
       endDate: a.end_date ?? null,
       notes: a.notes,

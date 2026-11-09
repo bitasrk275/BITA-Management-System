@@ -116,14 +116,23 @@ export async function acceptQuotationAndRecordPo(
       }
     }
   } else if (shouldEnsureJob) {
+    const resolvedScope = input.scope ?? existing.subject ?? null;
+    const upperScope = (resolvedScope || "").toUpperCase();
+    const inferredMethods: Enums<"test_method">[] = [];
+    if (/\bUT\b|ULTRASONIC/.test(upperScope)) inferredMethods.push("UT");
+    if (/\bMPT\b|\bMT\b|\bMPI\b|MAGNETIC/.test(upperScope)) inferredMethods.push("MPT");
+    if (/\bDPT\b|\bPT\b|\bLPI\b|PENETRANT/.test(upperScope)) inferredMethods.push("DPT");
+    if (inferredMethods.length === 0) inferredMethods.push("UT");
+
     const { data: createdJob, error: jobCreateErr } = await supabase
       .from("jobs")
       .insert({
         customer_id: existing.customer_id,
         enquiry_id: existing.enquiry_id,
         quotation_id: quotationId,
-        scope: input.scope ?? existing.subject ?? null,
+        scope: resolvedScope,
         site: input.site ?? null,
+        test_methods: inferredMethods,
         po_number: input.po_number,
         po_date: input.po_date,
         po_value: input.po_value,
