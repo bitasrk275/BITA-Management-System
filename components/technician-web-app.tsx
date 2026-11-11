@@ -490,8 +490,7 @@ export function TechnicianWebApp() {
           <h2 className="text-[15px] font-semibold text-ink">Step 1: Pair Technician Phone</h2>
           <p className="mt-1 text-[13px] text-ink-2">
             In the Office Dashboard, open <strong>Registers → People</strong>, click{" "}
-            <strong>Link Phone</strong> next to a technician (e.g., <em>S. Radhakrishnan</em> or{" "}
-            <em>Anand Teertha</em>), and enter the 6-digit code below.
+            <strong>Link Phone</strong> next to a technician, and enter the 6-digit code below.
           </p>
           <form onSubmit={handlePair} className="mt-4 space-y-3">
             <div>
