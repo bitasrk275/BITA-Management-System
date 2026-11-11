@@ -142,6 +142,26 @@ const tests = [
       }
     },
   },
+  {
+    name: "Technician Web App Page (GET /field-app)",
+    path: "/field-app",
+    method: "GET",
+    expectedStatus: [200],
+    validate: (res, body) => {
+      const isHtml = (res.headers.get("content-type") || "").includes("text/html");
+      return isHtml && body.includes("BITA Field");
+    },
+  },
+  {
+    name: "Technician Alias Route (GET /technician)",
+    path: "/technician",
+    method: "GET",
+    expectedStatus: [200],
+    validate: (res, body) => {
+      const isHtml = (res.headers.get("content-type") || "").includes("text/html");
+      return isHtml && body.includes("BITA Field");
+    },
+  },
 ];
 
 async function runSmokeTests() {

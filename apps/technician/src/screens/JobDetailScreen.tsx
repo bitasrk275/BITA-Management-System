@@ -7,6 +7,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
+  StatusBar,
 } from "react-native";
 import { colors, spacing, typography } from "../theme";
 import { Card } from "../components/Card";
@@ -42,6 +44,8 @@ export function JobDetailScreen({
     currentJob.endDate && currentJob.endDate !== currentJob.workDate
       ? `${currentJob.workDate} to ${currentJob.endDate}`
       : currentJob.workDate;
+  const activeMethods: TestMethod[] =
+    currentJob.testMethods.length > 0 ? currentJob.testMethods : ["UT"];
 
   async function handleAcknowledge() {
     setLoadingAction(true);
@@ -109,7 +113,7 @@ export function JobDetailScreen({
           <View style={styles.methodRow}>
             <Text style={styles.detailLabel}>Test methods: </Text>
             <View style={styles.badgeList}>
-              {currentJob.testMethods.map((m) => (
+              {activeMethods.map((m) => (
                 <Badge key={m} label={m} />
               ))}
             </View>
@@ -176,7 +180,7 @@ export function JobDetailScreen({
 
           {isStarted && !isCompleted && (
             <View style={styles.buttonStack}>
-              {currentJob.testMethods.map((m) => (
+              {activeMethods.map((m) => (
                 <Button
                   key={m}
                   title={`Enter ${m} inspection report`}
@@ -194,7 +198,7 @@ export function JobDetailScreen({
                   ? "✓ Report approved by office — locked."
                   : "✓ Field report submitted — editable until office approval."}
               </Text>
-              {currentJob.testMethods.map((m) => (
+              {activeMethods.map((m) => (
                 <Button
                   key={m}
                   title={
@@ -226,6 +230,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0,
   },
   header: {
     paddingHorizontal: spacing.lg,

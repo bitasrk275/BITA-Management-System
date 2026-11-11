@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
@@ -130,6 +131,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0,
   },
   inner: {
     flex: 1,

@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
+  StatusBar,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { colors, spacing, typography } from "../theme";
@@ -423,6 +425,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0,
   },
   header: {
     paddingHorizontal: spacing.lg,

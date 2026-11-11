@@ -8,6 +8,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
+  StatusBar,
 } from "react-native";
 import { colors, spacing, typography } from "../theme";
 import { Card } from "../components/Card";
@@ -153,6 +155,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0,
   },
   header: {
     paddingHorizontal: spacing.lg,

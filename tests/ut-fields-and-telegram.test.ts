@@ -31,6 +31,8 @@ import {
   redeemTelegramLinkCode,
   type ExecutiveSnapshot,
 } from "../lib/modules/telegram/service";
+import { acceptQuotationAndRecordPo } from "../lib/modules/po/service";
+import { getTechnicianJobs } from "../lib/field/assignments";
 
 vi.stubGlobal("React", React);
 
@@ -505,3 +507,225 @@ describe("Telegram Executive Bot Service & Webhook Integration", () => {
     expect(nlCal.toLowerCase()).toMatch(/calibration|valid/);
   });
 });
+
+describe("Quotation Acceptance & Technician Assignment test_methods Inference", () => {
+  it("1. acceptQuotationAndRecordPo populates jobs.test_methods from quotation scope/subject and falls back to ['UT']", async () => {
+    const insertedJobs: Array<Record<string, unknown>> = [];
+
+    function makePoSupabase(quotationSubject: string | null) {
+      return {
+        from(table: string) {
+          if (table === "quotations") {
+            return {
+              select() {
+                return {
+                  eq() {
+                    return {
+                      async maybeSingle() {
+                        return {
+                          data: {
+                            id: "30000000-0000-4000-8000-000000000001",
+                            customer_id: "10000000-0000-4000-8000-000000000001",
+                            enquiry_id: null,
+                            subject: quotationSubject,
+                            approved_at: "2026-11-10T10:00:00Z",
+                            approved_by: "20000000-0000-4000-8000-000000000001",
+                          },
+                          error: null,
+                        };
+                      },
+                    };
+                  },
+                };
+              },
+              update() {
+                return {
+                  async eq() {
+                    return { error: null };
+                  },
+                };
+              },
+            };
+          }
+          if (table === "jobs") {
+            return {
+              select() {
+                return {
+                  eq() {
+                    return {
+                      order() {
+                        return {
+                          async limit() {
+                            return { data: [], error: null };
+                          },
+                        };
+                      },
+                    };
+                  },
+                };
+              },
+              insert(payload: Record<string, unknown>) {
+                insertedJobs.push(payload);
+                return {
+                  select() {
+                    return {
+                      async single() {
+                        return {
+                          data: {
+                            id: `40000000-0000-4000-8000-00000000000${insertedJobs.length}`,
+                            job_no: `BITA/26-27/020${insertedJobs.length}`,
+                          },
+                          error: null,
+                        };
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          }
+          throw new Error(`Unexpected table: ${table}`);
+        },
+      } as unknown as SupabaseClient<Database>;
+    }
+
+    // Case A: Scope mentions Ultrasonic (UT) and MPT
+    const resA = await acceptQuotationAndRecordPo(
+      makePoSupabase("Ultrasonic and MPT inspection of forged shafts"),
+      "30000000-0000-4000-8000-000000000001",
+      { id: "20000000-0000-4000-8000-000000000001", roles: ["management"] },
+      {
+        po_number: "PO-FAKE-901",
+        po_date: "2026-11-11",
+        po_value: 50000,
+        site: "Peenya Works",
+        scope: null,
+        create_job: true,
+      },
+    );
+    expect(resA.ok).toBe(true);
+    expect(insertedJobs[0]?.test_methods).toEqual(["UT", "MPT"]);
+
+    // Case B: Explicit input.scope mentions Dye Penetrant (DPT)
+    const resB = await acceptQuotationAndRecordPo(
+      makePoSupabase("General NDT quotation"),
+      "30000000-0000-4000-8000-000000000001",
+      { id: "20000000-0000-4000-8000-000000000001", roles: ["management"] },
+      {
+        po_number: "PO-FAKE-902",
+        po_date: "2026-11-11",
+        po_value: 25000,
+        site: "Bommasandra",
+        scope: "Liquid Penetrant (DPT) weld inspection",
+        create_job: true,
+      },
+    );
+    expect(resB.ok).toBe(true);
+    expect(insertedJobs[1]?.test_methods).toEqual(["DPT"]);
+
+    // Case C: Scope has no method keywords -> defaults to ["UT"]
+    const resC = await acceptQuotationAndRecordPo(
+      makePoSupabase("Third party shaft inspection at customer works"),
+      "30000000-0000-4000-8000-000000000001",
+      { id: "20000000-0000-4000-8000-000000000001", roles: ["management"] },
+      {
+        po_number: "PO-FAKE-903",
+        po_date: "2026-11-11",
+        po_value: 30000,
+        site: "Whitefield",
+        scope: null,
+        create_job: true,
+      },
+    );
+    expect(resC.ok).toBe(true);
+    expect(insertedJobs[2]?.test_methods).toEqual(["UT"]);
+  });
+
+  it("2. getTechnicianJobs always returns non-empty testMethods even when jobs.test_methods is empty", async () => {
+    const mockAssignments = [
+      {
+        id: "50000000-0000-4000-8000-000000000001",
+        job_id: "40000000-0000-4000-8000-000000000001",
+        person_id: "20000000-0000-4000-8000-000000000010",
+        work_date: "2026-11-11",
+        end_date: null,
+        notes: null,
+        acknowledged_at: "2026-11-11T08:00:00Z",
+        started_at: "2026-11-11T09:00:00Z",
+        completed_at: null,
+        jobs: {
+          id: "40000000-0000-4000-8000-000000000001",
+          job_no: "BITA/26-27/0002",
+          site: "Peenya Unit 2",
+          scope: "Inspection of forged ring",
+          test_methods: [], // Empty array in DB
+          customer_id: "10000000-0000-4000-8000-000000000001",
+          customers: { id: "10000000-0000-4000-8000-000000000001", name: "Sample Rings Pvt Ltd" },
+        },
+      },
+      {
+        id: "50000000-0000-4000-8000-000000000002",
+        job_id: "40000000-0000-4000-8000-000000000002",
+        person_id: "20000000-0000-4000-8000-000000000010",
+        work_date: "2026-11-11",
+        end_date: "2026-11-12",
+        notes: null,
+        acknowledged_at: null,
+        started_at: null,
+        completed_at: null,
+        jobs: {
+          id: "40000000-0000-4000-8000-000000000002",
+          job_no: "BITA/26-27/0003",
+          site: "Bommasandra",
+          scope: "Magnetic Particle (MPT) & DPT testing of weldments",
+          test_methods: [], // Empty array in DB, inferred from scope
+          customer_id: "10000000-0000-4000-8000-000000000001",
+          customers: { id: "10000000-0000-4000-8000-000000000001", name: "Sample Rings Pvt Ltd" },
+        },
+      },
+    ];
+
+    const fieldSupabase = {
+      from(table: string) {
+        if (table === "assignments") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    gte() {
+                      return {
+                        async order() {
+                          return { data: mockAssignments, error: null };
+                        },
+                      };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        }
+        if (table === "assignment_equipment" || table === "inspections") {
+          return {
+            select() {
+              return {
+                async in() {
+                  return { data: [], error: null };
+                },
+              };
+            },
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    } as unknown as SupabaseClient<Database>;
+
+    const jobs = await getTechnicianJobs(fieldSupabase, "20000000-0000-4000-8000-000000000010");
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0]?.testMethods.length).toBeGreaterThan(0);
+    expect(jobs[0]?.testMethods).toEqual(["UT"]);
+    expect(jobs[1]?.testMethods).toEqual(["MPT", "DPT"]);
+  });
+});
+
