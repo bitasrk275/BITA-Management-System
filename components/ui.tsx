@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
-import { FormAwareButton } from "@/components/form-button";
+import { FormAwareButton } from "./form-button";
 
 // Shared building blocks for every screen (DESIGN.md). Clean black and white; colour only for status.
 
