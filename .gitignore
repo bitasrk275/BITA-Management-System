@@ -65,3 +65,12 @@ supabase/.branches/
 .codex/config.toml
 .codex/hooks.json
 .agents/mcp_config.json
+
+# Build outputs and local files that must never be committed
+/*.apk
+apps/technician/android/
+apps/technician/ios/
+/*.jpg
+/*.jpeg
+/*.png
+/*.html
