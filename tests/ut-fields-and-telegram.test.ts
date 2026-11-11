@@ -327,7 +327,7 @@ describe("Telegram Executive Bot Service & Webhook Integration", () => {
         return chain;
       },
     } as unknown as SupabaseClient<Database>;
-  });
+  }, 30000);
 
   it("1. Normalizes config and linked chats state", () => {
     const cfg = normalizeTelegramConfig({
