@@ -10,6 +10,7 @@ import { parseApproveReportInput, parseReturnReportInput } from "@/lib/modules/r
 import {
   approveReportRecord,
   loadBookedJobEquipmentForReport,
+  markReportSentRecord,
   returnReportRecord,
 } from "@/lib/modules/reports/service";
 import { missingFields } from "@/lib/reports/fields";
@@ -19,7 +20,6 @@ import {
   extractReadings,
   friendlyReportError,
   parseEditedReportReadings,
-  parseRecipients,
   prefillReadingsFromBookedEquipment,
   reportPdfStoragePath,
   supportedMethod,
@@ -352,43 +352,18 @@ export async function markReportSent(reportId: string, fd: FormData) {
 
   const path = `/review/${reportId}`;
   const rawRecipients = text(fd, "sent_to") ?? "";
-  let emails: string[];
-  try {
-    emails = parseRecipients(rawRecipients);
-  } catch (err) {
-    redirectError(path, err instanceof Error ? err.message : "Enter valid recipient email addresses.");
+  const { data, error } = await markReportSentRecord(
+    supabase,
+    reportId,
+    rawRecipients,
+  );
+
+  if (error || !data) {
+    redirectError(path, error ?? "Could not mark report as sent.");
   }
 
-  const { data: report } = await supabase
-    .from("reports")
-    .select("*")
-    .eq("id", reportId)
-    .maybeSingle();
-
-  if (!report) redirect("/review");
-  if (!report.approved_at || !["approved", "sent"].includes(report.status)) {
-    redirectError(path, "Report must be approved by a technical reviewer before marking it as sent.");
-  }
-
-  const sentAt = new Date().toISOString();
-  const { error } = await supabase
-    .from("reports")
-    .update({
-      status: "sent",
-      sent_at: sentAt,
-      sent_to: emails,
-    })
-    .eq("id", report.id);
-
-  if (error) redirectError(path, error.message);
-
-  await supabase
-    .from("jobs")
-    .update({ status: "report_sent" })
-    .eq("id", report.job_id)
-    .in("status", ["scheduled", "inspection_done", "report_in_review"]);
-
-  revalidateReportPaths(report.id, report.job_id);
+  revalidateReportPaths(data.id, data.job_id);
+  revalidatePath("/jobs");
   redirect(`${path}?saved=sent`);
 }
 

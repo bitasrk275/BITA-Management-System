@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Button, ButtonLink, Card, ErrorNote, PageHeader, SavedNote, Status } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, ErrorNote, PageHeader, SavedNote, SecondaryButton, Status } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { checkPoUtilization } from "@/lib/modules/po/service";
 import { formatIST } from "../../enquiries/labels";
-import { closeJob, updateJob } from "../actions";
+import { closeJob, reopenJob, updateJob } from "../actions";
 import { generateInvoiceFromJob } from "../../invoices/actions";
 import { isJobReadyToClose } from "../closure";
 import { JobForm } from "../job-form";
@@ -54,6 +54,7 @@ export default async function JobPage({
   const outstanding = (invoices.data ?? [])
     .filter((i) => i.status === "issued" || i.status === "partly_paid")
     .reduce((sum, i) => sum + (i.balance ?? 0), 0);
+  const isManagement = !!person?.roles.includes("management");
   const canWriteJob = !!person?.roles.some((r) => r === "management" || r === "office");
   const readyToClose = isJobReadyToClose({
     status: job.status,
@@ -66,7 +67,15 @@ export default async function JobPage({
       <PageHeader
         title={job.job_no}
         action={
-          readyToClose && canWriteJob ? (
+          job.status === "closed" ? (
+            isManagement ? (
+              <form action={reopenJob.bind(null, job.id)}>
+                <SecondaryButton type="submit">
+                  Reopen job
+                </SecondaryButton>
+              </form>
+            ) : undefined
+          ) : isManagement || (readyToClose && canWriteJob) ? (
             <form action={closeJob.bind(null, job.id)}>
               <Button type="submit">Close job</Button>
             </form>

@@ -4,15 +4,20 @@ import { daysBetween } from "../../../lib/dates";
 export type JobClosureInput = {
   status: Enums<"job_status">;
   reports?: readonly { status: Enums<"report_status">; sent_at?: string | null }[] | null;
-  invoices?: readonly { kind?: Enums<"invoice_kind">; balance: number | null }[] | null;
+  invoices?: readonly {
+    kind?: Enums<"invoice_kind">;
+    status?: string | null;
+    balance: number | null;
+  }[] | null;
 };
 
 /**
- * T20 & T22: A job is ready to close when:
+ * T20, T22 & G4: A job is ready to close when:
  * 1. It is not already closed.
  * 2. Its report has been sent (job status is `report_sent` or `invoiced`, or all reports on the job are `sent`),
  *    and no report on the job is still un-sent (`draft`, `in_review`, `returned`, `approved`).
- * 3. Every tax invoice on the job has balance 0 (nothing is outstanding).
+ * 3. At least one non-cancelled tax invoice exists on the job, none is still in `draft`,
+ *    and every non-cancelled tax invoice has balance 0 (nothing is outstanding after payments + TDS + credit notes).
  */
 export function isJobReadyToClose(job: JobClosureInput): boolean {
   if (job.status === "closed") return false;
@@ -29,9 +34,16 @@ export function isJobReadyToClose(job: JobClosureInput): boolean {
   if (!reportSent) return false;
 
   const taxInvoices = (job.invoices ?? []).filter(
-    (inv) => !inv.kind || inv.kind === "tax_invoice"
+    (inv) =>
+      (!inv.kind || inv.kind === "tax_invoice") && inv.status !== "cancelled",
   );
-  const outstanding = taxInvoices.reduce((sum, inv) => sum + Number(inv.balance ?? 0), 0);
+  if (taxInvoices.length === 0) return false;
+  if (taxInvoices.some((inv) => inv.status === "draft")) return false;
+
+  const outstanding = taxInvoices.reduce(
+    (sum, inv) => sum + Math.max(0, Number(inv.balance ?? 0)),
+    0,
+  );
   if (outstanding > 0) return false;
 
   return true;

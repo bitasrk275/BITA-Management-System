@@ -6,11 +6,12 @@ import { requireStaff } from "@/lib/auth";
 import { friendlyError } from "@/lib/forms";
 import { parseJobInput } from "@/lib/modules/jobs/schema";
 import {
+  closeJobRecord,
   createJobRecord,
   deleteJobRecord,
+  reopenJobRecord,
   updateJobRecord,
 } from "@/lib/modules/jobs/service";
-import { isJobReadyToClose } from "./closure";
 
 type Supabase = Awaited<ReturnType<typeof requireStaff>>["supabase"];
 
@@ -94,47 +95,10 @@ export async function updateJob(id: string, fd: FormData) {
 
 export async function closeJob(id: string) {
   const { supabase, person } = await requireStaff();
-  if (!person?.roles.some((r) => r === "management" || r === "office")) {
-    redirect(
-      `/jobs/${id}?error=` +
-        encodeURIComponent("Only management or office staff can close a job."),
-    );
-  }
-
-  const [jobRes, reportsRes, invoicesRes] = await Promise.all([
-    supabase.from("jobs").select("id, status").eq("id", id).maybeSingle(),
-    supabase.from("reports").select("status, sent_at").eq("job_id", id),
-    supabase.from("invoices").select("kind, balance").eq("job_id", id),
-  ]);
-
-  if (!jobRes.data) redirect("/jobs");
-
-  const ready = isJobReadyToClose({
-    status: jobRes.data.status,
-    reports: reportsRes.data ?? [],
-    invoices: invoicesRes.data ?? [],
-  });
-
-  if (!ready) {
-    redirect(
-      `/jobs/${id}?error=` +
-        encodeURIComponent(
-          "Job can only be closed once the report is sent and no invoice balance is outstanding.",
-        ),
-    );
-  }
-
-  const { error } = await supabase
-    .from("jobs")
-    .update({
-      status: "closed",
-      closed_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-
+  const { error } = await closeJobRecord(supabase, id, person?.roles);
   if (error) {
     redirect(
-      `/jobs/${id}?error=` + encodeURIComponent(friendlyError(error.message)),
+      `/jobs/${id}?error=` + encodeURIComponent(friendlyError(error)),
     );
   }
 
@@ -143,6 +107,22 @@ export async function closeJob(id: string) {
   revalidatePath("/dashboard");
   revalidatePath("/office");
   redirect(`/jobs/${id}?saved=closed`);
+}
+
+export async function reopenJob(id: string) {
+  const { supabase, person } = await requireStaff();
+  const { error } = await reopenJobRecord(supabase, id, person?.roles);
+  if (error) {
+    redirect(
+      `/jobs/${id}?error=` + encodeURIComponent(friendlyError(error)),
+    );
+  }
+
+  revalidatePath(`/jobs/${id}`);
+  revalidatePath("/jobs");
+  revalidatePath("/dashboard");
+  revalidatePath("/office");
+  redirect(`/jobs/${id}?saved=reopened`);
 }
 
 export async function deleteJobAction(jobId: string) {

@@ -8,6 +8,7 @@ import {
   extractReadings,
   generateReportPdfBytes,
   generateSignedReportPdfBytes,
+  parseRecipients,
   prefillReadingsFromBookedEquipment,
   reportPdfStoragePath,
   supportedMethod,
@@ -18,6 +19,7 @@ import {
   isReportInvoicePending,
   loadActiveInvoiceReportMap,
 } from "../invoices/service";
+import { evaluateAndAutoCloseJob } from "../jobs/service";
 import type { ApproveReportInput } from "./schema";
 
 export type ReportRow = Tables<"reports">;
@@ -388,6 +390,96 @@ export async function returnReportRecord(
   }
 
   return { data: updated, error: null };
+}
+
+/**
+ * Marks an approved report as `sent` (`sent_at = now()`, `sent_to = emails`),
+ * advances the job status to `report_sent` if still in pre-invoice stage,
+ * and (G4) automatically closes the job if all its non-cancelled tax invoices are already fully paid.
+ */
+export async function markReportSentRecord(
+  supabase: SupabaseClient<Database>,
+  reportId: string,
+  recipientsInput: string | readonly string[],
+): Promise<{
+  data: ReportRow | null;
+  jobClosed: boolean;
+  error: string | null;
+}> {
+  if (!validUuid(reportId)) {
+    return { data: null, jobClosed: false, error: "Invalid report ID." };
+  }
+
+  let emails: string[];
+  try {
+    const raw =
+      typeof recipientsInput === "string"
+        ? recipientsInput
+        : recipientsInput.join(", ");
+    emails = parseRecipients(raw);
+  } catch (err) {
+    return {
+      data: null,
+      jobClosed: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Enter valid recipient email addresses.",
+    };
+  }
+
+  const { data: report } = await supabase
+    .from("reports")
+    .select("*")
+    .eq("id", reportId)
+    .maybeSingle();
+
+  if (!report) {
+    return { data: null, jobClosed: false, error: "Report not found." };
+  }
+  if (!report.approved_at || !["approved", "sent"].includes(report.status)) {
+    return {
+      data: null,
+      jobClosed: false,
+      error:
+        "Report must be approved by a technical reviewer before marking it as sent.",
+    };
+  }
+
+  const sentAt = new Date().toISOString();
+  const { data: updated, error } = await supabase
+    .from("reports")
+    .update({
+      status: "sent",
+      sent_at: sentAt,
+      sent_to: emails,
+    })
+    .eq("id", report.id)
+    .select("*")
+    .single();
+
+  if (error || !updated) {
+    return {
+      data: null,
+      jobClosed: false,
+      error: error?.message ?? "Could not mark report as sent.",
+    };
+  }
+
+  await supabase
+    .from("jobs")
+    .update({ status: "report_sent" })
+    .eq("id", report.job_id)
+    .in("status", ["scheduled", "inspection_done", "report_in_review"]);
+
+  // G4: If all non-cancelled tax invoices of this job are already paid, auto-close the job
+  const closeRes = await evaluateAndAutoCloseJob(supabase, report.job_id);
+
+  return {
+    data: updated,
+    jobClosed: closeRes.closed,
+    error: null,
+  };
 }
 
 export async function generateReportPdfDownload(

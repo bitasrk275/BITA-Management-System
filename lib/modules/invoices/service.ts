@@ -10,6 +10,7 @@ import {
   buildDraftInvoiceLinesFromPriceList,
   listPriceItems,
 } from "../price-items/service";
+import { evaluateAndAutoCloseJobsForInvoice } from "../jobs/service";
 import { METHOD_LABEL } from "../../../app/(office)/jobs/labels";
 import type {
   CreateCreditNoteInput,
@@ -654,6 +655,10 @@ export async function recordInvoicePayment(
   if (error || !data) {
     throw new Error(error?.message ?? "Could not record payment.");
   }
+
+  // G4: Automatically close any linked job whose reports are sent and whose non-cancelled tax invoices are all paid
+  await evaluateAndAutoCloseJobsForInvoice(supabase, invoiceId);
+
   return data;
 }
 
@@ -716,6 +721,12 @@ export async function createCreditNoteForInvoice(
   if (error || !data) {
     throw new Error(error?.message ?? "Could not create credit note.");
   }
+
+  if (data.status === "issued") {
+    // G4: An issued credit note reduces the invoice balance; auto-close any linked job if now fully settled and report sent
+    await evaluateAndAutoCloseJobsForInvoice(supabase, invoice.id);
+  }
+
   return data;
 }
 
