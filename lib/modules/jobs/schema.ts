@@ -1,5 +1,6 @@
 import { Constants, type Enums } from "../../db/types";
 import { parsePoValue } from "../po/schema";
+import { mapToCanonicalTestMethodEnum } from "../settings/templates";
 
 export interface JobInput {
   customer_id: string;
@@ -42,9 +43,14 @@ export function parseJobInput(
     rawMethods = raw.test_methods.split(",").map((s) => s.trim());
   }
 
-  const testMethods = rawMethods
-    .map(String)
-    .filter((m): m is Enums<"test_method"> => validMethods.includes(m));
+  const testMethods = Array.from(
+    new Set(
+      rawMethods
+        .map(String)
+        .map((m) => mapToCanonicalTestMethodEnum(m))
+        .filter((m): m is Enums<"test_method"> => validMethods.includes(m)),
+    ),
+  );
 
   const poValRes = parsePoValue(raw, "po_value");
   if (!poValRes.ok) {

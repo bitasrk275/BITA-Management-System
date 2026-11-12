@@ -11,9 +11,16 @@ import {
   parseSettingsOptionInput,
 } from "@/lib/modules/settings/schema";
 import {
+  buildSeedTemplates,
+  getOrSeedReportTemplates,
+  type TemplateFieldConfig,
+  type TemplateFieldKind,
+} from "@/lib/modules/settings/templates";
+import {
   createSettingsOption,
   deleteSettingsOption,
   getSetting,
+  listSettingsOptions,
   updateSettingsOption,
   upsertSetting,
 } from "@/lib/modules/settings/service";
@@ -315,39 +322,109 @@ export async function removeHolidayAction(date: string) {
   redirect("/settings?saved=1");
 }
 
+export async function addTestMethodAction(fd: FormData) {
+  const { supabase } = await requireStaff();
+  const code = (text(fd, "code") ?? "").trim().toUpperCase();
+  const label = (text(fd, "label") ?? "").trim();
+  if (!code || !label) {
+    redirect("/settings?error=" + encodeURIComponent("Test method code and label are required."));
+  }
+
+  const { data: existing } = await listSettingsOptions(supabase, { listKey: "test_methods" });
+  const position = ((existing?.length ?? 0) + 1) * 10;
+
+  const { error } = await createSettingsOption(supabase, {
+    list_key: "test_methods",
+    value: `${code} | ${label}`,
+    position,
+    active: true,
+  });
+
+  if (error) {
+    redirect("/settings?error=" + encodeURIComponent(friendlyError(error)));
+  }
+
+  revalidatePath("/settings");
+  revalidatePath("/jobs");
+  redirect("/settings?saved=1");
+}
+
+export async function toggleTestMethodAction(id: string, nextActive: boolean) {
+  const { supabase } = await requireStaff();
+  const { error } = await updateSettingsOption(supabase, id, { active: nextActive });
+  if (error) {
+    redirect("/settings?error=" + encodeURIComponent(friendlyError(error)));
+  }
+  revalidatePath("/settings");
+  revalidatePath("/jobs");
+  redirect("/settings?saved=1");
+}
+
+export async function removeTestMethodAction(id: string) {
+  const { supabase, person } = await requireStaff();
+  const res = await deleteSettingsOption(supabase, id, person?.roles);
+  if (!res.ok) {
+    redirect("/settings?error=" + encodeURIComponent(friendlyError(res.error)));
+  }
+  revalidatePath("/settings");
+  revalidatePath("/jobs");
+  redirect("/settings?saved=1");
+}
+
 export async function addReportTemplateFieldAction(fd: FormData) {
   const { supabase, person } = await requireStaff();
-  const method = (text(fd, "method") ?? "UT").toUpperCase();
+  const method = (text(fd, "method") ?? "UT").trim();
   const key = (text(fd, "field_key") ?? "")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, "_");
   const label = (text(fd, "field_label") ?? "").trim();
-  const input = (text(fd, "field_input") ?? "text").trim();
+  const kindRaw = (text(fd, "field_kind") ?? "typed").trim();
+  const kind: TemplateFieldKind =
+    kindRaw === "fixed" ? "fixed" : kindRaw === "dropdown" ? "dropdown" : "typed";
+  const inputRaw = (text(fd, "field_input") ?? "text").trim();
+  const validInputs = ["text", "date", "number", "textarea"];
+  const input = validInputs.includes(inputRaw)
+    ? (inputRaw as TemplateFieldConfig["input"])
+    : "text";
   const required = fd.get("field_required") === "on" || fd.get("field_required") === "true";
+  const rawOptions = text(fd, "field_options") ?? "";
+  const options = rawOptions
+    ? rawOptions
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : undefined;
 
   if (!key || !label) {
     redirect("/settings?error=" + encodeURIComponent("Field key and label are required."));
   }
 
-  const { data } = await getSetting(supabase, "report_templates");
-  const current =
-    data?.value && typeof data.value === "object" && !Array.isArray(data.value)
-      ? ({ ...(data.value as Record<string, unknown>) } as Record<string, unknown[]>)
-      : {};
+  const current = await getOrSeedReportTemplates(supabase);
+  const methodFields = current[method] ? [...current[method]] : [];
+  const existingIdx = methodFields.findIndex((f) => f.key === key);
+  const newField: TemplateFieldConfig = {
+    key,
+    label,
+    kind,
+    input,
+    required,
+    ...(options && options.length > 0 ? { options } : {}),
+    ...(kind === "fixed" ? { fixed: true } : {}),
+  };
 
-  const methodFields = Array.isArray(current[method]) ? [...current[method]] : [];
-  const filtered = methodFields.filter(
-    (f) => !(f && typeof f === "object" && (f as { key?: string }).key === key),
-  );
-  filtered.push({ key, label, input, required });
-  current[method] = filtered;
+  if (existingIdx >= 0) {
+    methodFields[existingIdx] = newField;
+  } else {
+    methodFields.push(newField);
+  }
+  current[method] = methodFields;
 
   const { error } = await upsertSetting(
     supabase,
     "report_templates",
     current as unknown as Json,
-    "Dynamic custom report fields per NDT test method (UT, MPT, DPT)",
+    "Dynamic ordered report fields per NDT test method",
     person?.id ?? null,
   );
 
@@ -355,27 +432,58 @@ export async function addReportTemplateFieldAction(fd: FormData) {
     redirect("/settings?error=" + encodeURIComponent(friendlyError(error)));
   }
   revalidatePath("/settings");
-  redirect("/settings?saved=1");
+  revalidatePath(`/report-preview/${method}`);
+  redirect(`/settings?saved=1&tab_method=${encodeURIComponent(method)}`);
+}
+
+export async function moveReportTemplateFieldAction(
+  method: string,
+  fieldKey: string,
+  direction: "up" | "down",
+) {
+  const { supabase, person } = await requireStaff();
+  const current = await getOrSeedReportTemplates(supabase);
+  const methodFields = current[method] ? [...current[method]] : [];
+  const idx = methodFields.findIndex((f) => f.key === fieldKey);
+
+  if (idx !== -1) {
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx >= 0 && targetIdx < methodFields.length) {
+      const temp = methodFields[idx];
+      methodFields[idx] = methodFields[targetIdx];
+      methodFields[targetIdx] = temp;
+      current[method] = methodFields;
+
+      const { error } = await upsertSetting(
+        supabase,
+        "report_templates",
+        current as unknown as Json,
+        "Dynamic ordered report fields per NDT test method",
+        person?.id ?? null,
+      );
+
+      if (error) {
+        redirect("/settings?error=" + encodeURIComponent(friendlyError(error)));
+      }
+    }
+  }
+
+  revalidatePath("/settings");
+  revalidatePath(`/report-preview/${method}`);
+  redirect(`/settings?saved=1&tab_method=${encodeURIComponent(method)}`);
 }
 
 export async function removeReportTemplateFieldAction(method: string, fieldKey: string) {
   const { supabase, person } = await requireStaff();
-  const { data } = await getSetting(supabase, "report_templates");
-  const current =
-    data?.value && typeof data.value === "object" && !Array.isArray(data.value)
-      ? ({ ...(data.value as Record<string, unknown>) } as Record<string, unknown[]>)
-      : {};
-
-  const methodFields = Array.isArray(current[method]) ? [...current[method]] : [];
-  current[method] = methodFields.filter(
-    (f) => !(f && typeof f === "object" && (f as { key?: string }).key === fieldKey),
-  );
+  const current = await getOrSeedReportTemplates(supabase);
+  const methodFields = current[method] ? [...current[method]] : [];
+  current[method] = methodFields.filter((f) => f.key !== fieldKey);
 
   const { error } = await upsertSetting(
     supabase,
     "report_templates",
     current as unknown as Json,
-    "Dynamic custom report fields per NDT test method (UT, MPT, DPT)",
+    "Dynamic ordered report fields per NDT test method",
     person?.id ?? null,
   );
 
@@ -383,7 +491,30 @@ export async function removeReportTemplateFieldAction(method: string, fieldKey: 
     redirect("/settings?error=" + encodeURIComponent(friendlyError(error)));
   }
   revalidatePath("/settings");
-  redirect("/settings?saved=1");
+  revalidatePath(`/report-preview/${method}`);
+  redirect(`/settings?saved=1&tab_method=${encodeURIComponent(method)}`);
+}
+
+export async function resetReportTemplateAction(method: string) {
+  const { supabase, person } = await requireStaff();
+  const seeds = buildSeedTemplates();
+  const current = await getOrSeedReportTemplates(supabase);
+  current[method] = seeds[method] ?? seeds["general_inspection"] ?? [];
+
+  const { error } = await upsertSetting(
+    supabase,
+    "report_templates",
+    current as unknown as Json,
+    "Dynamic ordered report fields per NDT test method",
+    person?.id ?? null,
+  );
+
+  if (error) {
+    redirect("/settings?error=" + encodeURIComponent(friendlyError(error)));
+  }
+  revalidatePath("/settings");
+  revalidatePath(`/report-preview/${method}`);
+  redirect(`/settings?saved=1&tab_method=${encodeURIComponent(method)}`);
 }
 
 export async function saveTelegramConfigAction(fd: FormData) {

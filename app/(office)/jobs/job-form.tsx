@@ -13,6 +13,7 @@ export function JobForm({
   quotations,
   defaults,
   submitLabel,
+  availableTestMethods,
 }: {
   action: (fd: FormData) => Promise<void>;
   job?: Tables<"jobs">;
@@ -28,8 +29,16 @@ export function JobForm({
     test_methods?: Enums<"test_method">[];
   };
   submitLabel: string;
+  availableTestMethods?: Array<{ code: string; label: string }>;
 }) {
   const methods = new Set(job?.test_methods ?? defaults?.test_methods ?? []);
+  const methodsList =
+    availableTestMethods && availableTestMethods.length > 0
+      ? availableTestMethods
+      : Constants.public.Enums.test_method.map((m) => ({
+          code: m,
+          label: METHOD_LABEL[m],
+        }));
   return (
     <form action={action} className="space-y-4">
       <Field label="Customer">
@@ -76,16 +85,16 @@ export function JobForm({
       <fieldset>
         <legend className="text-sm font-medium text-ink-2">Test methods</legend>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {Constants.public.Enums.test_method.map((m) => (
-            <label key={m} className="flex items-center gap-2 text-sm">
+          {methodsList.map((m) => (
+            <label key={m.code} className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 name="test_methods"
-                value={m}
-                defaultChecked={methods.has(m)}
+                value={m.code}
+                defaultChecked={methods.has(m.code as Enums<"test_method">)}
                 className="h-4 w-4"
               />
-              {METHOD_LABEL[m]}
+              {m.label}
             </label>
           ))}
         </div>

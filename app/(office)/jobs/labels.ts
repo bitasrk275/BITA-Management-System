@@ -24,6 +24,11 @@ export const METHOD_LABEL: Record<Enums<"test_method">, string> = {
   general_inspection: "General inspection",
 };
 
+export function getMethodLabel(method: string | null | undefined): string {
+  if (!method) return "–";
+  return (METHOD_LABEL as Record<string, string>)[method] ?? method;
+}
+
 // Shown as Indian rupees (D-017 in-app invoicing).
 export function formatINR(n: number | null) {
   if (n === null) return "–";

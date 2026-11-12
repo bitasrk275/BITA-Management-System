@@ -11,6 +11,11 @@ import {
   type FieldDefinition,
   type ReportMethodInput,
 } from "../../../../../lib/reports/fields";
+import {
+  buildSeedTemplates,
+  getOrSeedReportTemplates,
+  templateConfigsToFieldDefinitions,
+} from "../../../../../lib/modules/settings/templates";
 
 export const runtime = "nodejs";
 
@@ -27,54 +32,71 @@ export async function GET(
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
-    let canonicalMethod;
-    try {
-      canonicalMethod = reportMethod(method as ReportMethodInput);
-    } catch {
-      return NextResponse.json(
-        { error: `Unsupported test method '${method}'. Expected UT, MPT (or MT), or DPT.` },
-        { status: 400 },
-      );
-    }
+    const rawMethod = (method || "").trim();
+    const canonicalMethod = rawMethod.toUpperCase() === "MT" ? "MPT" : rawMethod;
 
-    let fields: readonly FieldDefinition[] = fieldsForMethod(canonicalMethod);
     const dropdownOptions: Record<string, string[]> = {};
     for (const [k, vals] of Object.entries(DEFAULT_REPORT_DROPDOWN_OPTIONS)) {
       dropdownOptions[k] = [...vals];
     }
     let rememberedDefaults: Record<string, string> = {};
 
+    let fields: readonly FieldDefinition[] = [];
+
+    let templates = buildSeedTemplates();
     if (typeof (supabase as { from?: unknown })?.from === "function") {
       try {
-        const url = new URL(req.url);
-        const customerId = url.searchParams.get("customer_id")?.trim();
+        templates = await getOrSeedReportTemplates(supabase).catch(() => buildSeedTemplates());
+        const { data: optData } = await supabase
+          .from("settings_options")
+          .select("list_key, value")
+          .eq("active", true)
+          .order("position", { ascending: true });
 
-        const [tplRes, optRes] = await Promise.all([
-          supabase.from("settings").select("value").eq("key", "report_templates").maybeSingle(),
-          supabase
-            .from("settings_options")
-            .select("list_key, value")
-            .eq("active", true)
-            .order("position", { ascending: true }),
-        ]);
-        for (const opt of optRes.data ?? []) {
+        for (const opt of optData ?? []) {
           const list = dropdownOptions[opt.list_key] ?? [];
           if (!list.includes(opt.value)) {
             list.push(opt.value);
           }
           dropdownOptions[opt.list_key] = list;
         }
-        fields = mergeCustomMethodFields(
-          canonicalMethod,
-          tplRes.data?.value,
-          dropdownOptions,
-        );
+      } catch {
+        // Fall back to seed templates
+      }
+    }
 
+    const methodFields = templates[canonicalMethod] || templates[rawMethod];
+    const isStandardMethod =
+      canonicalMethod === "UT" || canonicalMethod === "MPT" || canonicalMethod === "DPT";
+
+    if (!methodFields && !isStandardMethod) {
+      return NextResponse.json(
+        { error: `Unsupported test method '${method}'. Expected UT, MPT (or MT), or DPT.` },
+        { status: 400 },
+      );
+    }
+
+    if (methodFields && methodFields.length > 0) {
+      fields = templateConfigsToFieldDefinitions(methodFields, dropdownOptions);
+    } else {
+      try {
+        const legacy = reportMethod(canonicalMethod as ReportMethodInput);
+        fields = mergeCustomMethodFields(legacy, templates, dropdownOptions);
+      } catch {
+        fields = fieldsForMethod(canonicalMethod as ReportMethodInput);
+      }
+    }
+
+    if (typeof (supabase as { from?: unknown })?.from === "function") {
+      try {
+        const url = new URL(req.url);
+        const customerId = url.searchParams.get("customer_id")?.trim();
         if (customerId) {
+          const queryMethod = isStandardMethod ? canonicalMethod : "general_inspection";
           const { data: prevInsp } = await supabase
             .from("inspections")
             .select("readings, jobs!inner(customer_id)")
-            .eq("method", canonicalMethod)
+            .eq("method", queryMethod)
             .eq("jobs.customer_id", customerId)
             .not("submitted_at", "is", null)
             .order("submitted_at", { ascending: false })
@@ -85,7 +107,7 @@ export async function GET(
           }
         }
       } catch {
-        // Fall back to static METHOD_FIELDS if settings lookup fails
+        // Ignore customer defaults lookup error
       }
     }
 

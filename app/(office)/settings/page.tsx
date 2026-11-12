@@ -27,6 +27,10 @@ import {
   listSettingsOptions,
 } from "@/lib/modules/settings/service";
 import {
+  getOrSeedTestMethods,
+  getOrSeedReportTemplates,
+} from "@/lib/modules/settings/templates";
+import {
   normalizeTelegramConfig,
   normalizeTelegramLinksState,
 } from "@/lib/modules/telegram/service";
@@ -35,11 +39,15 @@ import {
   addDropdownOption,
   addHolidayAction,
   addReportTemplateFieldAction,
+  addTestMethodAction,
   createTelegramPairingCodeAction,
+  moveReportTemplateFieldAction,
   registerTelegramWebhookAction,
   removeDropdownOption,
   removeHolidayAction,
   removeReportTemplateFieldAction,
+  removeTestMethodAction,
+  resetReportTemplateAction,
   saveCompanyProfileAction,
   saveInvoiceNumberingAction,
   savePermissionsMatrixAction,
@@ -47,6 +55,7 @@ import {
   saveTelegramConfigAction,
   sendTestTelegramDigestAction,
   toggleDropdownOption,
+  toggleTestMethodAction,
   unlinkTelegramChatAction,
 } from "./actions";
 
@@ -74,26 +83,35 @@ export default async function SettingsPage({
     error?: string;
     saved?: string;
     list?: string;
+    tab_method?: string;
     tg_code?: string;
     tg_webhook?: string;
   }>;
 }) {
-  const { error, saved, list, tg_code, tg_webhook } = await searchParams;
+  const { error, saved, list, tab_method, tg_code, tg_webhook } = await searchParams;
   const { supabase, person } = await requireStaff();
   const isManagement = Boolean(person?.roles.includes("management"));
 
-  const [{ data: settings, error: settingsErr }, { data: options, error: optionsErr }, permissions, staffRes] =
-    await Promise.all([
-      listSettings(supabase),
-      listSettingsOptions(supabase, { listKey: list }),
-      getPermissionsMatrix(supabase),
-      supabase
-        .from("people")
-        .select("id, full_name, position, roles")
-        .is("deleted_at", null)
-        .eq("active", true)
-        .order("full_name"),
-    ]);
+  const [
+    { data: settings, error: settingsErr },
+    { data: options, error: optionsErr },
+    permissions,
+    staffRes,
+    testMethods,
+    reportTemplates,
+  ] = await Promise.all([
+    listSettings(supabase),
+    listSettingsOptions(supabase, { listKey: list }),
+    getPermissionsMatrix(supabase),
+    supabase
+      .from("people")
+      .select("id, full_name, position, roles")
+      .is("deleted_at", null)
+      .eq("active", true)
+      .order("full_name"),
+    getOrSeedTestMethods(supabase),
+    getOrSeedReportTemplates(supabase),
+  ]);
 
   const activeStaff = staffRes.data ?? [];
 
@@ -181,15 +199,18 @@ export default async function SettingsPage({
         .map((h) => ({ date: String(h.date), name: String(h.name) }))
     : [];
 
-  const rawReportTemplates =
-    settingMap.get("report_templates") &&
-    typeof settingMap.get("report_templates") === "object" &&
-    !Array.isArray(settingMap.get("report_templates"))
-      ? (settingMap.get("report_templates") as Record<
-          string,
-          Array<{ key: string; label: string; input?: string; required?: boolean }>
-        >)
-      : {};
+  const selectedMethod = tab_method || "UT";
+  const templateMethods = Array.from(
+    new Set([
+      "UT",
+      "MPT",
+      "DPT",
+      ...testMethods.map((m) => m.code),
+      ...Object.keys(reportTemplates),
+    ]),
+  );
+  const currentMethodFields =
+    reportTemplates[selectedMethod] || reportTemplates[selectedMethod.toUpperCase()] || [];
 
   const listKeys = Array.from(new Set(options.map((o) => o.list_key))).sort();
 
@@ -448,9 +469,75 @@ export default async function SettingsPage({
             </form>
           </Card>
 
-          {/* 3. Payment Reminders & Calibration Alert Timings */}
+          {/* 3. Test Methods (NDT Services) */}
           <Card>
-            <SectionTitle>3. Payment Reminders & Calibration Alert Timings</SectionTitle>
+            <SectionTitle>3. Test Methods (NDT Services)</SectionTitle>
+            <p className="mb-3 text-xs text-ink-3">
+              Standard methods (UT, MPT, DPT, RT, VT, etc.) and custom NDT methods configured for jobs, scheduling, and field reporting.
+            </p>
+            {testMethods.length > 0 ? (
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-line text-ink-3">
+                      <th className="py-2 pr-2 w-8">#</th>
+                      <th className="py-2 pr-3 font-medium">Code</th>
+                      <th className="py-2 pr-3 font-medium">Label</th>
+                      <th className="py-2 pr-3 font-medium">Status</th>
+                      <th className="py-2 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line-2">
+                    {testMethods.map((m, i) => (
+                      <tr key={m.id} className="hover:bg-side">
+                        <td className="py-2 pr-2 text-ink-3">{i + 1}</td>
+                        <td className="py-2 pr-3 font-mono font-semibold text-ink">{m.code}</td>
+                        <td className="py-2 pr-3 text-ink font-medium">{m.label}</td>
+                        <td className="py-2 pr-3">
+                          <Status tone={m.active ? "ok" : "none"}>
+                            {m.active ? "Active" : "Inactive"}
+                          </Status>
+                        </td>
+                        <td className="py-2 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <form action={toggleTestMethodAction.bind(null, m.id, !m.active)}>
+                              <SecondaryButton type="submit" className="px-2.5 py-1 text-xs">
+                                {m.active ? "Disable" : "Enable"}
+                              </SecondaryButton>
+                            </form>
+                            <form action={removeTestMethodAction.bind(null, m.id)}>
+                              <SecondaryButton type="submit" className="px-2.5 py-1 text-xs">
+                                Remove
+                              </SecondaryButton>
+                            </form>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-xs text-ink-3 mb-3">No test methods configured.</p>
+            )}
+
+            <form action={addTestMethodAction} className="border-t border-line-2 pt-3 space-y-3">
+              <span className="text-xs font-semibold text-ink">Add New Test Method</span>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Method Code" hint="e.g. ET, UT, ECT">
+                  <Input name="code" placeholder="e.g. ET" required />
+                </Field>
+                <Field label="Method Label" hint="e.g. Eddy Current Testing">
+                  <Input name="label" placeholder="e.g. Eddy Current Testing" required />
+                </Field>
+              </div>
+              <Button type="submit" className="px-3 py-1.5 text-xs">Add test method</Button>
+            </form>
+          </Card>
+
+          {/* 4. Payment Reminders & Calibration Alert Timings */}
+          <Card>
+            <SectionTitle>4. Payment Reminders & Calibration Alert Timings</SectionTitle>
             <p className="mb-3 text-xs text-ink-3">
               Controls when automated email payment reminders and equipment calibration warnings fire.
             </p>
@@ -494,10 +581,10 @@ export default async function SettingsPage({
             </form>
           </Card>
 
-          {/* 4. Permissions Matrix */}
+          {/* 5. Permissions Matrix */}
           <Card>
             <SectionTitle link={{ href: "/settings/users", label: "Manage users" }}>
-              4. Role Permissions Matrix
+              5. Role Permissions Matrix
             </SectionTitle>
             <p className="mb-3 text-xs text-ink-3">
               Enforced in both database triggers/RLS and application services.
@@ -531,9 +618,9 @@ export default async function SettingsPage({
 
         {/* RIGHT COLUMN */}
         <div className="space-y-6">
-          {/* 5. Telegram Executive Bot */}
+          {/* 6. Telegram Executive Bot */}
           <Card>
-            <SectionTitle>5. Telegram Executive Bot & Real-Time Alerts</SectionTitle>
+            <SectionTitle>6. Telegram Executive Bot & Real-Time Alerts</SectionTitle>
             <p className="mb-3 text-xs text-ink-3">
               Allows BITA directors & office leads to ask live dashboard questions (<Mono>/status</Mono>,{" "}
               <Mono>/jobs</Mono>, <Mono>/invoices</Mono>, <Mono>/overdue</Mono>, <Mono>/reports</Mono>,{" "}
@@ -648,86 +735,190 @@ export default async function SettingsPage({
             </div>
           </Card>
 
-          {/* 6. Custom Report Template Fields */}
+          {/* 7. Report Templates & Ordered Fields Editor */}
           <Card>
-            <SectionTitle>6. Custom Report Template Fields (UT / MPT / DPT)</SectionTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <SectionTitle>7. Report Templates & Ordered Fields Editor</SectionTitle>
+              <ButtonLink
+                href={`/report-preview/${selectedMethod}`}
+                variant="secondary"
+                size="sm"
+              >
+                Preview {selectedMethod} Report ↗
+              </ButtonLink>
+            </div>
             <p className="mb-3 text-xs text-ink-3">
-              Add custom reading fields to any NDT method. They immediately appear in the technician app (
-              <Mono>/api/field/report-template/[method]</Mono>).
+              Configured per NDT method. Dynamic ordered field list is loaded by the technician phone app (
+              <Mono>/api/field/report-template/[method]</Mono>) and paper layout preview.
             </p>
-            <form action={addReportTemplateFieldAction} className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Method">
-                  <Select name="method" defaultValue="UT">
-                    <option value="UT">UT</option>
-                    <option value="MPT">MPT (MT)</option>
-                    <option value="DPT">DPT</option>
-                  </Select>
-                </Field>
-                <Field label="Field Key">
+
+            {/* Method Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-4 border-b border-line pb-3">
+              {templateMethods.map((code) => {
+                const isSelected = selectedMethod === code;
+                return (
+                  <Link
+                    key={code}
+                    href={`/settings?tab_method=${encodeURIComponent(code)}`}
+                    className={`rounded px-2.5 py-1 text-xs font-medium transition ${
+                      isSelected
+                        ? "bg-ink text-white"
+                        : "border border-line bg-surface text-ink-2 hover:text-ink hover:bg-side"
+                    }`}
+                  >
+                    {code}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Fields Table */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-ink">
+                  {selectedMethod} Fields ({currentMethodFields.length})
+                </span>
+                <form action={resetReportTemplateAction.bind(null, selectedMethod)}>
+                  <SecondaryButton type="submit" className="px-2.5 py-1 text-xs">
+                    Reset to default seed
+                  </SecondaryButton>
+                </form>
+              </div>
+
+              {currentMethodFields.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-line text-ink-3">
+                        <th className="py-2 pr-2 w-7">#</th>
+                        <th className="py-2 pr-2 font-medium">Key</th>
+                        <th className="py-2 pr-2 font-medium">Label</th>
+                        <th className="py-2 pr-2 font-medium">Kind</th>
+                        <th className="py-2 pr-2 font-medium">Input</th>
+                        <th className="py-2 pr-2 font-medium">Req</th>
+                        <th className="py-2 pr-2 font-medium">Options</th>
+                        <th className="py-2 text-right font-medium">Order / Remove</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line-2">
+                      {currentMethodFields.map((f, i) => (
+                        <tr key={f.key} className="hover:bg-side">
+                          <td className="py-2 pr-2 text-ink-3">{i + 1}</td>
+                          <td className="py-2 pr-2 font-mono text-ink">{f.key}</td>
+                          <td className="py-2 pr-2 text-ink font-medium">{f.label}</td>
+                          <td className="py-2 pr-2">
+                            <Badge>{f.kind}</Badge>
+                          </td>
+                          <td className="py-2 pr-2 text-ink-2">{f.input}</td>
+                          <td className="py-2 pr-2">
+                            {f.required ? (
+                              <span className="font-semibold text-bad">Yes</span>
+                            ) : (
+                              <span className="text-ink-3">No</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-2 text-ink-3 truncate max-w-[120px]" title={f.options?.join(", ")}>
+                            {f.options && f.options.length > 0 ? f.options.join(", ") : "—"}
+                          </td>
+                          <td className="py-2 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <form action={moveReportTemplateFieldAction.bind(null, selectedMethod, f.key, "up")}>
+                                <button
+                                  type="submit"
+                                  disabled={i === 0}
+                                  title="Move up"
+                                  className="rounded border border-line px-1.5 py-0.5 text-[10px] text-ink-2 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                  ↑
+                                </button>
+                              </form>
+                              <form action={moveReportTemplateFieldAction.bind(null, selectedMethod, f.key, "down")}>
+                                <button
+                                  type="submit"
+                                  disabled={i === currentMethodFields.length - 1}
+                                  title="Move down"
+                                  className="rounded border border-line px-1.5 py-0.5 text-[10px] text-ink-2 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                  ↓
+                                </button>
+                              </form>
+                              <form action={removeReportTemplateFieldAction.bind(null, selectedMethod, f.key)}>
+                                <button
+                                  type="submit"
+                                  title="Remove field"
+                                  className="rounded border border-line px-1.5 py-0.5 text-[10px] text-bad hover:bg-bad-bg"
+                                >
+                                  ✕
+                                </button>
+                              </form>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-xs text-ink-3 py-2">No fields configured for {selectedMethod}.</p>
+              )}
+            </div>
+
+            {/* Add Field Form */}
+            <form action={addReportTemplateFieldAction} className="border-t border-line-2 pt-3 space-y-3">
+              <span className="text-xs font-semibold text-ink">Add Field to {selectedMethod}</span>
+              <input type="hidden" name="method" value={selectedMethod} />
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Field Key" hint="lowercase_with_underscores">
                   <Input name="field_key" placeholder="e.g. surface_temp" required />
+                </Field>
+                <Field label="Field Label" hint="User-friendly name">
+                  <Input name="field_label" placeholder="e.g. Surface temperature (°C)" required />
+                </Field>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Field Kind">
+                  <Select name="field_kind" defaultValue="typed">
+                    <option value="typed">typed (Free text / numeric input)</option>
+                    <option value="dropdown">dropdown (Choice list with pick-or-type)</option>
+                    <option value="fixed">fixed (Locked / automatic system value)</option>
+                  </Select>
                 </Field>
                 <Field label="Input Type">
                   <Select name="field_input" defaultValue="text">
-                    <option value="text">Text</option>
-                    <option value="number">Number</option>
-                    <option value="date">Date</option>
-                    <option value="textarea">Multiline Text</option>
+                    <option value="text">text (Single-line text)</option>
+                    <option value="number">number (Numeric)</option>
+                    <option value="date">date (Calendar date)</option>
+                    <option value="textarea">textarea (Multi-line text)</option>
                   </Select>
                 </Field>
               </div>
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div className="min-w-[200px] flex-1">
-                  <Field label="Field Label">
-                    <Input name="field_label" placeholder="e.g. Surface temperature (°C)" required />
-                  </Field>
-                </div>
-                <label className="flex items-center gap-2 pb-2 text-xs text-ink-2">
+
+              <Field
+                label="Dropdown Options (Optional)"
+                hint="Comma-separated options (e.g. Pass, Fail, Re-inspect)"
+              >
+                <Input name="field_options" placeholder="Option 1, Option 2, Option 3" />
+              </Field>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <label className="flex items-center gap-2 text-xs text-ink-2 cursor-pointer">
                   <input
                     type="checkbox"
                     name="field_required"
                     className="h-4 w-4 rounded border-line"
                   />
-                  Required
+                  <span>Required field (must be filled before inspection submission)</span>
                 </label>
-                <Button type="submit">Add field</Button>
+                <Button type="submit" className="px-3 py-1.5 text-xs">Add field to {selectedMethod}</Button>
               </div>
             </form>
-
-            {Object.keys(rawReportTemplates).length > 0 && (
-              <div className="mt-4 border-t border-line-2 pt-3 space-y-2">
-                {Object.entries(rawReportTemplates).map(([method, fields]) =>
-                  Array.isArray(fields) && fields.length > 0 ? (
-                    <div key={method} className="text-xs">
-                      <div className="font-semibold text-ink mb-1">{method} Custom Fields:</div>
-                      <ul className="divide-y divide-line-2">
-                        {fields.map((f) => (
-                          <li
-                            key={`${method}-${f.key}`}
-                            className="flex items-center justify-between py-1.5"
-                          >
-                            <span>
-                              <Mono>{f.key}</Mono> — {f.label} ({f.input ?? "text"}
-                              {f.required ? ", required" : ""})
-                            </span>
-                            <form
-                              action={removeReportTemplateFieldAction.bind(null, method, f.key)}
-                            >
-                              <SecondaryButton type="submit">Remove</SecondaryButton>
-                            </form>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null,
-                )}
-              </div>
-            )}
           </Card>
 
-          {/* 7. Company Holidays */}
+          {/* 8. Company Holidays */}
           <Card>
-            <SectionTitle>7. Company Holidays ({holidays.length})</SectionTitle>
+            <SectionTitle>8. Company Holidays ({holidays.length})</SectionTitle>
             <p className="mb-3 text-xs text-ink-3">
               Holidays are highlighted on the scheduling calendar and warn before scheduling technicians.
             </p>
@@ -760,10 +951,10 @@ export default async function SettingsPage({
             )}
           </Card>
 
-          {/* 8. Dropdown Options */}
+          {/* 9. Dropdown Options */}
           <Card>
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold text-ink">8. Add Dropdown Option</h2>
+              <h2 className="text-sm font-semibold text-ink">9. Add Dropdown Option</h2>
               <Link href="/equipment/types" className="text-xs text-ink-2 hover:text-ink underline">
                 Equipment categories →
               </Link>

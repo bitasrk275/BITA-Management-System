@@ -19,13 +19,15 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { daysBetween, shortDate, todayIST } from "@/lib/dates";
+import type { Enums } from "@/lib/db/types";
 import {
   isReportInvoicePending,
   loadActiveInvoiceReportMap,
 } from "@/lib/modules/invoices/service";
 import { homeFor } from "@/lib/roles";
+import { getActiveTestMethods } from "@/lib/modules/settings/templates";
 import { generateInvoiceFromSelectedReports } from "../invoices/actions";
-import { METHOD_LABEL } from "../jobs/labels";
+import { getMethodLabel } from "../jobs/labels";
 import { prepareReport } from "./actions";
 
 export const metadata = { title: "Reports to review – BITA" };
@@ -38,12 +40,14 @@ export default async function ReviewQueue({
     error?: string;
     inspectionId?: string;
     filter?: string;
+    method?: string;
   }>;
 }) {
   const {
     error: actionError,
     inspectionId: preselectedInspectionId,
     filter,
+    method: methodFilter,
   } = await searchParams;
   const { supabase, person } = await requireStaff();
   if (!person?.roles.some((r) => r === "reviewer" || r === "management" || r === "office")) {
@@ -53,38 +57,54 @@ export default async function ReviewQueue({
   const canBill = person.roles.some((r) => r === "management" || r === "office");
   const filterInvoicePending = filter === "invoice_pending";
 
-  const [queue, drafts, recent, inspectionsRes, signatoriesRes, activeInvoiceMap] =
+  let queueQuery = supabase
+    .from("reports")
+    .select(
+      "id, report_no, method, created_at, jobs(id, job_no, customers(name)), inspections(missing_fields, submitted_at)",
+    )
+    .eq("status", "in_review")
+    .order("created_at");
+
+  let draftsQuery = supabase
+    .from("reports")
+    .select(
+      "id, report_no, method, status, jobs(id, job_no, customers(name)), inspections(missing_fields, submitted_at)",
+    )
+    .in("status", ["draft", "returned"])
+    .order("created_at");
+
+  let recentQuery = supabase
+    .from("reports")
+    .select(
+      "id, report_no, method, status, approved_at, pdf_path, jobs(id, job_no, po_number, customers(name, gstin))",
+    )
+    .in("status", ["approved", "sent"])
+    .order("approved_at", { ascending: false })
+    .limit(50);
+
+  let inspectionsQuery = supabase
+    .from("inspections")
+    .select(
+      "id, job_id, method, submitted_at, missing_fields, jobs(job_no, customers(name))",
+    )
+    .not("submitted_at", "is", null)
+    .order("submitted_at", { ascending: false })
+    .limit(50);
+
+  if (methodFilter && methodFilter !== "all") {
+    const enumVal = methodFilter as unknown as Enums<"test_method">;
+    queueQuery = queueQuery.eq("method", enumVal);
+    draftsQuery = draftsQuery.eq("method", enumVal);
+    recentQuery = recentQuery.eq("method", enumVal);
+    inspectionsQuery = inspectionsQuery.eq("method", enumVal);
+  }
+
+  const [queue, drafts, recent, inspectionsRes, signatoriesRes, activeInvoiceMap, activeMethods] =
     await Promise.all([
-      supabase
-        .from("reports")
-        .select(
-          "id, report_no, method, created_at, jobs(id, job_no, customers(name)), inspections(missing_fields, submitted_at)",
-        )
-        .eq("status", "in_review")
-        .order("created_at"),
-      supabase
-        .from("reports")
-        .select(
-          "id, report_no, method, status, jobs(id, job_no, customers(name)), inspections(missing_fields, submitted_at)",
-        )
-        .in("status", ["draft", "returned"])
-        .order("created_at"),
-      supabase
-        .from("reports")
-        .select(
-          "id, report_no, method, status, approved_at, pdf_path, jobs(id, job_no, po_number, customers(name, gstin))",
-        )
-        .in("status", ["approved", "sent"])
-        .order("approved_at", { ascending: false })
-        .limit(50),
-      supabase
-        .from("inspections")
-        .select(
-          "id, job_id, method, submitted_at, missing_fields, jobs(job_no, customers(name))",
-        )
-        .not("submitted_at", "is", null)
-        .order("submitted_at", { ascending: false })
-        .limit(50),
+      queueQuery,
+      draftsQuery,
+      recentQuery,
+      inspectionsQuery,
       supabase
         .from("people")
         .select("id, full_name, position")
@@ -92,6 +112,7 @@ export default async function ReviewQueue({
         .contains("roles", ["reviewer"])
         .order("full_name"),
       loadActiveInvoiceReportMap(supabase),
+      getActiveTestMethods(supabase).catch(() => []),
     ]);
 
   const today = todayIST();
@@ -134,7 +155,7 @@ export default async function ReviewQueue({
       {/* Filter pills */}
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <Link
-          href="/review"
+          href={methodFilter ? `/review?method=${encodeURIComponent(methodFilter)}` : "/review"}
           className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
             !filterInvoicePending
               ? "bg-ink text-white"
@@ -144,7 +165,11 @@ export default async function ReviewQueue({
           All queues
         </Link>
         <Link
-          href="/review?filter=invoice_pending"
+          href={
+            methodFilter
+              ? `/review?filter=invoice_pending&method=${encodeURIComponent(methodFilter)}`
+              : "/review?filter=invoice_pending"
+          }
           className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
             filterInvoicePending
               ? "bg-ink text-white"
@@ -153,6 +178,35 @@ export default async function ReviewQueue({
         >
           Invoice pending ({invoicePendingReports.length})
         </Link>
+
+        {activeMethods.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l border-line">
+            <span className="text-xs text-ink-3">Method:</span>
+            <Link
+              href={filterInvoicePending ? "/review?filter=invoice_pending" : "/review"}
+              className={`rounded-md px-2.5 py-1 text-xs transition ${
+                !methodFilter
+                  ? "bg-ink-2 text-white font-medium"
+                  : "border border-line text-ink-2 hover:text-ink"
+              }`}
+            >
+              All
+            </Link>
+            {activeMethods.map((m) => (
+              <Link
+                key={m.code}
+                href={`/review?${filterInvoicePending ? "filter=invoice_pending&" : ""}method=${encodeURIComponent(m.code)}`}
+                className={`rounded-md px-2.5 py-1 text-xs transition ${
+                  methodFilter === m.code
+                    ? "bg-ink-2 text-white font-medium"
+                    : "border border-line text-ink-2 hover:text-ink"
+                }`}
+              >
+                {m.code}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Multi-report invoice builder for Invoice pending reports */}
@@ -201,7 +255,7 @@ export default async function ReviewQueue({
                             {r.status === "sent" ? "Sent" : "Approved"}
                           </Status>
                           <span className="text-xs text-ink-2">
-                            {METHOD_LABEL[r.method]} · Job {r.jobs?.job_no ?? "—"} ·{" "}
+                            {getMethodLabel(r.method)} · Job {r.jobs?.job_no ?? "—"} ·{" "}
                             <strong className="text-ink">
                               {r.jobs?.customers?.name ?? "Customer"}
                             </strong>
@@ -257,7 +311,7 @@ export default async function ReviewQueue({
                       <div className="flex flex-wrap items-center gap-2">
                         <Mono>{r.report_no}</Mono>
                         <span className="font-normal text-ink-2">
-                          {METHOD_LABEL[r.method]} · {r.jobs?.customers?.name}
+                          {getMethodLabel(r.method)} · {r.jobs?.customers?.name}
                         </span>
                       </div>
                     }
@@ -305,7 +359,7 @@ export default async function ReviewQueue({
                         </Status>
                       </div>
                     }
-                    detail={`${METHOD_LABEL[r.method]} · ${r.jobs?.job_no ?? ""} · ${r.jobs?.customers?.name ?? ""}`}
+                    detail={`${getMethodLabel(r.method)} · ${r.jobs?.job_no ?? ""} · ${r.jobs?.customers?.name ?? ""}`}
                     action={
                       <ButtonLink href={`/review/${r.id}`} variant="secondary" size="sm">
                         Open
@@ -342,7 +396,7 @@ export default async function ReviewQueue({
                           ) : null}
                         </div>
                       }
-                      detail={`${METHOD_LABEL[r.method]} · ${r.jobs?.customers?.name ?? ""}${
+                      detail={`${getMethodLabel(r.method)} · ${r.jobs?.customers?.name ?? ""}${
                         r.approved_at ? ` · ${shortDate(r.approved_at.slice(0, 10))}` : ""
                       }`}
                       action={
@@ -382,7 +436,7 @@ export default async function ReviewQueue({
                         <option key={insp.id} value={insp.id}>
                           {insp.jobs?.job_no ?? insp.job_id.slice(0, 8)} ·{" "}
                           {insp.jobs?.customers?.name ?? "Customer"} ·{" "}
-                          {METHOD_LABEL[insp.method]}
+                          {getMethodLabel(insp.method)}
                           {hasMissing
                             ? ` (Missing ${insp.missing_fields.length} reading${insp.missing_fields.length === 1 ? "" : "s"})`
                             : " (Complete)"}
