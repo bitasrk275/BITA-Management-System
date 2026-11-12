@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Button, ButtonLink, Card, ErrorNote, Field, PageHeader, Select } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, ErrorNote, Field, PageHeader, SecondaryButton, Select } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { Constants } from "@/lib/db/types";
-import { linkCustomer, setStatus } from "../actions";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
+import { deleteEnquiry, linkCustomer, setStatus } from "../actions";
 import { CustomerSelect } from "../customer-select";
 import { formatIST, SOURCE_LABEL, STATUS_LABEL } from "../labels";
 
@@ -16,9 +17,12 @@ export default async function EnquiryPage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
-  const { supabase } = await requireStaff();
+  const { supabase, person } = await requireStaff();
 
-  const { data: enquiry } = await supabase.from("enquiries").select("*, customers(id, name)").eq("id", id).maybeSingle();
+  const [{ data: enquiry }, canDelete] = await Promise.all([
+    supabase.from("enquiries").select("*, customers(id, name)").eq("id", id).maybeSingle(),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
+  ]);
   if (!enquiry) notFound();
 
   const { data: customers } = await supabase.from("customers").select("id, name").order("name");
@@ -106,6 +110,26 @@ export default async function EnquiryPage({
               <Button type="submit">Update</Button>
             </form>
           </Card>
+
+          {canDelete && (
+            <Card>
+              <details>
+                <summary className="cursor-pointer text-sm font-medium text-bad">
+                  Delete enquiry
+                </summary>
+                <p className="mt-2 text-xs text-ink-3">
+                  Deleting moves this enquiry to the{" "}
+                  <Link href="/recycle-bin" className="underline">
+                    recycle bin
+                  </Link>
+                  , where management can restore it at any time.
+                </p>
+                <form action={deleteEnquiry.bind(null, id)} className="mt-3">
+                  <SecondaryButton type="submit">Confirm delete enquiry</SecondaryButton>
+                </form>
+              </details>
+            </Card>
+          )}
         </div>
       </div>
     </>

@@ -13,6 +13,8 @@ import { requireStaff } from "@/lib/auth";
 import { todayIST } from "@/lib/dates";
 import { Constants, type Enums } from "@/lib/db/types";
 import { currentFinancialYear } from "@/lib/modules/finance/schema";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
+import { deleteJob } from "./actions";
 import { isJobReadyToClose } from "./closure";
 import { JOB_STATUS_LABEL, METHOD_LABEL } from "./labels";
 
@@ -38,10 +40,11 @@ export default async function JobsPage({
     fy?: string;
     month?: string;
     customer_id?: string;
+    deleted?: string;
   }>;
 }) {
   const { q, status, fy, month, customer_id: customerId } = await searchParams;
-  const { supabase } = await requireStaff();
+  const { supabase, person } = await requireStaff();
 
   const asOf = todayIST();
   const defaultFy = currentFinancialYear(asOf);
@@ -51,7 +54,7 @@ export default async function JobsPage({
   let query = supabase
     .from("jobs")
     .select(
-      "id, job_no, customer_id, status, scope, site, test_methods, po_number, created_at, customers(id, name), reports(status, sent_at), invoices(kind, balance)",
+      "id, job_no, customer_id, status, scope, site, test_methods, po_number, created_at, customers(id, name), reports(status, sent_at), invoices(kind, balance, status, issued_at)",
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -73,9 +76,10 @@ export default async function JobsPage({
     );
   }
 
-  const [{ data: jobs, error }, { data: customers }] = await Promise.all([
+  const [{ data: jobs, error }, { data: customers }, canDelete] = await Promise.all([
     query,
     supabase.from("customers").select("id, name").order("name", { ascending: true }),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
   ]);
 
   return (
@@ -174,12 +178,20 @@ export default async function JobsPage({
             reports: j.reports,
             invoices: j.invoices,
           });
+          const hasIssuedInvoice = (j.invoices ?? []).some(
+            (i) =>
+              i.status !== "cancelled" &&
+              (i.issued_at !== null ||
+                ["issued", "partially_paid", "partly_paid", "paid"].includes(
+                  i.status,
+                )),
+          );
           return (
-            <li key={j.id}>
-              <Link
-                href={`/jobs/${j.id}`}
-                className="block px-4 py-3 hover:bg-side"
-              >
+            <li
+              key={j.id}
+              className="flex flex-col justify-between px-4 py-3 hover:bg-side sm:flex-row sm:items-center"
+            >
+              <Link href={`/jobs/${j.id}`} className="block flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-sm font-semibold">
                     {j.job_no}
@@ -201,6 +213,33 @@ export default async function JobsPage({
                     .join(" · ")}
                 </div>
               </Link>
+              {canDelete && (
+                <details className="mt-2 text-xs sm:mt-0">
+                  <summary className="cursor-pointer font-medium text-bad hover:underline">
+                    Delete…
+                  </summary>
+                  <form
+                    action={deleteJob.bind(null, j.id)}
+                    className="mt-1.5 flex items-center gap-2 rounded border border-line bg-surface-2 p-2"
+                  >
+                    {hasIssuedInvoice ? (
+                      <span className="text-xs text-bad">
+                        Issued invoice exists (cancel by credit note first)
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-xs text-ink-2">Recycle bin?</span>
+                        <button
+                          type="submit"
+                          className="rounded border border-bad bg-bad/10 px-2 py-0.5 text-xs font-semibold text-bad hover:bg-bad/20"
+                        >
+                          Confirm delete
+                        </button>
+                      </>
+                    )}
+                  </form>
+                </details>
+              )}
             </li>
           );
         })}

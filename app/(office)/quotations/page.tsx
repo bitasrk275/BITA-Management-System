@@ -16,7 +16,9 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { Constants, type Enums } from "@/lib/db/types";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
 import { formatINR } from "../jobs/labels";
+import { deleteQuotation } from "./actions";
 import { formatDateIN, QUOTATION_STATUS_LABEL } from "./labels";
 import { calculateQuotationTotal, quotationFileName, quotationStatusDisplay } from "./upload";
 
@@ -33,10 +35,10 @@ const STATUS_TONE: Record<Enums<"quotation_status">, Tone> = {
 export default async function QuotationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; rate?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; rate?: string; deleted?: string }>;
 }) {
   const { q, status, rate } = await searchParams;
-  const { supabase } = await requireStaff();
+  const { supabase, person } = await requireStaff();
 
   let query = supabase
     .from("quotations")
@@ -69,7 +71,11 @@ export default async function QuotationsPage({
     itemQuery = itemQuery.or(`description.ilike.%${rateTerm}%,basis.ilike.%${rateTerm}%,notes.ilike.%${rateTerm}%`);
   }
 
-  const [{ data: quotations, error }, { data: pastItems }] = await Promise.all([query, itemQuery]);
+  const [{ data: quotations, error }, { data: pastItems }, canDelete] = await Promise.all([
+    query,
+    itemQuery,
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
+  ]);
 
   return (
     <>
@@ -197,7 +203,7 @@ export default async function QuotationsPage({
                 </>
               }
               action={
-                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center">
                   {qt.status === "accepted" && (
                     <ButtonLink
                       href={`/jobs/new?quotation=${qt.id}&customer=${qt.customer_id}${
@@ -211,6 +217,25 @@ export default async function QuotationsPage({
                   <ButtonLink href={`/quotations/${qt.id}`} variant="secondary" size="sm">
                     Open
                   </ButtonLink>
+                  {canDelete && (
+                    <details className="text-right text-xs">
+                      <summary className="cursor-pointer font-medium text-bad hover:underline">
+                        Delete…
+                      </summary>
+                      <form
+                        action={deleteQuotation.bind(null, qt.id)}
+                        className="mt-1 flex items-center justify-end gap-2 rounded border border-line bg-surface-2 p-1.5"
+                      >
+                        <span className="text-xs text-ink-2">Recycle bin?</span>
+                        <button
+                          type="submit"
+                          className="rounded border border-bad bg-bad/10 px-2 py-0.5 text-xs font-semibold text-bad hover:bg-bad/20"
+                        >
+                          Confirm
+                        </button>
+                      </form>
+                    </details>
+                  )}
                 </div>
               }
             />

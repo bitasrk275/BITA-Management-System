@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../../db/types";
+import type { Database, Enums } from "../../db/types";
+import { checkCanDelete } from "../settings/service";
 import {
   type CreateJobExpenseInput,
   type ExpenseKind,
@@ -294,8 +295,14 @@ export async function createJobExpense(
 
 export async function deleteJobExpense(
   supabase: SupabaseClient<Database>,
-  expenseId: string
+  expenseId: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ) {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) {
+    throw new Error(perm.error);
+  }
+
   const { error } = await supabase
     .from("job_expenses")
     .delete()

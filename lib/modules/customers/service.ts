@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Tables } from "../../db/types";
+import type { Database, Enums, Tables } from "../../db/types";
 import { restoreRecord, softDeleteRecord } from "../recycle-bin/service";
+import { checkCanDelete } from "../settings/service";
 import {
   sanitizeCustomerSearchTerm,
   type ContactInput,
@@ -128,7 +129,10 @@ export async function updateCustomerRecord(
 export async function deleteCustomerRecord(
   supabase: SupabaseClient<Database>,
   id: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) return perm;
   return softDeleteRecord(supabase, "customers", id);
 }
 
@@ -171,7 +175,10 @@ export async function updateCustomerContact(
 export async function deleteCustomerContact(
   supabase: SupabaseClient<Database>,
   contactId: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) return perm;
   const { error } = await supabase.from("customer_contacts").delete().eq("id", contactId);
   if (error) return { ok: false, error: error.message };
   return { ok: true };

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Enums } from "../../db/types";
 import { notifyTechnician } from "../../field/notify";
+import { checkCanDelete } from "../settings/service";
 import {
   type AssignJobInput,
   type CalendarAssignment,
@@ -652,8 +653,14 @@ export async function moveCalendarAssignment(
 
 export async function deleteCalendarAssignment(
   supabase: SupabaseClient<Database>,
-  assignmentId: string
+  assignmentId: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ) {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) {
+    throw new Error(perm.error);
+  }
+
   // Release equipment current_job_id if linked
   const { data: aeList } = await supabase
     .from("assignment_equipment")
@@ -707,8 +714,14 @@ export async function createLeaveDay(
 
 export async function deleteLeaveDay(
   supabase: SupabaseClient<Database>,
-  leaveDayId: string
+  leaveDayId: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ) {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) {
+    throw new Error(perm.error);
+  }
+
   const { error } = await supabase.from("leave_days").delete().eq("id", leaveDayId);
   if (error) {
     throw new Error("Failed to delete leave day: " + error.message);

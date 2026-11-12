@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Tables } from "../../db/types";
+import type { Database, Enums, Tables } from "../../db/types";
 import { computeLineAmount, type BuiltInvoiceLine } from "../../invoices";
 import { restoreRecord, softDeleteRecord } from "../recycle-bin/service";
+import { checkCanDelete } from "../settings/service";
 import type { PriceItemInput } from "./schema";
 
 export type PriceItemRow = Tables<"price_items">;
@@ -98,7 +99,10 @@ export async function updatePriceItem(
 export async function softDeletePriceItem(
   supabase: SupabaseClient<Database>,
   id: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) return perm;
   return softDeleteRecord(supabase, "price_items", id);
 }
 

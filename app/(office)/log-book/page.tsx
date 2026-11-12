@@ -31,6 +31,7 @@ import {
   todayIST,
 } from "@/lib/modules/log-book/schema";
 import { listLogBookOverview } from "@/lib/modules/log-book/service";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
 import { formatINR } from "../jobs/labels";
 import {
   addJobExpenseAction,
@@ -66,7 +67,7 @@ export default async function LogBookPage({
   const selectedJobId = params.job_id || undefined;
   const searchTerm = params.q || undefined;
 
-  const [overview, jobsRes, peopleRes] = await Promise.all([
+  const [overview, jobsRes, peopleRes, canDelete] = await Promise.all([
     listLogBookOverview(supabase, {
       month: selectedMonth,
       status: selectedStatus,
@@ -86,6 +87,7 @@ export default async function LogBookPage({
       .is("deleted_at", null)
       .eq("active", true)
       .order("full_name"),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
   ]);
 
   const jobs = jobsRes.data ?? [];
@@ -437,7 +439,7 @@ export default async function LogBookPage({
                         </div>
                       }
                       action={
-                        canWrite ? (
+                        canDelete ? (
                           <details className="relative">
                             <summary className="cursor-pointer list-none rounded border border-line px-2 py-1 text-xs text-bad hover:bg-bad/5">
                               Delete
