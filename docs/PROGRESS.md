@@ -33,6 +33,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | G10 – Client acceptance test script (`docs/UAT_GUIDE.md`) | Naveen | Done | PR 25, feature/naveen-uat-guide | 18-step UAT walkthrough for BITA management & office staff, feedback sheet, and deployment checklist |
 | G11 – Strip internal requirement codes from UI | Naveen | Done | feature/naveen-g11-remove-ui-codes | Removed internal codes (`R17`, `R20`, `P4a`, `A6`, etc.) from `.tsx` screens + added `tests/no-ui-requirement-codes.test.ts` guard |
 | G12 – UAT database kit (`demo.sql`, `uat-reset.sql`, `docs/UAT_SETUP.md`) | Naveen | Done | PR 34, feature/naveen-g12-uat-kit | Phase 2 UAT seed with non-fake customer guard, multi-state GSTINs (CGST/SGST & IGST), `uat-reset.sql`, `docs/UAT_SETUP.md`, and `tests/uat-seed-g12.test.ts` |
+| G14 – Release notes for BITA (`docs/RELEASE_NOTES.md`) | Naveen | Done | PR 35, feature/naveen-g14-release-notes | Plain-English summary of all 14 workflow steps, new post-7-Nov features, and excluded items with 6 Nov reasons |
 | Glossary | Krishna | Done | PR 15, docs/GLOSSARY.md | NDT & inspection glossary for BITA workflows |
 | Test data | Krishna | Done | PR 15, scripts/seed/ | Deterministic fake seed data (`npm run seed`) |
 | Client inputs tracker | Krishna | Done | PR 15, docs/CLIENT_INPUTS.md | Tracks BITA-supplied templates, HSN/SAC codes, and pending credentials |
