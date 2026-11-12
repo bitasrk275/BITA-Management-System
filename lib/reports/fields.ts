@@ -362,10 +362,24 @@ function hasReading(value: unknown): boolean {
  * Rows are checked individually: one complete technician/item cannot hide another incomplete row.
  * Measures such as zero are present; null, whitespace, booleans and objects are not readings.
  */
-export function missingFields(method: ReportMethodInput, readings: unknown): string[] {
+export function missingFields(
+  method: ReportMethodInput | string,
+  readings: unknown,
+  customFields?: readonly FieldDefinition[],
+): string[] {
   const values = record(readings);
   const missing: string[] = [];
-  for (const definition of fieldsForMethod(method)) {
+  let scalarFields: readonly FieldDefinition[] = [];
+  if (customFields) {
+    scalarFields = customFields;
+  } else {
+    try {
+      scalarFields = fieldsForMethod(method as ReportMethodInput);
+    } catch {
+      scalarFields = [];
+    }
+  }
+  for (const definition of scalarFields) {
     if (definition.required && (!Object.hasOwn(values, definition.key) || !hasReading(values[definition.key]))) missing.push(definition.key);
   }
   for (const group of REPEATING_GROUPS) {

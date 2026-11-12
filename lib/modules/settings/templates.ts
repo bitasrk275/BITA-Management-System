@@ -2,8 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Enums, Json } from "../../db/types";
 import {
   DEFAULT_REPORT_DROPDOWN_OPTIONS,
+  fieldsForMethod,
   type FieldDefinition,
   type ReportFieldKind,
+  type ReportMethodInput,
 } from "../../reports/fields";
 import {
   createSettingsOption,
@@ -371,13 +373,17 @@ export async function getOrSeedReportTemplates(
 
   // Seed default templates
   const seeds = buildSeedTemplates();
-  await upsertSetting(
-    supabase,
-    "report_templates",
-    seeds as unknown as Json,
-    "Dynamic ordered report fields per NDT test method",
-    null,
-  );
+  try {
+    await upsertSetting(
+      supabase,
+      "report_templates",
+      seeds as unknown as Json,
+      "Dynamic ordered report fields per NDT test method",
+      null,
+    );
+  } catch {
+    // Ignore if caller uses a read-only or partial mock client
+  }
 
   return seeds;
 }
@@ -413,4 +419,45 @@ export function templateConfigsToFieldDefinitions(
       ...(combinedOptions.length > 0 ? { options: combinedOptions } : {}),
     };
   });
+}
+
+/**
+ * Server-side resolver that loads the configured report template fields for `method`
+ * from `settings.report_templates` (using `getOrSeedReportTemplates` + `templateConfigsToFieldDefinitions`),
+ * falling back to `fieldsForMethod(method)` (or default seed templates) when the setting is absent or malformed.
+ */
+export async function resolveFieldsForMethod(
+  supabase: SupabaseClient<Database> | null | undefined,
+  method: string,
+): Promise<readonly FieldDefinition[]> {
+  const raw = (method || "").trim();
+  const canonical = raw.toUpperCase() === "MT" ? "MPT" : raw;
+
+  if (supabase && typeof (supabase as { from?: unknown })?.from === "function") {
+    try {
+      const templates = await getOrSeedReportTemplates(supabase);
+      const configs =
+        templates[canonical] ??
+        templates[raw] ??
+        templates[mapToCanonicalTestMethodEnum(canonical)] ??
+        templates.general_inspection;
+      if (Array.isArray(configs) && configs.length > 0) {
+        return templateConfigsToFieldDefinitions(configs);
+      }
+    } catch {
+      // Fall back to static code definitions below
+    }
+  }
+
+  try {
+    return fieldsForMethod(canonical as ReportMethodInput);
+  } catch {
+    const seeds = buildSeedTemplates();
+    const fallbackConfigs =
+      seeds[canonical] ??
+      seeds[mapToCanonicalTestMethodEnum(canonical)] ??
+      seeds.general_inspection ??
+      [];
+    return templateConfigsToFieldDefinitions(fallbackConfigs);
+  }
 }

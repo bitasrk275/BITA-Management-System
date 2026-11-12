@@ -20,6 +20,7 @@ import {
   loadActiveInvoiceReportMap,
 } from "../invoices/service";
 import { evaluateAndAutoCloseJob } from "../jobs/service";
+import { resolveFieldsForMethod } from "../settings/templates";
 import type { ApproveReportInput } from "./schema";
 
 export type ReportRow = Tables<"reports">;
@@ -205,7 +206,7 @@ export async function approveReportRecord(
     return { data: null, error: "This report is not waiting for approval." };
   }
 
-  const [inspectionRes, jobRes, bookedEquipment] = await Promise.all([
+  const [inspectionRes, jobRes, bookedEquipment, customFields] = await Promise.all([
     report.inspection_id
       ? supabase
           .from("inspections")
@@ -219,6 +220,7 @@ export async function approveReportRecord(
       .eq("id", report.job_id)
       .maybeSingle(),
     loadBookedJobEquipmentForReport(supabase, report.job_id),
+    resolveFieldsForMethod(supabase, report.method),
   ]);
 
   const inspection = inspectionRes.data;
@@ -227,7 +229,12 @@ export async function approveReportRecord(
     extractReadings(report.content, inspection?.readings),
     bookedEquipment,
   );
-  const readiness = checkReportReadiness(report.method, inspection, readings);
+  const readiness = checkReportReadiness(
+    report.method,
+    inspection,
+    readings,
+    customFields,
+  );
   if (!readiness.ready) {
     return { data: null, error: readiness.blockers.join(" ") };
   }
@@ -279,6 +286,7 @@ export async function approveReportRecord(
       readings,
       letterhead: assets.letterhead,
       approval: assets.approval,
+      customFields,
     });
 
     const storageClient = getServiceClient() ?? supabase;
@@ -523,7 +531,7 @@ export async function generateReportPdfDownload(
     }
   }
 
-  const [inspectionRes, jobRes, attachmentsRes] = await Promise.all([
+  const [inspectionRes, jobRes, attachmentsRes, customFields] = await Promise.all([
     report.inspection_id
       ? supabase
           .from("inspections")
@@ -542,6 +550,7 @@ export async function generateReportPdfDownload(
       .eq("job_id", report.job_id)
       .eq("include_in_report", true)
       .order("uploaded_at", { ascending: true }),
+    resolveFieldsForMethod(supabase, report.method),
   ]);
 
   const readings = extractReadings(report.content, inspectionRes.data?.readings);
@@ -563,6 +572,7 @@ export async function generateReportPdfDownload(
     readings,
     letterhead: assets.letterhead,
     approval: assets.approval,
+    customFields,
     attachments: attachments.map((a) => ({
       kind: a.kind,
       caption: a.caption,
@@ -602,7 +612,7 @@ export async function generateReportDocxDownload(
     };
   }
 
-  const [inspectionRes, attachmentsRes] = await Promise.all([
+  const [inspectionRes, attachmentsRes, customFields] = await Promise.all([
     report.inspection_id
       ? supabase
           .from("inspections")
@@ -616,6 +626,7 @@ export async function generateReportDocxDownload(
       .eq("job_id", report.job_id)
       .eq("include_in_report", true)
       .order("uploaded_at", { ascending: true }),
+    resolveFieldsForMethod(supabase, report.method),
   ]);
 
   const isApproved =
@@ -644,7 +655,7 @@ export async function generateReportDocxDownload(
     })),
   };
 
-  const docxBytes = await generateReportDocxBytes(report.method, doc);
+  const docxBytes = await generateReportDocxBytes(report.method, doc, customFields);
   const safeFileName =
     report.report_no.replace(/[^A-Za-z0-9._-]+/g, "-") + ".docx";
 

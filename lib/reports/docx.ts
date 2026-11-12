@@ -14,6 +14,7 @@ import {
 } from "docx";
 import {
   reportMethod,
+  type FieldDefinition,
   type ReadingValue,
   type ReportMethod,
   type ReportMethodInput,
@@ -137,13 +138,73 @@ export type ReportDocxSpec = {
   footerNotes: readonly string[];
 };
 
+const BUILTIN_LAYOUT_KEYS: Record<ReportMethod, ReadonlySet<string>> = {
+  UT: new Set([
+    "client",
+    "project",
+    "inspection_site",
+    "inspection_date",
+    "component_header_id",
+    "equipment",
+    "equipment_serial",
+    "equipment_calibration",
+    "probes",
+    "reference_blocks",
+    "calibration_method",
+    "screen_range",
+    "sensitivity",
+    "scanning_level",
+    "couplant",
+    "surface_condition",
+    "standard",
+    "acceptance_criteria",
+  ]),
+  MPT: new Set([
+    "client",
+    "project",
+    "inspection_site",
+    "inspection_date",
+    "component_header_id",
+    "equipment",
+    "equipment_serial",
+    "equipment_calibration",
+    "magnetic_medium",
+    "standard",
+    "magnetisation_method",
+    "current",
+    "visible_light_intensity",
+    "black_light",
+    "black_light_intensity",
+    "test_block",
+    "yoke_lifting_capacity",
+  ]),
+  DPT: new Set([
+    "client",
+    "project",
+    "inspection_site",
+    "inspection_date",
+    "component_header_id",
+    "component_description",
+    "cleaner",
+    "cleaner_batch",
+    "penetrant",
+    "penetrant_batch",
+    "developer",
+    "developer_batch",
+    "standard",
+    "dwell_time",
+    "developing_time",
+  ]),
+};
+
 /**
  * Builds the deterministic BITA Word (.docx) report structure matching `templates/reports/report.tsx`
  * and `templates/reports/layouts.ts` in field order, grid column widths (twips), and cell spans.
  */
 export function buildReportDocxSpec(
   methodInput: ReportMethodInput,
-  document: ReportDocument
+  document: ReportDocument,
+  customFields?: readonly FieldDefinition[],
 ): ReportDocxSpec {
   const method = reportMethod(methodInput);
   const layout = REPORT_LAYOUTS[method];
@@ -151,7 +212,7 @@ export function buildReportDocxSpec(
   const rawTechs = r.technicians?.length ? r.technicians : [{}];
   const rawItems = r.items?.length ? r.items : [{}];
 
-  const detailPairs: ReportDocxDetailPair[] =
+  const baseDetailPairs: ReportDocxDetailPair[] =
     method === "UT"
       ? [
           {
@@ -222,6 +283,30 @@ export function buildReportDocxSpec(
             },
           ]
         : [];
+
+  const extraFields = (customFields ?? []).filter(
+    (f) => !BUILTIN_LAYOUT_KEYS[method].has(f.key),
+  );
+  const extraPairs: ReportDocxDetailPair[] = [];
+  for (let i = 0; i < extraFields.length; i += 2) {
+    const left = extraFields[i]!;
+    const right = extraFields[i + 1];
+    const leftRaw = (r as Record<string, ReadingValue | undefined>)[left.key];
+    const rightRaw = right
+      ? (r as Record<string, ReadingValue | undefined>)[right.key]
+      : undefined;
+    extraPairs.push({
+      leftLabel: left.label,
+      leftValue: left.input === "date" ? formatDate(leftRaw) : formatValue(leftRaw),
+      rightLabel: right ? right.label : "",
+      rightValue: right
+        ? right.input === "date"
+          ? formatDate(rightRaw)
+          : formatValue(rightRaw)
+        : "",
+    });
+  }
+  const detailPairs: ReportDocxDetailPair[] = [...baseDetailPairs, ...extraPairs];
 
   const dptDetails =
     method === "DPT"
@@ -383,9 +468,10 @@ function makeCell(
  */
 export async function generateReportDocxBytes(
   methodInput: ReportMethodInput,
-  document: ReportDocument
+  document: ReportDocument,
+  customFields?: readonly FieldDefinition[],
 ): Promise<Uint8Array> {
-  const spec = buildReportDocxSpec(methodInput, document);
+  const spec = buildReportDocxSpec(methodInput, document, customFields);
   const layout = REPORT_LAYOUTS[spec.method];
   const totalCols = spec.columns.length;
   const totalWidthTwips = spec.columns.reduce((sum, w) => sum + w, 0);

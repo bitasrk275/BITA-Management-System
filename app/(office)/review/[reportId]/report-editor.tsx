@@ -120,6 +120,7 @@ export function ReportEditor({
   isApproved,
   defaultOpen = false,
   action,
+  fields,
 }: {
   method: ReportMethod;
   reportDate: string;
@@ -127,9 +128,10 @@ export function ReportEditor({
   isApproved: boolean;
   defaultOpen?: boolean;
   action: (fd: FormData) => Promise<void>;
+  fields?: readonly FieldDefinition[];
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const scalarDefinitions = fieldsForMethod(method) as readonly ExtendedFieldDefinition[];
+  const scalarDefinitions = (fields ?? fieldsForMethod(method)) as readonly ExtendedFieldDefinition[];
   const techGroup = REPEATING_GROUPS[0];
   const itemGroup = REPEATING_GROUPS[1];
 

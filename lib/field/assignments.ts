@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Enums, Json } from "../db/types";
 import { missingFields, reportMethod, type ReportMethodInput } from "../reports/fields";
-import { mapToCanonicalTestMethodEnum } from "../modules/settings/templates";
+import { mapToCanonicalTestMethodEnum, resolveFieldsForMethod } from "../modules/settings/templates";
 
 export const MAX_PHOTO_BYTES = 6 * 1024 * 1024; // 6 MB limit per contract
 
@@ -344,17 +344,17 @@ export async function submitInspectionReport(
   }
 
   let canonicalMethod: Enums<"test_method">;
-  let isLegacyMethod = true;
   try {
     canonicalMethod = reportMethod(params.method);
   } catch {
     canonicalMethod = mapToCanonicalTestMethodEnum(String(params.method ?? ""));
-    isLegacyMethod = false;
   }
 
-  const missing = isLegacyMethod
-    ? missingFields(params.method, params.readings)
-    : [];
+  const resolvedFields = await resolveFieldsForMethod(
+    supabase,
+    String(params.method ?? canonicalMethod),
+  );
+  const missing = missingFields(params.method, params.readings, resolvedFields);
   const isDraft = params.draft !== false;
   const canFinalize = !isDraft && missing.length === 0;
   const now = new Date().toISOString();

@@ -1,3 +1,4 @@
+import { inflateRawSync } from "node:zlib";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/types";
@@ -10,6 +11,7 @@ import {
   mapToCanonicalTestMethodEnum,
   normalizeReportTemplates,
   parseTestMethodValue,
+  resolveFieldsForMethod,
   templateConfigsToFieldDefinitions,
   type ReportTemplatesMap,
   type TemplateFieldConfig,
@@ -19,6 +21,42 @@ import { GET as getReportTemplateRoute } from "@/app/api/field/report-template/[
 import * as fieldAuth from "@/lib/field/auth";
 import * as fieldService from "@/lib/field/service";
 import { submitInspectionReport } from "@/lib/field/assignments";
+import { buildReportDocxSpec, generateReportDocxBytes } from "@/lib/reports/docx";
+import {
+  DEFAULT_DEV_LETTERHEAD,
+  checkReportReadiness,
+  generateReportPdfBytes,
+  parseEditedReportReadings,
+} from "@/lib/reports/review";
+import type { ReportDocument } from "@/templates/reports/types";
+
+function extractZipTextEntries(zipBytes: Uint8Array): Record<string, string> {
+  const buf = Buffer.from(zipBytes);
+  const entries: Record<string, string> = {};
+  let offset = 0;
+
+  while (offset + 30 <= buf.length) {
+    const sig = buf.readUInt32LE(offset);
+    if (sig !== 0x04034b50) break;
+    const compressionMethod = buf.readUInt16LE(offset + 8);
+    const compressedSize = buf.readUInt16LE(offset + 18);
+    const fileNameLen = buf.readUInt16LE(offset + 26);
+    const extraLen = buf.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + fileNameLen + extraLen;
+    const name = buf.subarray(nameStart, nameStart + fileNameLen).toString("utf8");
+    const compressed = buf.subarray(dataStart, dataStart + compressedSize);
+
+    if (compressionMethod === 0) {
+      entries[name] = compressed.toString("utf8");
+    } else if (compressionMethod === 8 && compressedSize > 0) {
+      entries[name] = inflateRawSync(compressed).toString("utf8");
+    }
+    offset = dataStart + compressedSize;
+  }
+
+  return entries;
+}
 
 describe("G8: Settings: Test methods and report templates", () => {
   describe("parseTestMethodValue", () => {
@@ -532,6 +570,220 @@ describe("G8: Settings: Test methods and report templates", () => {
       expect(res).toHaveProperty("ok", true);
       expect(holder.inspection).not.toBeNull();
       expect(holder.inspection?.method).toBe("general_inspection");
+    });
+
+    it("G8b: adding a required field to the stored UT template flags it as missing on submit and renders it in Word (.docx) and PDF", async () => {
+      const baseTemplates = buildSeedTemplates();
+      const customUtTemplates: ReportTemplatesMap = {
+        ...baseTemplates,
+        UT: [
+          ...baseTemplates.UT,
+          {
+            key: "component_surface_temp",
+            label: "Component surface temperature",
+            kind: "typed",
+            input: "text",
+            required: true,
+          },
+        ],
+      };
+
+      const mockSupabase = {
+        from: vi.fn((table: string) => {
+          if (table === "settings") {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { key: "report_templates", value: customUtTemplates },
+                error: null,
+              }),
+            };
+          }
+          if (table === "assignments") {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: {
+                  id: "assign-ut-1",
+                  job_id: "job-ut-1",
+                  person_id: "tech-1",
+                  work_date: "2026-11-12",
+                  acknowledged_at: "2026-11-12T08:00:00Z",
+                  started_at: "2026-11-12T08:30:00Z",
+                  completed_at: null,
+                },
+                error: null,
+              }),
+              update: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null }),
+              }),
+            };
+          }
+          if (table === "inspections") {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              insert: vi.fn().mockImplementation((payload: Record<string, unknown>) => ({
+                select: vi.fn().mockReturnThis(),
+                single: vi.fn().mockResolvedValue({
+                  data: { id: "insp-ut-1", ...payload },
+                  error: null,
+                }),
+              })),
+            };
+          }
+          if (table === "jobs") {
+            return {
+              update: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  in: vi.fn().mockResolvedValue({ error: null }),
+                }),
+              }),
+            };
+          }
+          return { select: vi.fn() };
+        }),
+      } as unknown as SupabaseClient<Database>;
+
+      const completeBaseReadings = {
+        client: "Apex Fake Forgings Ltd",
+        project: "Main Shaft Batch",
+        inspection_site: "Peenya Stage II",
+        inspection_date: "2026-11-12",
+        equipment: "GE USM 36S",
+        equipment_serial: "FAKE-UT-99",
+        equipment_calibration: "Valid Upto 2027-05-01",
+        probes: "Ø24x2MHz Normal Probe B2S",
+        reference_blocks: "IIW V1 & V2",
+        calibration_method: "DAC",
+        screen_range: "0 - 250 mm",
+        sensitivity: "DAC + 6 dB",
+        scanning_level: "+6 dB",
+        couplant: "Oil",
+        surface_condition: "Proof Machined",
+        standard: "ASTM A388",
+        acceptance_criteria: "Class 1",
+        technicians: [
+          {
+            name: "Demo Tech",
+            qualification: "UT Level II",
+            certificate_no: "ISNT-FAKE-01",
+            issued_on: "2024-01-01",
+            valid_until: "2029-01-01",
+          },
+        ],
+        items: [
+          {
+            description: "Proof Machined Shaft Forging",
+            quantity: 1,
+            observations: "No recordable indications observed.",
+          },
+        ],
+      };
+
+      // 1. Resolve stored UT fields via resolveFieldsForMethod
+      const resolvedUtFields = await resolveFieldsForMethod(mockSupabase, "UT");
+      expect(resolvedUtFields.some((f) => f.key === "component_surface_temp" && f.required)).toBe(true);
+
+      // 2. Submit without the newly added required field -> flagged in missingFields
+      const submitMissingRes = await submitInspectionReport(
+        mockSupabase,
+        "assign-ut-1",
+        "tech-1",
+        {
+          method: "UT",
+          readings: completeBaseReadings,
+          draft: false,
+        },
+      );
+      expect(submitMissingRes).toHaveProperty("ok", true);
+      if ("ok" in submitMissingRes) {
+        expect(submitMissingRes.missingFields).toContain("component_surface_temp");
+        expect(submitMissingRes.submittedAt).toBeNull();
+      }
+
+      // Check readiness also flags the missing custom field
+      const readinessBefore = checkReportReadiness(
+        "UT",
+        { submitted_at: "2026-11-12T09:00:00Z", missing_fields: [], readings: completeBaseReadings },
+        completeBaseReadings,
+        resolvedUtFields,
+      );
+      expect(readinessBefore.ready).toBe(false);
+      expect(readinessBefore.missing).toContain("component_surface_temp");
+
+      // 3. Provide the new field value -> submit succeeds with 0 missing fields
+      const readingsWithCustomField = {
+        ...completeBaseReadings,
+        component_surface_temp: "32 deg C (Verified)",
+      };
+      const submitCompleteRes = await submitInspectionReport(
+        mockSupabase,
+        "assign-ut-1",
+        "tech-1",
+        {
+          method: "UT",
+          readings: readingsWithCustomField,
+          draft: false,
+        },
+      );
+      expect(submitCompleteRes).toHaveProperty("ok", true);
+      if ("ok" in submitCompleteRes) {
+        expect(submitCompleteRes.missingFields).toEqual([]);
+        expect(submitCompleteRes.submittedAt).not.toBeNull();
+      }
+
+      // 4. Render Word (.docx) and PDF -> the new field label and value appear in both!
+      const reportDoc: ReportDocument = {
+        reportNumber: "BITA/26-27/UT-G8B",
+        reportDate: "2026-11-12",
+        letterhead: DEFAULT_DEV_LETTERHEAD,
+        readings: readingsWithCustomField,
+        approval: { approved: false },
+      };
+
+      const docxSpec = buildReportDocxSpec("UT", reportDoc, resolvedUtFields);
+      expect(
+        docxSpec.detailPairs.some(
+          (p) =>
+            p.leftLabel === "Component surface temperature" &&
+            p.leftValue === "32 deg C (Verified)",
+        ),
+      ).toBe(true);
+
+      const docxBytes = await generateReportDocxBytes("UT", reportDoc, resolvedUtFields);
+      const docxXml = extractZipTextEntries(docxBytes)["word/document.xml"] ?? "";
+      expect(docxXml).toContain("Component surface temperature");
+      expect(docxXml).toContain("32 deg C (Verified)");
+
+      const pdfBytes = generateReportPdfBytes({
+        reportNo: "BITA/26-27/UT-G8B",
+        reportDate: "2026-11-12",
+        method: "UT",
+        jobNo: "BITA/26-27/0150",
+        customerName: "Apex Fake Forgings Ltd",
+        readings: readingsWithCustomField,
+        approval: { approved: false },
+        customFields: resolvedUtFields,
+      });
+      const pdfText = Buffer.from(pdfBytes).toString("utf8");
+      expect(pdfText).toContain("Component surface temperature: 32 deg C \\(Verified\\)");
+
+      // 5. Verify office report editor parser preserves the custom field
+      const editFd = new FormData();
+      editFd.set("reading_component_surface_temp", "34 deg C (Updated)");
+      const edited = parseEditedReportReadings(
+        "UT",
+        editFd,
+        readingsWithCustomField,
+        resolvedUtFields,
+      );
+      expect((edited as Record<string, unknown>).component_surface_temp).toBe(
+        "34 deg C (Updated)",
+      );
     });
   });
 });

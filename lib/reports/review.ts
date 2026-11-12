@@ -3,6 +3,7 @@ import {
   fieldsForMethod,
   missingFields,
   REPEATING_GROUPS,
+  type FieldDefinition,
   type ItemReadings,
   type ReportMethod,
   type ReportReadings,
@@ -127,9 +128,14 @@ export function buildReportContent(
 export function checkReportReadiness(
   method: Enums<"test_method">,
   inspection: Pick<InspectionRow, "submitted_at" | "missing_fields" | "readings"> | null,
-  readings: ReportReadings
+  readings: ReportReadings,
+  customFields?: readonly FieldDefinition[],
 ): { missing: string[]; blockers: string[]; ready: boolean } {
-  const computedMissing = supportedMethod(method) ? missingFields(method, readings) : [];
+  const computedMissing = customFields
+    ? missingFields(method, readings, customFields)
+    : supportedMethod(method)
+      ? missingFields(method, readings)
+      : [];
   const dbMissing = inspection?.missing_fields ?? [];
   const missing = [...new Set([...dbMissing, ...computedMissing])];
 
@@ -235,6 +241,7 @@ export function generateReportPdfBytes(input: {
   readings: ReportReadings;
   letterhead?: ReportLetterhead;
   approval: ReportApproval;
+  customFields?: readonly FieldDefinition[];
   attachments?: ReadonlyArray<{
     kind: string;
     caption?: string | null;
@@ -274,9 +281,13 @@ export function generateReportPdfBytes(input: {
   lines.push(`JOB ID:    ${input.jobNo}    CUSTOMER: ${input.customerName}`);
   lines.push("--------------------------------------------------------------------------------");
 
-  if (supportedMethod(input.method)) {
-    for (const f of fieldsForMethod(input.method)) {
-      const val = r[f.key as keyof ReportReadings];
+  const fieldList =
+    input.customFields ??
+    (supportedMethod(input.method) ? fieldsForMethod(input.method) : null);
+
+  if (fieldList && fieldList.length > 0) {
+    for (const f of fieldList) {
+      const val = (r as Record<string, unknown>)[f.key];
       const str = val === null || val === undefined || String(val).trim() === "" ? "-" : String(val);
       lines.push(`${f.label.padEnd(28, " ")}: ${str}`);
     }
@@ -389,23 +400,27 @@ export function generateSignedReportPdfBytes(input: {
   readings: ReportReadings;
   letterhead?: ReportLetterhead;
   approval: Extract<ReportApproval, { approved: true }>;
+  customFields?: readonly FieldDefinition[];
 }): Uint8Array {
   return generateReportPdfBytes(input);
 }
 
 /**
  * Parses admin edits from the `/review/[reportId]` Edit report form into a clean `ReportReadings` object,
- * driven dynamically by `fieldsForMethod(method)` and `REPEATING_GROUPS` in `lib/reports/fields.ts`.
+ * driven dynamically by `customFields` or `fieldsForMethod(method)` and `REPEATING_GROUPS`.
  */
 export function parseEditedReportReadings(
   method: Enums<"test_method">,
   fd: FormData,
-  baseReadings: ReportReadings = {}
+  baseReadings: ReportReadings = {},
+  customFields?: readonly FieldDefinition[],
 ): ReportReadings {
   const result: Record<string, unknown> = { ...(baseReadings as Record<string, unknown>) };
 
-  if (supportedMethod(method)) {
-    for (const def of fieldsForMethod(method)) {
+  const scalarDefs =
+    customFields ?? (supportedMethod(method) ? fieldsForMethod(method) : []);
+  if (scalarDefs.length > 0) {
+    for (const def of scalarDefs) {
       const rawVal = fd.get(`reading_${def.key}`);
       const otherVal = fd.get(`reading_${def.key}__other`);
       const chosenRaw =

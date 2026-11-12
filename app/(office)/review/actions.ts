@@ -14,6 +14,7 @@ import {
   returnReportRecord,
 } from "@/lib/modules/reports/service";
 import { missingFields } from "@/lib/reports/fields";
+import { resolveFieldsForMethod } from "@/lib/modules/settings/templates";
 import {
   buildReportContent,
   checkReportReadiness,
@@ -22,7 +23,6 @@ import {
   parseEditedReportReadings,
   prefillReadingsFromBookedEquipment,
   reportPdfStoragePath,
-  supportedMethod,
   validUuid,
 } from "@/lib/reports/review";
 
@@ -88,12 +88,15 @@ export async function prepareReport(fd: FormData) {
     redirectError("/review", err instanceof Error ? err.message : "Invalid report number.");
   }
 
-  const bookedEquipment = await loadBookedJobEquipment(supabase, inspection.job_id);
+  const [bookedEquipment, methodFields] = await Promise.all([
+    loadBookedJobEquipment(supabase, inspection.job_id),
+    resolveFieldsForMethod(supabase, inspection.method),
+  ]);
   const readings = prefillReadingsFromBookedEquipment(
     extractReadings(inspection.readings),
     bookedEquipment
   );
-  const readiness = checkReportReadiness(inspection.method, inspection, readings);
+  const readiness = checkReportReadiness(inspection.method, inspection, readings, methodFields);
   if (!readiness.ready) {
     redirectError("/review", readiness.blockers.join(" "));
   }
@@ -154,12 +157,15 @@ export async function refreshReportFromInspection(reportId: string) {
     redirectError(path, "The linked field inspection could not be loaded.");
   }
 
-  const bookedEquipment = await loadBookedJobEquipment(supabase, report.job_id);
+  const [bookedEquipment, methodFields] = await Promise.all([
+    loadBookedJobEquipment(supabase, report.job_id),
+    resolveFieldsForMethod(supabase, report.method),
+  ]);
   const readings = prefillReadingsFromBookedEquipment(
     extractReadings(inspection.readings),
     bookedEquipment
   );
-  const readiness = checkReportReadiness(report.method, inspection, readings);
+  const readiness = checkReportReadiness(report.method, inspection, readings, methodFields);
   if (!readiness.ready) {
     redirectError(path, readiness.blockers.join(" "));
   }
@@ -207,8 +213,9 @@ export async function updateReportContent(reportId: string, fd: FormData) {
         .maybeSingle()
     : { data: null };
 
+  const methodFields = await resolveFieldsForMethod(supabase, report.method);
   const currentReadings = extractReadings(report.content, inspection?.readings);
-  const editedReadings = parseEditedReportReadings(report.method, fd, currentReadings);
+  const editedReadings = parseEditedReportReadings(report.method, fd, currentReadings, methodFields);
   const reportDateRaw = text(fd, "report_date");
   const reportDate =
     reportDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(reportDateRaw)
@@ -230,8 +237,8 @@ export async function updateReportContent(reportId: string, fd: FormData) {
 
   const updatedContent = buildReportContent(editedReadings, observations, submittedAt);
 
-  if (report.inspection_id && supportedMethod(report.method)) {
-    const newMissing = missingFields(report.method, editedReadings);
+  if (report.inspection_id) {
+    const newMissing = missingFields(report.method, editedReadings, methodFields);
     const syncClient = getServiceClient() ?? supabase;
     await syncClient
       .from("inspections")
@@ -274,8 +281,9 @@ export async function sendReportForReview(reportId: string) {
     ? await supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
     : { data: null };
 
+  const methodFields = await resolveFieldsForMethod(supabase, report.method);
   const readings = extractReadings(report.content, inspection?.readings);
-  const readiness = checkReportReadiness(report.method, inspection, readings);
+  const readiness = checkReportReadiness(report.method, inspection, readings, methodFields);
   if (!readiness.ready) {
     redirectError(path, readiness.blockers.join(" "));
   }

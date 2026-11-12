@@ -20,11 +20,11 @@ import {
 import { requireStaff } from "@/lib/auth";
 import { shortDate } from "@/lib/dates";
 import {
-  fieldsForMethod,
   REPEATING_GROUPS,
   type ItemReadings,
   type TechnicianReadings,
 } from "@/lib/reports/fields";
+import { resolveFieldsForMethod } from "@/lib/modules/settings/templates";
 import { loadReportApprovalAssets } from "@/lib/reports/branding.server";
 import {
   type BookedJobEquipmentItem,
@@ -89,7 +89,7 @@ export default async function ReportReviewPage({
 
   if (!report) notFound();
 
-  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes, activeInvoiceMap, bookedAssignmentsRes] =
+  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes, activeInvoiceMap, bookedAssignmentsRes, methodFields] =
     await Promise.all([
       report.inspection_id
         ? supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
@@ -130,6 +130,7 @@ export default async function ReportReviewPage({
         `)
         .eq("job_id", report.job_id)
         .order("work_date", { ascending: true }),
+      resolveFieldsForMethod(supabase, report.method),
     ]);
 
   const inspection = inspectionRes.data;
@@ -179,7 +180,7 @@ export default async function ReportReviewPage({
     extractReadings(report.content, inspection?.readings),
     bookedEquipment
   );
-  const readiness = checkReportReadiness(report.method, inspection, readings);
+  const readiness = checkReportReadiness(report.method, inspection, readings, methodFields);
   const isApproved = (report.status === "approved" || report.status === "sent") && !!report.approved_at;
   const isReviewer = person.roles.includes("reviewer");
   const canBill = person.roles.some((r) => r === "management" || r === "office");
@@ -533,6 +534,7 @@ export default async function ReportReviewPage({
             isApproved={isApproved}
             defaultOpen={edit === "1"}
             action={updateReportContent.bind(null, report.id)}
+            fields={methodFields}
           />
         )}
 
@@ -605,9 +607,9 @@ export default async function ReportReviewPage({
       <div className="report-preview-controls mt-8 space-y-6">
         <SectionTitle>Field readings & mandatory check</SectionTitle>
 
-        {supportedMethod(report.method) && (
+        {methodFields.length > 0 && (
           <List>
-            {fieldsForMethod(report.method).map((f) => {
+            {methodFields.map((f) => {
               const isMissing = readiness.missing.includes(f.key);
               const val = readings[f.key as keyof typeof readings];
               return (
