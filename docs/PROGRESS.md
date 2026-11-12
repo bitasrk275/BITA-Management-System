@@ -7,26 +7,37 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 
 | Area | Owner | Status | Branch / PR | Notes |
 | --- | --- | --- | --- | --- |
-| Repo, schema, roles, security | Naveen | In review | feature/naveen-p1-foundation | Phase 2 Foundation (P1): modules + /api/v1, soft delete + recycle bin, settings & settings_options tables, docs/ARCHITECTURE.md |
-| Email intake + AI extraction | Naveen | Not started | | |
-| Customer and enquiry screens | Naveen | In review | feature/naveen-login-customers-enquiries | Login, customers with contacts, enquiries with customer link |
-| Jobs, quotations, POs, scheduling | Naveen | In review | PR 20, feature/naveen-calendar | Phase 2 A3: Interactive Calendar (/calendar week/month view), multi-day assignments (assignments.end_date), equipment conflict detection (check_equipment_conflict), technician leave days (leave_days), REST API v1 |
-| Technician field form | Naveen | Done | feature/naveen-retire-field-web | Web routes retired for Android APK (D-016); /technician notice; Expo app in apps/technician |
-| Report templates + approval + PDF | Naveen | In review | feature/naveen-report-templates | T8a fields/templates/staff preview ready; T8 review/approval/PDF persistence is separate |
-| AI report drafting | Naveen | Not started | | |
-| Zoho Books integration | Naveen | Not started | | Needs Zoho admin access |
-| Payments, reminders, job closure | Naveen | In review | feature/naveen-p4c-credit-notes-tds | Phase 2 P4c: Credit notes (`BITA/YY-YY/CN-0001`) linked to issued tax invoices + TDS deducted on payments (`payments.tds_amount`) settling invoice balance |
-| Dashboard | Naveen | Not started | | |
-| WhatsApp intake + technician messages (R3, X1) | Naveen | Not started | | Needs BITA's WhatsApp Business number |
-| Financial reports from Zoho (X4) | Naveen | In review | feature/naveen-gst-export | T36 CA GST export (GSTR-1 B2B & B2C CSV + Excel XML workbook at /invoices/export) |
-| Submission checks + correction history view (X2, X3) | Naveen | Not started | | Database side done in setup PR |
-| Qualification + equipment registers (R19–R20, R29–R31) | Naveen | In review | PR 6, feature/naveen-registers | Registers and private certificate copies built; 44 tests, build, lint/typecheck and 375 px fixture checks pass |
-| Glossary | Krishna | Not started | | |
-| Test data | Krishna | Not started | | |
-| Client inputs tracker | Krishna | Not started | | See `docs/CLIENT_INPUTS.md` |
-| Excel import | Naveen | Not started | | Needs BITA lists |
-| Smoke tests | Naveen | In review | feature/naveen-field-db-tests | T42 Field API PGlite tests (tests/field-api.test.ts); T40 e2e flow |
-| User guide | Krishna | Not started | | |
+| Repo, schema, roles, security | Naveen | Done | PR 16, feature/naveen-p1-foundation | Phase 1 + Phase 2 Foundation (P1): RLS across all tables, modules + `/api/v1`, soft delete + recycle bin, `settings` & `settings_options`, `docs/ARCHITECTURE.md` |
+| Email intake + AI extraction | Naveen | Done | PR 14, PR 31, feature/naveen-g5-enquiry-ai | Inbound email webhook (`/api/enquiries/inbound`) + `/enquiries/new` AI email paste-to-fill assist (`extractEnquiry` + `matchCustomer`); live mailbox forwarding awaits BITA mailbox rule |
+| Customer and enquiry screens | Naveen | Done | PR 17, PR 31, feature/naveen-g5-enquiry-ai | Login, customers with contacts & soft-delete/restore, enquiries with customer link, AI email assist, and `/api/v1/{customers,enquiries}` |
+| Jobs, quotations, POs, scheduling | Naveen | Done | PR 20, PR 28, PR 30, feature/naveen-calendar | Quotations + rate card (`/price-items`), PO conversion, Jobs + register export (G3), Interactive Calendar (`/calendar` week/month view, multi-day assignments, equipment conflict check, leave days) |
+| Technician field form | Naveen | Done | PR 19, feature/naveen-retire-field-web | Standalone Android APK (`BITA-Technician.apk` in `apps/technician`) + browser/PWA companion at `/field-app` and `/technician` with 29-field UT datasheet |
+| Report templates + approval + PDF | Naveen | Done | PR 19, PR 27, feature/naveen-g2-api-v1 | 29-field BITA UT report + multi-method templates, technical reviewer approval with expired calibration guard, deterministic Word (`.docx`) and PDF downloads |
+| AI report drafting | Naveen | Done | PR 14, feature/naveen-ai-intake | `lib/ai/draft-report.ts` + reviewer draft action (`ANTHROPIC_API_KEY` optional; works cleanly with or without key) |
+| Zoho Books integration | Naveen | Done | PR 9, D-017, feature/naveen-in-house-invoicing | Replaced per D-017 by in-house GST invoicing (`/invoices`, proforma + tax invoice `5388+`, credit notes, TDS, CA GSTR-1 CSV/Excel export at `/invoices/export`) |
+| Payments, reminders, job closure | Naveen | Done | PR 18, PR 30, feature/naveen-g4-job-closure | Payments with TDS, credit notes (`BITA/YY-YY/CN-0001`), configurable payment/calibration reminders (`/api/reminders/run`), automatic + manual job closure/reopen with `audit_log` (G4) |
+| Dashboard | Naveen | Done | PR 19, feature/naveen-dashboard-v2 | Management & operations dashboard (`/dashboard`) with pipeline counts, overdue invoices, expiring qualifications/calibrations, and quick actions |
+| WhatsApp / Telegram notifications (R3, X1, P7) | Naveen | Done | PR 19, feature/naveen-telegram | Live `@bita_executive_bot` Telegram webhook + 6-digit pairing in Settings, `/status`, `/jobs`, `/invoices`, `/overdue`, `/reports`, `/equipment`, `/schedule`, natural-language Q&A; WhatsApp adapter ready pending BITA WABA number |
+| Financial reports & CA GST export (X4, G1) | Naveen | Done | PR 18, PR 26, feature/naveen-g1-finance | `/finance` management reports (receivables ageing, FY customer revenue, monthly income vs log-book expenses, monthly payments + TDS, open proformas + CSV exports) + `/invoices/export` GSTR-1 workbook |
+| Submission checks + correction history view (X2, X3) | Naveen | Done | PR 8, PR 27, feature/naveen-g2-api-v1 | Required-field checks before submission, reviewer return-for-correction with note, versioned `report_revisions` + `audit_log` timeline at `/review/[reportId]/history` |
+| Qualification + equipment + employee registers (R19–R20, R29–R31, A4, A5) | Naveen | Done | PR 6, PR 19, feature/naveen-registers | People, qualifications (`qualification_status`), equipment (`calibration_due` warnings + certificate storage), employee work/idle/leave register (`/employees`), and job expense log book (`/log-book`) |
+| G1 – Financial reports (`X4`, management only) | Naveen | Done | PR 26, feature/naveen-g1-finance | `lib/modules/finance/`, `/finance`, `/api/v1/finance/*`, `view_finance` permission, CSV formula-injection guard |
+| G2 – API v1 completeness (`client change 11`) | Naveen | Done | PR 27, feature/naveen-g2-api-v1 | Full `/api/v1/{enquiries,quotations,jobs,reports}` including report approve, return-to-technician, `.pdf` and `.docx` downloads; updated `docs/ARCHITECTURE.md` |
+| G3 – Jobs register export (`R17`) | Naveen | Done | PR 28, feature/naveen-g3-jobs-export | `/jobs/export` + `/api/v1/jobs/export` CSV & multi-sheet Excel XML register with FY, month, and customer filters |
+| G4 – Job closure (auto + manual) | Naveen | Done | PR 30, feature/naveen-g4-job-closure | Auto-close when all non-cancelled tax invoices are settled and all reports are sent; manual Close/Reopen for management with `audit_log` |
+| G5 – Enquiry AI assist | Naveen | Done | PR 31, feature/naveen-g5-enquiry-ai | Paste customer email -> Fill from email on `/enquiries/new` using `extractEnquiry` + `matchCustomer`; hidden when `ANTHROPIC_API_KEY` is unset |
+| G6 – Delete everywhere + permissions (`client change 14`) | Naveen | Done | PR 29, feature/naveen-delete-permissions | Soft delete + restore across enquiries, quotations, jobs, customers, employees, equipment, log-book, price-items, calendar, and settings options gated by `checkCanDelete` |
+| G7 – Real branding on reports and invoices | Naveen | In progress | feature/naveen-branding-uploads | Uploadable company logo, signatory stamp/signature in `/settings`, rendered in report and invoice HTML/PDF/DOCX |
+| G8 – Mobile APK from latest code | Naveen | In progress | feature/naveen-apk-refresh | Fresh technician APK build after Phase 2 + Gap Round changes |
+| G9 – Progress status board update | Naveen | Done | feature/naveen-g9-progress-docs | Rewrote `docs/PROGRESS.md` status board to reflect Phase 1, Phase 2, and Gap Round G1–G11 reality |
+| G10 – Client acceptance test script (`docs/UAT_GUIDE.md`) | Naveen | Done | PR 25, feature/naveen-uat-guide | 18-step UAT walkthrough for BITA management & office staff, feedback sheet, and deployment checklist |
+| G11 – Strip internal requirement codes from UI | Naveen | Done | feature/naveen-g11-remove-ui-codes | Removed internal codes (`R17`, `R20`, `P4a`, `A6`, etc.) from `.tsx` screens + added `tests/no-ui-requirement-codes.test.ts` guard |
+| Glossary | Krishna | Done | PR 15, docs/GLOSSARY.md | NDT & inspection glossary for BITA workflows |
+| Test data | Krishna | Done | PR 15, scripts/seed/ | Deterministic fake seed data (`npm run seed`) |
+| Client inputs tracker | Krishna | Done | PR 15, docs/CLIENT_INPUTS.md | Tracks BITA-supplied templates, HSN/SAC codes, and pending credentials |
+| Excel import | Naveen | Done | PR 13, scripts/import/ | Customer, price-item, and equipment import scripts (`scripts/import/`) |
+| Smoke tests | Naveen | Done | PR 22, PR 24, feature/naveen-atlas-audit | 49 Vitest suites (PGlite RLS + API v1 + DOCX/PDF + UI code guard) + `scripts/smoke-test-live.mjs` |
+| User guide | Krishna | Done | PR 15, PR 25, docs/guide/ & docs/UAT_GUIDE.md | Office, reviewer, and technician user guides + 18-step UAT guide |
 
 Status values: Not started · In progress · In review · Done · Blocked
 
@@ -66,6 +77,20 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-12 12:00 – Naveen – Claude
+Task: Pre-handover Gap Audit Round (G1–G6, G9, G10, G11)
+Done:
+- G1 (PR #26): Built `/finance` management financial reports (`lib/modules/finance/`, `/api/v1/finance/*`) covering receivables ageing, customer-wise FY revenue & outstanding, monthly income vs log-book expenses, monthly payments with TDS, and open proformas with CSV exports and formula-injection protection.
+- G2 (PR #27): Completed `/api/v1/{enquiries,quotations,jobs,reports}` (including report approval, return-to-technician with note, and `.pdf` / `.docx` downloads) backed by shared module services; updated `docs/ARCHITECTURE.md`.
+- G3 (PR #28): Added `/jobs/export` and `/api/v1/jobs/export` (CSV + Excel XML jobs register with financial year, month, and customer filters).
+- G4 (PR #30): Implemented automatic job closure when all non-cancelled tax invoices are settled (payments + TDS + credit notes) and all job reports are marked sent, plus management manual Close/Reopen with `audit_log`.
+- G5 (PR #31): Added "Paste the customer's email" + "Fill from email" AI assist on `/enquiries/new` (`lib/modules/enquiries/ai-assist.ts`, `/api/v1/enquiries/extract`) using `extractEnquiry` and `matchCustomer` without storing raw email text unless kept in notes.
+- G6 (PR #29): Added soft delete, restore, and `checkCanDelete` permission enforcement across enquiries, quotations, jobs, and all module services.
+- G9, G10 (PR #25), G11: Added `docs/UAT_GUIDE.md` 18-step acceptance script, removed internal requirement codes from `.tsx` screens with `tests/no-ui-requirement-codes.test.ts` guard, and updated `docs/PROGRESS.md` status board.
+Files changed: lib/modules/finance/, app/(office)/finance/, app/api/v1/, lib/modules/{enquiries,quotations,jobs,reports,invoices,settings}/, app/(office)/{enquiries,quotations,jobs,review,invoices}/, docs/{ARCHITECTURE.md,UAT_GUIDE.md,PROGRESS.md}, tests/
+Next: Complete G7 (real branding uploads on reports and invoices) and G8 (fresh technician APK build), then release `feature/naveen-integration` to `main`.
+Blockers / questions: none.
 
 ### 2026-11-09 18:50 – Naveen – Claude
 Task: Live Vercel + Mumbai region optimization, Telegram Executive Bot live pairing, Android APK release build (`BITA-Technician.apk`), interactive `/field-app` web companion, and end-to-end testing setup
