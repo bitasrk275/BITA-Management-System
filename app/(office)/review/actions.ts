@@ -6,15 +6,18 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import type { Database } from "@/lib/db/types";
 import { text } from "@/lib/forms";
-import { loadReportApprovalAssets } from "@/lib/reports/branding.server";
+import { parseApproveReportInput, parseReturnReportInput } from "@/lib/modules/reports/schema";
+import {
+  approveReportRecord,
+  loadBookedJobEquipmentForReport,
+  returnReportRecord,
+} from "@/lib/modules/reports/service";
 import { missingFields } from "@/lib/reports/fields";
 import {
-  type BookedJobEquipmentItem,
   buildReportContent,
   checkReportReadiness,
   extractReadings,
   friendlyReportError,
-  generateSignedReportPdfBytes,
   parseEditedReportReadings,
   parseRecipients,
   prefillReadingsFromBookedEquipment,
@@ -23,62 +26,7 @@ import {
   validUuid,
 } from "@/lib/reports/review";
 
-async function loadBookedJobEquipment(
-  supabase: Awaited<ReturnType<typeof requireStaff>>["supabase"],
-  jobId: string
-): Promise<BookedJobEquipmentItem[]> {
-  const { data: assigns } = await supabase
-    .from("assignments")
-    .select(`
-      work_date,
-      assignment_equipment(
-        equipment:equipment!assignment_equipment_equipment_id_fkey(
-          id,
-          make,
-          model,
-          serial_no,
-          calibration_due
-        )
-      )
-    `)
-    .eq("job_id", jobId)
-    .order("work_date", { ascending: true });
-
-  type AssignRow = {
-    work_date: string;
-    assignment_equipment: Array<{
-      equipment: {
-        id: string;
-        make: string | null;
-        model: string | null;
-        serial_no: string | null;
-        calibration_due: string | null;
-      } | null;
-    }>;
-  };
-
-  const seen = new Set<string>();
-  const items: BookedJobEquipmentItem[] = [];
-
-  for (const a of (assigns as unknown as AssignRow[]) ?? []) {
-    for (const ae of a.assignment_equipment ?? []) {
-      const eq = ae.equipment;
-      if (!eq || seen.has(eq.id)) continue;
-      seen.add(eq.id);
-      const isExpired = Boolean(eq.calibration_due && eq.calibration_due < a.work_date);
-      items.push({
-        id: eq.id,
-        make: eq.make,
-        model: eq.model,
-        serial_no: eq.serial_no,
-        calibration_due: eq.calibration_due,
-        work_date: a.work_date,
-        is_expired_on_work_date: isExpired,
-      });
-    }
-  }
-  return items;
-}
+const loadBookedJobEquipment = loadBookedJobEquipmentForReport;
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -355,115 +303,19 @@ export async function approveReport(reportId: string, fd: FormData) {
   if (!person) redirect("/login");
 
   const path = `/review/${reportId}`;
-  if (!person.roles.includes("reviewer")) {
-    redirectError(
-      path,
-      "Only a technical reviewer can approve a report (AGENTS.md rule 6). Add the Reviewer role in Settings -> Users if needed."
-    );
-  }
-
-  const { data: report } = await supabase
-    .from("reports")
-    .select("*")
-    .eq("id", reportId)
-    .maybeSingle();
-
-  if (!report) redirect("/review");
-  if (!["in_review", "draft"].includes(report.status)) {
-    redirectError(path, "This report is not waiting for approval.");
-  }
-
-  const [inspectionRes, jobRes, bookedEquipment] = await Promise.all([
-    report.inspection_id
-      ? supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase
-      .from("jobs")
-      .select("id, job_no, customers(name)")
-      .eq("id", report.job_id)
-      .maybeSingle(),
-    loadBookedJobEquipment(supabase, report.job_id),
-  ]);
-
-  const inspection = inspectionRes.data;
-  const job = jobRes.data;
-  const readings = prefillReadingsFromBookedEquipment(
-    extractReadings(report.content, inspection?.readings),
-    bookedEquipment
+  const parsed = parseApproveReportInput(fd);
+  const { data, error } = await approveReportRecord(
+    supabase,
+    reportId,
+    { id: person.id, roles: person.roles },
+    parsed,
   );
-  const readiness = checkReportReadiness(report.method, inspection, readings);
-  if (!readiness.ready) {
-    redirectError(path, readiness.blockers.join(" "));
+
+  if (error || !data) {
+    redirectError(path, error ?? "Could not approve report.");
   }
 
-  const expiredEquipment = bookedEquipment.filter((e) => e.is_expired_on_work_date);
-  const calibrationOverrideNote =
-    text(fd, "calibration_override_note") ?? report.calibration_override_note ?? null;
-
-  if (expiredEquipment.length > 0 && (!calibrationOverrideNote || !calibrationOverrideNote.trim())) {
-    const firstExp = expiredEquipment[0]!;
-    const label = [firstExp.make, firstExp.model, firstExp.serial_no].filter(Boolean).join(" ");
-    redirectError(
-      path,
-      `Booked equipment ${label} had expired calibration (due ${firstExp.calibration_due}) on work date ${firstExp.work_date}. Enter a calibration override reason to approve this report.`
-    );
-  }
-
-  const chosenSignatory = text(fd, "signatory_id") || report.signatory_id || person.id;
-  if (!validUuid(chosenSignatory)) {
-    redirectError(path, "Choose a valid signatory.");
-  }
-
-  const approvedAt = new Date().toISOString();
-  const storagePath = reportPdfStoragePath(report.job_id, report.report_no);
-
-  const assets = await loadReportApprovalAssets(supabase, {
-    approved: true,
-    approvedAt,
-    signatoryId: chosenSignatory,
-    approvedBy: person.id,
-  });
-
-  if (assets.approval.approved) {
-    const pdfBytes = generateSignedReportPdfBytes({
-      reportNo: report.report_no,
-      reportDate: report.report_date,
-      method: report.method,
-      jobNo: job?.job_no ?? report.job_id,
-      customerName: job?.customers?.name ?? String(readings.client ?? "Customer"),
-      readings,
-      letterhead: assets.letterhead,
-      approval: assets.approval,
-    });
-
-    const storageClient = getServiceClient() ?? supabase;
-    await storageClient.storage.from("reports").upload(storagePath, pdfBytes, {
-      contentType: "application/pdf",
-      upsert: true,
-    });
-  }
-
-  const { error } = await supabase
-    .from("reports")
-    .update({
-      status: "approved",
-      reviewed_by: person.id,
-      approved_by: person.id,
-      approved_at: approvedAt,
-      signatory_id: chosenSignatory,
-      pdf_path: storagePath,
-      ...(calibrationOverrideNote && calibrationOverrideNote.trim()
-        ? {
-            calibration_override_note: calibrationOverrideNote.trim(),
-            calibration_override_by: person.id,
-          }
-        : {}),
-    })
-    .eq("id", report.id);
-
-  if (error) redirectError(path, error.message);
-
-  revalidateReportPaths(report.id, report.job_id);
+  revalidateReportPaths(data.id, data.job_id);
   redirect(`${path}?saved=approved`);
 }
 
@@ -473,71 +325,23 @@ export async function returnReportToTechnician(reportId: string, fd: FormData) {
   if (!person) redirect("/login");
 
   const path = `/review/${reportId}`;
-  const note = text(fd, "note");
-  if (!note) {
-    redirectError(path, "Enter a clear note explaining what the technician needs to correct.");
+  const parsed = parseReturnReportInput(fd);
+  if (!parsed.ok) {
+    redirectError(path, parsed.error);
   }
 
-  const { data: report } = await supabase
-    .from("reports")
-    .select("*")
-    .eq("id", reportId)
-    .maybeSingle();
+  const { data, error } = await returnReportRecord(
+    supabase,
+    reportId,
+    { id: person.id, full_name: person.full_name },
+    parsed.value.note,
+  );
 
-  if (!report) redirect("/review");
-  if (report.status === "sent") {
-    redirectError(path, "A sent report cannot be returned.");
+  if (error || !data) {
+    redirectError(path, error ?? "Could not return report.");
   }
 
-  const { error } = await supabase
-    .from("reports")
-    .update({
-      status: "returned",
-      reviewed_by: person.id,
-      approved_by: null,
-      approved_at: null,
-      pdf_path: null,
-    })
-    .eq("id", report.id);
-
-  if (error) redirectError(path, error.message);
-
-  await supabase
-    .from("jobs")
-    .update({ status: "inspection_done" })
-    .eq("id", report.job_id)
-    .eq("status", "report_in_review");
-
-  // Notify the technician who submitted the inspection (or first assigned technician on the job)
-  let targetTechnicianId: string | null = null;
-  if (report.inspection_id) {
-    const { data: insp } = await supabase
-      .from("inspections")
-      .select("submitted_by")
-      .eq("id", report.inspection_id)
-      .maybeSingle();
-    targetTechnicianId = insp?.submitted_by ?? null;
-  }
-  if (!targetTechnicianId) {
-    const { data: assign } = await supabase
-      .from("assignments")
-      .select("person_id")
-      .eq("job_id", report.job_id)
-      .limit(1)
-      .maybeSingle();
-    targetTechnicianId = assign?.person_id ?? null;
-  }
-
-  if (targetTechnicianId) {
-    await supabase.from("technician_messages").insert({
-      person_id: targetTechnicianId,
-      job_id: report.job_id,
-      kind: "other",
-      message: `Report ${report.report_no} returned by ${person.full_name}: ${note}`,
-    });
-  }
-
-  revalidateReportPaths(report.id, report.job_id);
+  revalidateReportPaths(data.id, data.job_id);
   redirect(`${path}?saved=returned`);
 }
 

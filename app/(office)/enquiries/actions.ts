@@ -5,46 +5,68 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import type { Enums } from "@/lib/db/types";
 import { friendlyError, text } from "@/lib/forms";
+import { parseEnquiryInput } from "@/lib/modules/enquiries/schema";
+import {
+  createEnquiryRecord,
+  deleteEnquiryRecord,
+  updateEnquiryRecord,
+} from "@/lib/modules/enquiries/service";
 
 export async function createEnquiry(fd: FormData) {
   const { supabase } = await requireStaff();
-  const customerId = text(fd, "customer_id");
-  const receivedAt = text(fd, "received_at");
-  const { data, error } = await supabase
-    .from("enquiries")
-    .insert({
-      source: (text(fd, "source") ?? "phone") as Enums<"enquiry_source">,
-      from_name: text(fd, "from_name"),
-      from_address: text(fd, "from_address"),
-      subject: text(fd, "subject"),
-      body: text(fd, "body"),
-      customer_id: customerId,
-      status: customerId ? "linked" : "new",
-      ...(receivedAt ? { received_at: new Date(receivedAt).toISOString() } : {}),
-    })
-    .select("id")
-    .single();
-  if (error) redirect("/enquiries/new?error=" + encodeURIComponent(friendlyError(error.message)));
+  const parsed = parseEnquiryInput(fd);
+  if (!parsed.ok) {
+    redirect("/enquiries/new?error=" + encodeURIComponent(parsed.error));
+  }
+  const { data, error } = await createEnquiryRecord(supabase, parsed.value);
+  if (error || !data) {
+    redirect(
+      "/enquiries/new?error=" +
+        encodeURIComponent(friendlyError(error ?? "Could not create enquiry.")),
+    );
+  }
   redirect(`/enquiries/${data.id}`);
 }
 
 export async function linkCustomer(enquiryId: string, fd: FormData) {
   const { supabase } = await requireStaff();
   const customerId = text(fd, "customer_id");
-  const { error } = await supabase
-    .from("enquiries")
-    .update({ customer_id: customerId, ...(customerId ? { status: "linked" as const } : {}) })
-    .eq("id", enquiryId);
-  if (error) redirect(`/enquiries/${enquiryId}?error=` + encodeURIComponent(friendlyError(error.message)));
+  const { error } = await updateEnquiryRecord(supabase, enquiryId, {
+    customer_id: customerId,
+    ...(customerId ? { status: "linked" as const } : {}),
+  });
+  if (error) {
+    redirect(
+      `/enquiries/${enquiryId}?error=` +
+        encodeURIComponent(friendlyError(error)),
+    );
+  }
   revalidatePath(`/enquiries/${enquiryId}`);
 }
 
 export async function setStatus(enquiryId: string, fd: FormData) {
   const { supabase } = await requireStaff();
-  const { error } = await supabase
-    .from("enquiries")
-    .update({ status: text(fd, "status") as Enums<"enquiry_status"> })
-    .eq("id", enquiryId);
-  if (error) redirect(`/enquiries/${enquiryId}?error=` + encodeURIComponent(friendlyError(error.message)));
+  const status = text(fd, "status") as Enums<"enquiry_status">;
+  const { error } = await updateEnquiryRecord(supabase, enquiryId, { status });
+  if (error) {
+    redirect(
+      `/enquiries/${enquiryId}?error=` +
+        encodeURIComponent(friendlyError(error)),
+    );
+  }
   revalidatePath(`/enquiries/${enquiryId}`);
+}
+
+export async function deleteEnquiryAction(enquiryId: string) {
+  const { supabase, person } = await requireStaff();
+  const res = await deleteEnquiryRecord(supabase, enquiryId, person?.roles);
+  if (!res.ok) {
+    redirect(
+      `/enquiries/${enquiryId}?error=` +
+        encodeURIComponent(friendlyError(res.error)),
+    );
+  }
+  revalidatePath("/enquiries");
+  revalidatePath("/recycle-bin");
+  redirect("/enquiries?deleted=1");
 }

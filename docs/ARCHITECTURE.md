@@ -38,30 +38,60 @@ app/api/v1/<module>/
 
 ---
 
-## 2. Worked Example: `customers` Module
+## 2. Complete API v1 Route Table
 
-1. **Input validation (`lib/modules/customers/schema.ts`):**
-   - `parseCustomerInput(raw)` accepts either `FormData` (from a Server Action) or a JSON object (from `POST /api/v1/customers` or `PATCH /api/v1/customers/:id`).
-   - Validates required fields (`name`), normalizes uppercase codes and GSTINs, and checks `payment_terms_days` (0–365).
-2. **Service layer (`lib/modules/customers/service.ts`):**
-   - `listCustomers(supabase, { q })`
-   - `getCustomerDetail(supabase, id)`
-   - `createCustomerRecord(supabase, input)`
-   - `updateCustomerRecord(supabase, id, input)`
-   - `deleteCustomerRecord(supabase, id)` (delegates to `softDeleteRecord(supabase, "customers", id)`)
-   - `restoreCustomerRecord(supabase, id)` (delegates to `restoreRecord(supabase, "customers", id)`)
-   - `addCustomerContact`, `updateCustomerContact`, `deleteCustomerContact`
-3. **API v1 routes (`app/api/v1/customers/`):**
-   - `GET /api/v1/customers?q=...` → `listCustomers`
-   - `POST /api/v1/customers` → `parseCustomerInput` + `createCustomerRecord`
-   - `GET /api/v1/customers/:id` → `getCustomerDetail`
-   - `PATCH /api/v1/customers/:id` → `parseCustomerInput` + `updateCustomerRecord`
-   - `DELETE /api/v1/customers/:id` → `deleteCustomerRecord`
-   - `POST /api/v1/customers/:id/restore` → `restoreCustomerRecord`
-4. **Office screens (`app/(office)/customers/`):**
-   - `page.tsx` calls `listCustomers(supabase, { q })`.
-   - `[id]/page.tsx` calls `getCustomerDetail(supabase, id)` and renders a confirmation block for soft-deleting the customer.
-   - `actions.ts` calls `parseCustomerInput` and the `lib/modules/customers/service.ts` functions.
+| Domain | Endpoint | Methods | Service Module | Description |
+| --- | --- | --- | --- | --- |
+| **Customers** | `/api/v1/customers` | `GET`, `POST` | `lib/modules/customers` | List customers (`?q=`), create customer |
+| **Customers** | `/api/v1/customers/[id]` | `GET`, `PATCH`, `PUT`, `DELETE` | `lib/modules/customers` | Get detail, update, soft-delete customer |
+| **Customers** | `/api/v1/customers/[id]/restore` | `POST` | `lib/modules/customers` | Restore soft-deleted customer |
+| **Customers** | `/api/v1/customers/[id]/contacts` | `POST`, `PATCH`, `DELETE` | `lib/modules/customers` | Add, update, or remove customer contact |
+| **Enquiries** | `/api/v1/enquiries` | `GET`, `POST` | `lib/modules/enquiries` | List enquiries (`?status=&customer_id=&q=`), create enquiry |
+| **Enquiries** | `/api/v1/enquiries/[id]` | `GET`, `PATCH`, `PUT`, `DELETE` | `lib/modules/enquiries` | Get detail, update, soft-delete enquiry |
+| **Enquiries** | `/api/v1/enquiries/[id]/restore` | `POST` | `lib/modules/enquiries` | Restore soft-deleted enquiry |
+| **Quotations** | `/api/v1/quotations` | `GET`, `POST` | `lib/modules/quotations` | List quotations (`?status=&customer_id=&q=`), create quotation + items |
+| **Quotations** | `/api/v1/quotations/[id]` | `GET`, `PATCH`, `PUT`, `DELETE` | `lib/modules/quotations` | Get detail, update, soft-delete quotation (refused if linked job exists) |
+| **Quotations** | `/api/v1/quotations/[id]/restore` | `POST` | `lib/modules/quotations` | Restore soft-deleted quotation |
+| **Quotations / PO** | `/api/v1/quotations/[id]/accept` | `POST` | `lib/modules/po` | Accept quotation, record Customer PO (`po_number`, `po_date`, `po_value`, `po_file`), and create job |
+| **Jobs** | `/api/v1/jobs` | `GET`, `POST` | `lib/modules/jobs` | List jobs (`?status=&customer_id=&q=`), create job |
+| **Jobs** | `/api/v1/jobs/[id]` | `GET`, `PATCH`, `PUT`, `DELETE` | `lib/modules/jobs` | Get detail, update, soft-delete job (refused if issued invoice exists) |
+| **Jobs** | `/api/v1/jobs/[id]/restore` | `POST` | `lib/modules/jobs` | Restore soft-deleted job |
+| **Jobs / PO** | `/api/v1/jobs/[id]/po` | `POST`, `PATCH` | `lib/modules/po` | Record or update Customer PO on an existing job |
+| **Reports** | `/api/v1/reports` | `GET` | `lib/modules/reports` | List reports (`?status=&invoice_pending=1&job_id=&method=`) |
+| **Reports** | `/api/v1/reports/[id]` | `GET` | `lib/modules/reports` | Get report detail + `invoice_pending` flag |
+| **Reports** | `/api/v1/reports/[id]/approve` | `POST` | `lib/modules/reports` | Technical reviewer approval (`signatory_id`, `calibration_override_note`) |
+| **Reports** | `/api/v1/reports/[id]/return` | `POST` | `lib/modules/reports` | Return report to technician with required `note` |
+| **Reports** | `/api/v1/reports/[id]/pdf` | `GET` | `lib/modules/reports` | Download report PDF (signed if approved, draft otherwise) |
+| **Reports** | `/api/v1/reports/[id]/docx` | `GET` | `lib/modules/reports` | Download editable Word (`.docx`) report |
+| **Calendar** | `/api/v1/calendar` | `GET` | `lib/modules/calendar` | Week/month schedule, assignments, equipment bookings, leave, holidays |
+| **Calendar** | `/api/v1/calendar/assign` | `POST` | `lib/modules/calendar` | Create single/multi-day technician & equipment assignment |
+| **Calendar** | `/api/v1/calendar/assignments/[id]` | `PATCH`, `DELETE` | `lib/modules/calendar` | Update or soft-delete assignment |
+| **Calendar** | `/api/v1/calendar/assignments/[id]/move` | `POST` | `lib/modules/calendar` | Move assignment date range with conflict checks |
+| **Calendar** | `/api/v1/calendar/conflicts` | `GET` | `lib/modules/calendar` | Check technician/equipment/qualification/calibration conflicts |
+| **Calendar** | `/api/v1/calendar/leave` | `GET`, `POST` | `lib/modules/calendar` | List or record employee leave days |
+| **Calendar** | `/api/v1/calendar/leave/[id]` | `DELETE` | `lib/modules/calendar` | Soft-delete leave day |
+| **Log Book** | `/api/v1/log-book` | `GET`, `POST`, `PATCH`, `DELETE` | `lib/modules/log-book` | Monthly log-book overview, status updates, and `job_expenses` |
+| **Employees** | `/api/v1/employees` | `GET`, `POST` | `lib/modules/employees` | List employees (`view_salaries` gated), create employee |
+| **Employees** | `/api/v1/employees/[id]` | `GET`, `PATCH`, `DELETE` | `lib/modules/employees` | Employee detail, worked/idle/leave summary, soft-delete |
+| **Employees** | `/api/v1/employees/[id]/restore` | `POST` | `lib/modules/employees` | Restore soft-deleted employee |
+| **Equipment** | `/api/v1/equipment` | `GET`, `POST` | `lib/modules/equipment` | List equipment with calibration status, create equipment |
+| **Equipment** | `/api/v1/equipment/[id]` | `GET`, `PATCH`, `DELETE` | `lib/modules/equipment` | Equipment detail, update, soft-delete |
+| **Equipment** | `/api/v1/equipment/[id]/restore` | `POST` | `lib/modules/equipment` | Restore soft-deleted equipment |
+| **Equipment** | `/api/v1/equipment/[id]/movements` | `GET`, `POST` | `lib/modules/equipment` | Record equipment movement & delivery challan (`DC-xxxx`) |
+| **Equipment** | `/api/v1/equipment/types` | `GET`, `POST` | `lib/modules/equipment` | List or create equipment types |
+| **Equipment** | `/api/v1/equipment/types/[id]` | `PATCH`, `DELETE` | `lib/modules/equipment` | Update or soft-delete equipment type |
+| **Price List** | `/api/v1/price-items` | `GET`, `POST` | `lib/modules/price-items` | List or create price-list items |
+| **Price List** | `/api/v1/price-items/[id]` | `PATCH`, `PUT`, `DELETE` | `lib/modules/price-items` | Update or soft-delete price-list item |
+| **Price List** | `/api/v1/price-items/[id]/restore` | `POST` | `lib/modules/price-items` | Restore soft-deleted price-list item |
+| **Invoices** | `/api/v1/invoices` | `GET`, `POST` | `lib/modules/invoices` | List invoices, create proforma/tax invoice from 1+ approved reports |
+| **Invoices** | `/api/v1/invoices/pending-reports` | `GET` | `lib/modules/invoices` | List approved reports pending invoicing, grouped by customer GSTIN |
+| **Invoices** | `/api/v1/invoices/[id]/convert-to-tax` | `POST` | `lib/modules/invoices` | Convert a proforma invoice to a tax invoice in one click |
+| **Invoices** | `/api/v1/invoices/[id]/payments` | `POST` | `lib/modules/invoices` | Record full/part payment with optional `tds_amount` |
+| **Invoices** | `/api/v1/invoices/[id]/credit-notes` | `POST`, `DELETE` | `lib/modules/invoices` | Issue or cancel a credit note (`BITA/YY-YY/CN-xxxx`) |
+| **Finance** | `/api/v1/finance` | `GET` | `lib/modules/finance` | Full financial overview (`?fy=&month=&section=&format=csv`, `view_finance` gated) |
+| **Finance** | `/api/v1/finance/[report]` | `GET` | `lib/modules/finance` | Individual finance report (`ageing`, `customer-revenue`, `monthly`, `payments`, `proformas`) + CSV |
+| **Recycle Bin** | `/api/v1/recycle-bin` | `GET`, `POST` | `lib/modules/recycle-bin` | List soft-deleted records across tables or restore (`table_name`, `record_id`) |
+| **Settings** | `/api/v1/settings` | `GET`, `PUT`, `POST`, `PATCH`, `DELETE` | `lib/modules/settings` | System settings (`permissions`, `invoice_numbering`, `reminder_timings`, `holidays`) & dropdown options |
 
 ---
 
@@ -76,14 +106,17 @@ app/api/v1/<module>/
   - Every insert, update, soft-delete, and restore is recorded in `public.audit_log` with `old_row`, `new_row`, `changed_fields`, and actor IDs.
 - **Recycle bin (`/recycle-bin` & `/api/v1/recycle-bin`):**
   - Uses `public.list_recycle_bin()`, `public.soft_delete_record(p_table, p_id)`, and `public.restore_record(p_table, p_id)` (`lib/modules/recycle-bin/service.ts`).
-- **Issued tax invoices:** Sent/issued tax invoices are never deleted; they are cancelled or adjusted via credit notes (P4c).
+- **Issued tax invoices & linked records:**
+  - Sent/issued tax invoices are never deleted; they are cancelled or adjusted via credit notes (P4c).
+  - Deleting a job that has an issued invoice is refused.
+  - Deleting a quotation that has an active linked job is refused.
 
 ---
 
 ## 4. Settings Tables (`public.settings` & `public.settings_options`)
 
 - `public.settings` (`key text primary key, value jsonb, description text, updated_at timestamptz, updated_by uuid`):
-  - Stores configurable system settings (`permissions`, `invoice_numbering`, `reminder_timings`, `holidays`).
+  - Stores configurable system settings (`permissions`, `invoice_numbering`, `reminder_timings`, `holidays`, `company_profile`, `report_templates`, `telegram_config`).
   - Read by `private.has_permission(perm)` in PostgreSQL and by `lib/modules/settings/service.ts` in the app.
 - `public.settings_options` (`id uuid primary key, list_key text, value text, position integer, active boolean`):
-  - Stores configurable dropdown options (`equipment_type`, `couplant`, `surface_condition`, etc.) managed at `/settings` and `/api/v1/settings`.
+  - Stores configurable dropdown options (`equipment_type`, `couplant`, `surface_condition`, `test_methods`, etc.) managed at `/settings` and `/api/v1/settings`.
