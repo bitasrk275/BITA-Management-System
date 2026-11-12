@@ -27,11 +27,12 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | G4 – Job closure (auto + manual) | Naveen | Done | PR 30, feature/naveen-g4-job-closure | Auto-close when all non-cancelled tax invoices are settled and all reports are sent; manual Close/Reopen for management with `audit_log` |
 | G5 – Enquiry AI assist | Naveen | Done | PR 31, feature/naveen-g5-enquiry-ai | Paste customer email -> Fill from email on `/enquiries/new` using `extractEnquiry` + `matchCustomer`; hidden when `ANTHROPIC_API_KEY` is unset |
 | G6 – Delete everywhere + permissions (`client change 14`) | Naveen | Done | PR 29, feature/naveen-delete-permissions | Soft delete + restore across enquiries, quotations, jobs, customers, employees, equipment, log-book, price-items, calendar, and settings options gated by `checkCanDelete` |
-| G7 – Real branding on reports and invoices | Naveen | In progress | feature/naveen-branding-uploads | Uploadable company logo, signatory stamp/signature in `/settings`, rendered in report and invoice HTML/PDF/DOCX |
-| G8 – Mobile APK from latest code | Naveen | In progress | feature/naveen-apk-refresh | Fresh technician APK build after Phase 2 + Gap Round changes |
-| G9 – Progress status board update | Naveen | Done | feature/naveen-g9-progress-docs | Rewrote `docs/PROGRESS.md` status board to reflect Phase 1, Phase 2, and Gap Round G1–G11 reality |
+| G7 – Real branding on reports and invoices | Naveen | Done | PR 33, feature/naveen-branding-uploads | Uploadable company logo, company seal, and employee digital signatures in `/settings` and `/employees/[id]`, rendered in report and invoice HTML/PDF/DOCX |
+| G8 – Settings: test methods and report templates | Naveen | In progress | feature/naveen-test-methods-templates | Test methods and report templates configuration in `/settings` |
+| G9 – Progress status board update | Naveen | Done | PR 32, feature/naveen-g9-progress-docs | Rewrote `docs/PROGRESS.md` status board to reflect Phase 1, Phase 2, and Gap Round G1–G12 reality |
 | G10 – Client acceptance test script (`docs/UAT_GUIDE.md`) | Naveen | Done | PR 25, feature/naveen-uat-guide | 18-step UAT walkthrough for BITA management & office staff, feedback sheet, and deployment checklist |
 | G11 – Strip internal requirement codes from UI | Naveen | Done | feature/naveen-g11-remove-ui-codes | Removed internal codes (`R17`, `R20`, `P4a`, `A6`, etc.) from `.tsx` screens + added `tests/no-ui-requirement-codes.test.ts` guard |
+| G12 – UAT database kit (`demo.sql`, `uat-reset.sql`, `docs/UAT_SETUP.md`) | Naveen | Done | PR 34, feature/naveen-g12-uat-kit | Phase 2 UAT seed with non-fake customer guard, multi-state GSTINs (CGST/SGST & IGST), `uat-reset.sql`, `docs/UAT_SETUP.md`, and `tests/uat-seed-g12.test.ts` |
 | Glossary | Krishna | Done | PR 15, docs/GLOSSARY.md | NDT & inspection glossary for BITA workflows |
 | Test data | Krishna | Done | PR 15, scripts/seed/ | Deterministic fake seed data (`npm run seed`) |
 | Client inputs tracker | Krishna | Done | PR 15, docs/CLIENT_INPUTS.md | Tracks BITA-supplied templates, HSN/SAC codes, and pending credentials |
