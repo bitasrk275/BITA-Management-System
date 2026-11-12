@@ -1,55 +1,57 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireStaff } from "@/lib/auth";
+import { type NextRequest } from "next/server";
+import { apiError, apiSuccess, requireApiStaff } from "@/lib/api/v1";
 import { createLeaveDay, listLeaveDays } from "@/lib/modules/calendar/service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const auth = await requireApiStaff();
+  if (!auth.ok) return auth.response;
+
   try {
-    const { supabase } = await requireStaff();
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const personId = searchParams.get("personId");
 
-    const leaveDays = await listLeaveDays(supabase, {
+    const leaveDays = await listLeaveDays(auth.supabase, {
       startDate,
       endDate,
       personId,
     });
 
-    return NextResponse.json({ ok: true, data: leaveDays });
+    return apiSuccess(leaveDays);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to list leave days";
-    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    return apiError(message, 400);
   }
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireApiStaff();
+  if (!auth.ok) return auth.response;
+
   try {
-    const { user, supabase } = await requireStaff();
     const body = await request.json();
 
     if (!body.personId || !body.leaveDate) {
-      return NextResponse.json(
-        { ok: false, error: "personId and leaveDate are required." },
-        { status: 400 }
-      );
+      return apiError("personId and leaveDate are required.", 400);
     }
 
     const leaveDay = await createLeaveDay(
-      supabase,
+      auth.supabase,
       {
         personId: body.personId,
         leaveDate: body.leaveDate,
         reason: body.reason || null,
       },
-      user.id
+      auth.user.id
     );
 
-    return NextResponse.json({ ok: true, data: leaveDay }, { status: 201 });
+    return apiSuccess(leaveDay, 201);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to create leave day";
-    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    return apiError(message, 400);
   }
 }
+
