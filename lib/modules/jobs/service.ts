@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Enums, Tables } from "../../db/types";
 import { restoreRecord, softDeleteRecord } from "../recycle-bin/service";
-import { hasPermissionForRoles } from "../settings/service";
+import { checkCanDelete } from "../settings/service";
 import type { JobInput } from "./schema";
 
 export type JobRow = Tables<"jobs">;
@@ -140,15 +140,8 @@ export async function deleteJobRecord(
   id: string,
   callerRoles?: readonly Enums<"app_role">[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (callerRoles && callerRoles.length > 0) {
-    const allowed = await hasPermissionForRoles(supabase, callerRoles, "delete");
-    if (!allowed) {
-      return {
-        ok: false,
-        error: "Permission denied: your role is not permitted to delete records.",
-      };
-    }
-  }
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) return perm;
 
   // Rule: a job with an issued invoice can't be deleted (cancel by credit note first)
   const { data: directInvoices, error: invErr } = await supabase

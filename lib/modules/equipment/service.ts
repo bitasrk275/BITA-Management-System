@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../../db/types";
+import type { Database, Enums } from "../../db/types";
+import { checkCanDelete } from "../settings/service";
 import {
   type EquipmentItemInput,
   type EquipmentMovementInput,
@@ -102,8 +103,12 @@ export async function updateEquipmentType(
 
 export async function deleteEquipmentType(
   supabase: SupabaseClient<Database>,
-  id: string
+  id: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ) {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) throw new Error(perm.error);
+
   // Uses soft_delete_record RPC
   const { error } = await supabase.rpc("soft_delete_record", {
     p_table: "equipment_types",
@@ -326,8 +331,12 @@ export async function updateEquipment(
 
 export async function deleteEquipment(
   supabase: SupabaseClient<Database>,
-  id: string
+  id: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ) {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) throw new Error(perm.error);
+
   const { error } = await supabase.rpc("soft_delete_record", {
     p_table: "equipment",
     p_id: id,

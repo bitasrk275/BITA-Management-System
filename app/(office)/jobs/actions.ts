@@ -125,7 +125,7 @@ export async function reopenJob(id: string) {
   redirect(`/jobs/${id}?saved=reopened`);
 }
 
-export async function deleteJobAction(jobId: string) {
+export async function deleteJob(jobId: string) {
   const { supabase, person } = await requireStaff();
   const res = await deleteJobRecord(supabase, jobId, person?.roles);
   if (!res.ok) {
@@ -136,4 +136,8 @@ export async function deleteJobAction(jobId: string) {
   revalidatePath("/jobs");
   revalidatePath("/recycle-bin");
   redirect("/jobs?deleted=1");
+}
+
+export async function deleteJobAction(jobId: string) {
+  return deleteJob(jobId);
 }

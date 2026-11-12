@@ -75,6 +75,34 @@ export async function hasPermissionForRoles(
   return roles.some((r) => allowed.includes(r));
 }
 
+export async function checkCanDelete(
+  supabase: SupabaseClient<Database>,
+  callerRoles?: readonly Enums<"app_role">[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  let roles = callerRoles;
+  if (!roles && supabase.auth && typeof supabase.auth.getUser === "function") {
+    const { data } = await supabase.auth.getUser();
+    const user = data?.user;
+    if (user) {
+      const { data: person } = await supabase
+        .from("people")
+        .select("roles")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .maybeSingle();
+      roles = person?.roles ?? [];
+    }
+  }
+
+  if (roles && roles.length > 0) {
+    const allowed = await hasPermissionForRoles(supabase, roles, "delete");
+    if (!allowed) {
+      return { ok: false, error: "Permission denied: Only authorized roles can delete records." };
+    }
+  }
+  return { ok: true };
+}
+
 export async function listSettingsOptions(
   supabase: SupabaseClient<Database>,
   opts?: { listKey?: string; activeOnly?: boolean },
@@ -129,7 +157,10 @@ export async function updateSettingsOption(
 export async function deleteSettingsOption(
   supabase: SupabaseClient<Database>,
   id: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) return perm;
   const { error } = await supabase.from("settings_options").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   return { ok: true };

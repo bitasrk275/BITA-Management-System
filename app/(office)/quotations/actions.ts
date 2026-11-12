@@ -495,8 +495,7 @@ export async function deleteQuotationItem(quotationId: string, itemId: string) {
   revalidatePath("/quotations");
   redirect(`/quotations/${quotationId}?saved=item`);
 }
-
-export async function deleteQuotationAction(quotationId: string) {
+export async function deleteQuotation(quotationId: string) {
   const { supabase, person } = await requireStaff();
   const res = await deleteQuotationRecord(
     supabase,
@@ -513,3 +512,5 @@ export async function deleteQuotationAction(quotationId: string) {
   revalidatePath("/recycle-bin");
   redirect("/quotations?deleted=1");
 }
+
+export const deleteQuotationAction = deleteQuotation;

@@ -3,6 +3,7 @@ import { requireStaff } from "@/lib/auth";
 import type { Enums } from "@/lib/db/types";
 import { getMonthRange, getWeekRange, todayIST } from "@/lib/modules/calendar/schema";
 import { getCalendarView } from "@/lib/modules/calendar/service";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
 import { CalendarInteractiveView } from "./calendar-view";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function CalendarPage(props: {
   }>;
 }) {
   const searchParams = await props.searchParams;
-  const { supabase } = await requireStaff();
+  const { supabase, person } = await requireStaff();
 
   const currentDate = searchParams.date || todayIST();
   const viewMode = searchParams.view === "month" ? "month" : "week";
@@ -39,12 +40,15 @@ export default async function CalendarPage(props: {
     endDate = range.endDate;
   }
 
-  // 1. Fetch Calendar Grid Data
-  const calendarData = await getCalendarView(supabase, {
-    startDate,
-    endDate,
-    technicianId: searchParams.techId || null,
-  });
+  // 1. Fetch Calendar Grid Data & Permissions
+  const [calendarData, canDelete] = await Promise.all([
+    getCalendarView(supabase, {
+      startDate,
+      endDate,
+      technicianId: searchParams.techId || null,
+    }),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
+  ]);
 
   // 2. Fetch Active Jobs for Assign Modal
   const { data: jobRows } = await supabase
@@ -124,6 +128,7 @@ export default async function CalendarPage(props: {
         equipmentList={equipmentList}
         selectedJobId={searchParams.jobId || null}
         selectedTechId={searchParams.techId || null}
+        canDelete={canDelete}
       />
     </div>
   );

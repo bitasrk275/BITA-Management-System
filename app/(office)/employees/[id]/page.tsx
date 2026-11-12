@@ -21,6 +21,7 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { shortDate } from "@/lib/dates";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
 import {
   APP_ROLES,
   TEST_METHODS,
@@ -64,10 +65,13 @@ export default async function EmployeeDetailPage({
     person?.roles.some((r) => r === "management" || r === "office") ?? false;
   const month = query.month || currentMonthIST();
 
-  const employee = await getEmployeeDetail(supabase, id, {
-    month,
-    canViewSalaries: isManagement,
-  });
+  const [employee, canDelete] = await Promise.all([
+    getEmployeeDetail(supabase, id, {
+      month,
+      canViewSalaries: isManagement,
+    }),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
+  ]);
 
   if (!employee) notFound();
 
@@ -312,7 +316,7 @@ export default async function EmployeeDetailPage({
               )}
             </form>
 
-            {isManagement && (
+            {canDelete && (
               <div className="flex items-center justify-between border-t border-line pt-3 text-xs text-ink-2">
                 <span>Move employee to recycle bin</span>
                 <details className="relative">
@@ -472,7 +476,7 @@ export default async function EmployeeDetailPage({
                             Certificate ↗
                           </a>
                         )}
-                        {canEditStaff && (
+                        {canDelete && (
                           <details className="relative">
                             <summary className="cursor-pointer list-none rounded border border-line px-2 py-1 text-xs text-bad hover:bg-bad/5">
                               Remove

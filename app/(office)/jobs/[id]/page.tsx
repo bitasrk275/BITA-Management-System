@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { Badge, Button, ButtonLink, Card, ErrorNote, PageHeader, SavedNote, SecondaryButton, Status } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { checkPoUtilization } from "@/lib/modules/po/service";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
 import { formatIST } from "../../enquiries/labels";
-import { closeJob, reopenJob, updateJob } from "../actions";
+import { closeJob, deleteJob, reopenJob, updateJob } from "../actions";
 import { generateInvoiceFromJob } from "../../invoices/actions";
 import { isJobReadyToClose } from "../closure";
 import { JobForm } from "../job-form";
@@ -26,7 +27,7 @@ export default async function JobPage({
   const { data: job } = await supabase.from("jobs").select("*").eq("id", id).maybeSingle();
   if (!job) notFound();
 
-  const [customer, contacts, enquiry, quotation, assignments, inspections, reports, attachments, invoices, options] = await Promise.all([
+  const [customer, contacts, enquiry, quotation, assignments, inspections, reports, attachments, invoices, options, canDelete] = await Promise.all([
     supabase.from("customers").select("*").eq("id", job.customer_id).maybeSingle(),
     supabase.from("customer_contacts").select("name, mobile, email, receives_reports, receives_invoices").eq("customer_id", job.customer_id),
     job.enquiry_id ? supabase.from("enquiries").select("id, subject, source, received_at").eq("id", job.enquiry_id).maybeSingle() : null,
@@ -39,6 +40,7 @@ export default async function JobPage({
     supabase.from("attachments").select("id, kind, caption, storage_path").eq("job_id", id).order("uploaded_at"),
     supabase.from("invoices").select("id, kind, number, invoice_date, due_date, total, balance, status").eq("job_id", id).order("invoice_date"),
     jobFormOptions(supabase),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
   ]);
 
   const poUrl = job.po_path
@@ -274,10 +276,42 @@ export default async function JobPage({
           </Card>
         </div>
 
-        <Card>
-          <h2 className="mb-3 font-semibold">Edit job</h2>
-          <JobForm action={updateJob.bind(null, id)} job={job} submitLabel="Save changes" {...options} />
-        </Card>
+        <div className="space-y-6">
+          <Card>
+            <h2 className="mb-3 font-semibold">Edit job</h2>
+            <JobForm action={updateJob.bind(null, id)} job={job} submitLabel="Save changes" {...options} />
+          </Card>
+
+          {canDelete && (
+            <Card>
+              <details>
+                <summary className="cursor-pointer text-sm font-medium text-bad">
+                  Delete job
+                </summary>
+                {(invoices.data ?? []).some(
+                  (i) => i.status !== "cancelled" && ["issued", "partially_paid", "partly_paid", "paid"].includes(i.status)
+                ) ? (
+                  <p className="mt-2 text-xs text-bad">
+                    Cannot delete this job: an issued invoice exists. Cancel the invoice with a credit note first before deleting.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-xs text-ink-3">
+                      Deleting moves job <strong>{job.job_no}</strong> to the{" "}
+                      <Link href="/recycle-bin" className="underline">
+                        recycle bin
+                      </Link>
+                      , where management can restore it at any time.
+                    </p>
+                    <form action={deleteJob.bind(null, id)} className="mt-3">
+                      <SecondaryButton type="submit">Confirm delete job</SecondaryButton>
+                    </form>
+                  </>
+                )}
+              </details>
+            </Card>
+          )}
+        </div>
       </div>
     </>
   );

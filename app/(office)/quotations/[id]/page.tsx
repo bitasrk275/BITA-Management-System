@@ -21,11 +21,13 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { Constants } from "@/lib/db/types";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
 import { formatIST } from "../../enquiries/labels";
 import { formatINR } from "../../jobs/labels";
 import {
   acceptQuotation,
   addQuotationItem,
+  deleteQuotation,
   deleteQuotationItem,
   markQuotationSent,
   rejectQuotation,
@@ -73,7 +75,7 @@ export default async function QuotationPage({
     pastRatesQuery = pastRatesQuery.or(`description.ilike.%${rateTerm}%,basis.ilike.%${rateTerm}%`);
   }
 
-  const [customer, enquiry, items, approver, supersededBy, linkedJobs, pastRates, options] = await Promise.all([
+  const [customer, enquiry, items, approver, supersededBy, linkedJobs, pastRates, options, canDelete] = await Promise.all([
     supabase.from("customers").select("*").eq("id", quotation.customer_id).maybeSingle(),
     quotation.enquiry_id
       ? supabase.from("enquiries").select("id, subject, source, status, received_at").eq("id", quotation.enquiry_id).maybeSingle()
@@ -89,9 +91,11 @@ export default async function QuotationPage({
       .from("jobs")
       .select("id, job_no, status, scope, po_number, po_date, po_value")
       .eq("quotation_id", id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     pastRatesQuery,
     quotationFormOptions(supabase),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
   ]);
 
   const uploadedFileName = quotationFileName(quotation.pdf_path);
@@ -379,6 +383,35 @@ export default async function QuotationPage({
               )}
             </div>
           </Card>
+
+          {canDelete && (
+            <Card>
+              <details>
+                <summary className="cursor-pointer text-sm font-medium text-bad">
+                  Delete quotation
+                </summary>
+                {linkedJobs.data && linkedJobs.data.length > 0 ? (
+                  <p className="mt-2 text-xs text-bad">
+                    Cannot delete this quotation: active job{" "}
+                    <strong>{linkedJobs.data.map((j) => j.job_no).join(", ")}</strong> is linked to it.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-xs text-ink-3">
+                      Deleting moves this quotation to the{" "}
+                      <Link href="/recycle-bin" className="underline">
+                        recycle bin
+                      </Link>
+                      , where management can restore it at any time.
+                    </p>
+                    <form action={deleteQuotation.bind(null, id)} className="mt-3">
+                      <SecondaryButton type="submit">Confirm delete quotation</SecondaryButton>
+                    </form>
+                  </>
+                )}
+              </details>
+            </Card>
+          )}
 
           <Card className="space-y-2">
             <SectionTitle>Customer &amp; enquiry</SectionTitle>

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Enums } from "../../db/types";
+import { checkCanDelete } from "../settings/service";
 import {
   type EmployeeInput,
   type MonthlyAttendanceCounts,
@@ -422,8 +423,14 @@ export async function updateEmployee(
 
 export async function deleteEmployee(
   supabase: SupabaseClient<Database>,
-  personId: string
+  personId: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ) {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) {
+    throw new Error(perm.error);
+  }
+
   const { error } = await supabase.rpc("soft_delete_record", {
     p_table: "people",
     p_id: personId,
@@ -463,8 +470,14 @@ export async function createEmployeeQualification(
 
 export async function deleteEmployeeQualification(
   supabase: SupabaseClient<Database>,
-  qualificationId: string
+  qualificationId: string,
+  callerRoles?: readonly Enums<"app_role">[],
 ) {
+  const perm = await checkCanDelete(supabase, callerRoles);
+  if (!perm.ok) {
+    throw new Error(perm.error);
+  }
+
   const { error } = await supabase
     .from("qualifications")
     .delete()

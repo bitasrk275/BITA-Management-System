@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { listEquipmentTypes } from "@/lib/modules/equipment/service";
+import { hasPermissionForRoles } from "@/lib/modules/settings/service";
 import { createClient } from "@/lib/supabase/server";
 import { createEquipmentTypeAction, deleteEquipmentTypeAction } from "../actions";
 
@@ -24,11 +25,14 @@ export const dynamic = "force-dynamic";
 export default async function EquipmentTypesPage(props: {
   searchParams: Promise<{ saved?: string; deleted?: string; error?: string }>;
 }) {
-  await requireStaff();
+  const { person } = await requireStaff();
   const supabase = await createClient();
   const searchParams = await props.searchParams;
 
-  const types = await listEquipmentTypes(supabase);
+  const [types, canDelete] = await Promise.all([
+    listEquipmentTypes(supabase),
+    hasPermissionForRoles(supabase, person?.roles, "delete"),
+  ]);
 
   // Get item counts per type
   const { data: countsData } = await supabase
@@ -89,19 +93,21 @@ export default async function EquipmentTypesPage(props: {
                     ) : null
                   }
                   action={
-                    <details className="text-right">
-                      <summary className="cursor-pointer list-none rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-600 hover:text-red-700 hover:bg-red-50 inline-block">
-                        Delete
-                      </summary>
-                      <form action={deleteEquipmentTypeAction.bind(null, t.id)} className="mt-1.5">
-                        <button
-                          type="submit"
-                          className="rounded bg-red-700 px-2 py-1 text-xs text-white hover:bg-red-800"
-                        >
-                          Confirm delete
-                        </button>
-                      </form>
-                    </details>
+                    canDelete ? (
+                      <details className="text-right">
+                        <summary className="cursor-pointer list-none rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-600 hover:text-red-700 hover:bg-red-50 inline-block">
+                          Delete
+                        </summary>
+                        <form action={deleteEquipmentTypeAction.bind(null, t.id)} className="mt-1.5">
+                          <button
+                            type="submit"
+                            className="rounded bg-red-700 px-2 py-1 text-xs text-white hover:bg-red-800"
+                          >
+                            Confirm delete
+                          </button>
+                        </form>
+                      </details>
+                    ) : undefined
                   }
                 />
               );

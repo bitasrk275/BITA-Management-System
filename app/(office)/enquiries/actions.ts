@@ -57,7 +57,7 @@ export async function setStatus(enquiryId: string, fd: FormData) {
   revalidatePath(`/enquiries/${enquiryId}`);
 }
 
-export async function deleteEnquiryAction(enquiryId: string) {
+export async function deleteEnquiry(enquiryId: string) {
   const { supabase, person } = await requireStaff();
   const res = await deleteEnquiryRecord(supabase, enquiryId, person?.roles);
   if (!res.ok) {
@@ -70,3 +70,5 @@ export async function deleteEnquiryAction(enquiryId: string) {
   revalidatePath("/recycle-bin");
   redirect("/enquiries?deleted=1");
 }
+
+export const deleteEnquiryAction = deleteEnquiry;

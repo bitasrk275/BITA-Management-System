@@ -53,6 +53,7 @@ export function CalendarInteractiveView({
   equipmentList,
   selectedJobId,
   selectedTechId,
+  canDelete = true,
 }: {
   data: CalendarViewData;
   currentDate: string;
@@ -61,6 +62,7 @@ export function CalendarInteractiveView({
   equipmentList: EquipmentOption[];
   selectedJobId?: string | null;
   selectedTechId?: string | null;
+  canDelete?: boolean;
 }) {
   const router = useRouter();
 
@@ -364,16 +366,18 @@ export function CalendarInteractiveView({
                           <div className="rounded border border-amber-200 bg-amber-100/70 p-1.5 text-[11px] text-amber-900">
                             <div className="flex items-center justify-between">
                               <span className="font-semibold">On Leave</span>
-                              <form action={deleteLeaveAction}>
-                                <input type="hidden" name="leave_id" value={cell.leave.id} />
-                                <button
-                                  type="submit"
-                                  title="Cancel Leave"
-                                  className="text-amber-700 hover:text-amber-950 ml-1 text-xs"
-                                >
-                                  ×
-                                </button>
-                              </form>
+                              {canDelete && (
+                                <form action={deleteLeaveAction}>
+                                  <input type="hidden" name="leave_id" value={cell.leave.id} />
+                                  <button
+                                    type="submit"
+                                    title="Cancel Leave"
+                                    className="text-amber-700 hover:text-amber-950 ml-1 text-xs"
+                                  >
+                                    ×
+                                  </button>
+                                </form>
+                              )}
                             </div>
                             {cell.leave.reason && (
                               <div className="mt-0.5 text-[10px] text-amber-800 line-clamp-2">
@@ -577,32 +581,36 @@ export function CalendarInteractiveView({
               )}
 
               <div className="flex items-center justify-between pt-2">
-                {!confirmUnassign ? (
-                  <button
-                    type="button"
-                    className="text-xs text-bad hover:underline font-medium"
-                    onClick={() => setConfirmUnassign(true)}
-                  >
-                    Unassign Job
-                  </button>
+                {canDelete ? (
+                  !confirmUnassign ? (
+                    <button
+                      type="button"
+                      className="text-xs text-bad hover:underline font-medium"
+                      onClick={() => setConfirmUnassign(true)}
+                    >
+                      Unassign Job
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={submitting}
+                        onClick={handleUnassignConfirm}
+                        className="rounded bg-bad px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
+                      >
+                        {submitting ? "Removing…" : "Confirm Unassign"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmUnassign(false)}
+                        className="text-xs text-ink-3 hover:text-ink"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={handleUnassignConfirm}
-                      className="rounded bg-bad px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
-                    >
-                      {submitting ? "Removing…" : "Confirm Unassign"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmUnassign(false)}
-                      className="text-xs text-ink-3 hover:text-ink"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  <div />
                 )}
 
                 <div className="flex items-center gap-2">
