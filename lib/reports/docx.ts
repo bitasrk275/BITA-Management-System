@@ -2,6 +2,7 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
+  ImageRun,
   Packer,
   Paragraph,
   Table,
@@ -20,6 +21,23 @@ import {
 } from "./fields";
 import { REPORT_LAYOUTS } from "../../templates/reports/layouts";
 import type { ReportDocument } from "../../templates/reports/types";
+
+function dataUrlToBuffer(
+  dataUrl?: string | null,
+): { buffer: Buffer; mime: string; type: "png" | "jpg" } | null {
+  if (!dataUrl || !dataUrl.startsWith("data:")) return null;
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  const mime = match[1];
+  if (mime !== "image/png" && mime !== "image/jpeg" && mime !== "image/jpg") {
+    return null;
+  }
+  return {
+    mime,
+    type: mime === "image/png" ? "png" : "jpg",
+    buffer: Buffer.from(match[2], "base64"),
+  };
+}
 
 function formatValue(reading: ReadingValue | undefined): string {
   return reading === null || reading === undefined || String(reading).trim() === ""
@@ -88,6 +106,7 @@ export type ReportDocxSpec = {
     componentHeaderId?: string | null;
     reportDateFormatted: string;
     columnSpans: readonly number[];
+    logoDataUrl?: string;
   };
   clientRows: ReadonlyArray<readonly [string, string]>;
   detailPairs: readonly ReportDocxDetailPair[];
@@ -112,6 +131,8 @@ export type ReportDocxSpec = {
     signatoryName: string;
     signatoryQualification?: string;
     approvedAt: string;
+    signatureUrl?: string;
+    sealUrl?: string;
   } | null;
   footerNotes: readonly string[];
 };
@@ -269,6 +290,7 @@ export function buildReportDocxSpec(
       componentHeaderId: resolveHeaderComponentId(r),
       reportDateFormatted: formatDate(document.reportDate),
       columnSpans: layout.header,
+      logoDataUrl: document.letterhead.logoUrl,
     },
     clientRows: [
       ["CLIENT", formatValue(r.client)],
@@ -295,6 +317,8 @@ export function buildReportDocxSpec(
             signatoryName: document.approval.signatoryName,
             signatoryQualification: document.approval.signatoryQualification,
             approvedAt: document.approval.approvedAt,
+            signatureUrl: document.approval.signatureUrl,
+            sealUrl: document.approval.sealUrl,
           }
         : null,
     footerNotes: document.footerNotes ?? [],
@@ -412,11 +436,38 @@ export async function generateReportDocxBytes(
             ),
           ],
         }),
-        makeCell("BITA", {
-          columnSpan: spec.header.columnSpans[1],
-          bold: true,
-          align: AlignmentType.CENTER,
-        }),
+        (() => {
+          const logoImg = dataUrlToBuffer(spec.header.logoDataUrl);
+          if (
+            logoImg &&
+            ["image/png", "image/jpeg", "image/jpg"].includes(logoImg.mime)
+          ) {
+            return new TableCell({
+              columnSpan: spec.header.columnSpans[1],
+              verticalAlign: VerticalAlign.CENTER,
+              borders: CELL_BORDERS,
+              margins: { top: 60, bottom: 60, left: 60, right: 60 },
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  spacing: { before: 20, after: 20 },
+                  children: [
+                    new ImageRun({
+                      data: logoImg.buffer,
+                      transformation: { width: 75, height: 75 },
+                      type: logoImg.type,
+                    }),
+                  ],
+                }),
+              ],
+            });
+          }
+          return makeCell("BITA", {
+            columnSpan: spec.header.columnSpans[1],
+            bold: true,
+            align: AlignmentType.CENTER,
+          });
+        })(),
         makeCell(reportNoText, {
           columnSpan: spec.header.columnSpans[2],
           bold: true,
@@ -589,9 +640,52 @@ export async function generateReportDocxBytes(
           }),
         ],
       }),
+    );
+
+    const sigImg = dataUrlToBuffer(spec.signoff.signatureUrl);
+    if (
+      sigImg &&
+      ["image/png", "image/jpeg", "image/jpg"].includes(sigImg.mime)
+    ) {
+      sectionChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.RIGHT,
+          spacing: { before: 40, after: 40 },
+          children: [
+            new ImageRun({
+              data: sigImg.buffer,
+              transformation: { width: 140, height: 45 },
+              type: sigImg.type,
+            }),
+          ],
+        }),
+      );
+    }
+
+    const sealImg = dataUrlToBuffer(spec.signoff.sealUrl);
+    if (
+      sealImg &&
+      ["image/png", "image/jpeg", "image/jpg"].includes(sealImg.mime)
+    ) {
+      sectionChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.RIGHT,
+          spacing: { before: 20, after: 40 },
+          children: [
+            new ImageRun({
+              data: sealImg.buffer,
+              transformation: { width: 85, height: 85 },
+              type: sealImg.type,
+            }),
+          ],
+        }),
+      );
+    }
+
+    sectionChildren.push(
       new Paragraph({
         alignment: AlignmentType.RIGHT,
-        spacing: { before: 120, after: 40 },
+        spacing: { before: 80, after: 40 },
         children: [
           new TextRun({
             text: spec.signoff.signatoryName,
@@ -600,7 +694,7 @@ export async function generateReportDocxBytes(
             font: "Calibri",
           }),
         ],
-      })
+      }),
     );
     if (spec.signoff.signatoryQualification) {
       sectionChildren.push(

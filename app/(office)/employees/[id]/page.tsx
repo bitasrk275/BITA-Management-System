@@ -34,8 +34,10 @@ import {
   deleteEmployeeAction,
   deleteQualificationAction,
   linkEmployeePhoneAction,
+  removeEmployeeSignatureAction,
   revokeEmployeePhoneAction,
   updateEmployeeAction,
+  uploadEmployeeSignatureAction,
 } from "../actions";
 
 export const metadata = { title: "Employee details – BITA" };
@@ -416,6 +418,67 @@ export default async function EmployeeDetailPage({
               </List>
             </Card>
           )}
+
+          {/* Digital Signature Card */}
+          <Card className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <SectionTitle>Digital signature</SectionTitle>
+                <p className="text-xs text-ink-3">
+                  Applied to approved inspection reports when {employee.full_name} is the technical reviewer.
+                </p>
+              </div>
+              {employee.signature_path ? (
+                <Status tone="ok">Uploaded</Status>
+              ) : (
+                <Status tone="none">Not uploaded</Status>
+              )}
+            </div>
+
+            {employee.signature_path && (
+              <div className="flex items-center justify-between rounded border border-line bg-side/40 p-3">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="text-xs font-mono text-ink">
+                    {employee.signature_path.split("/").pop()}
+                  </span>
+                </div>
+                {isManagement && (
+                  <form action={removeEmployeeSignatureAction.bind(null, employee.id)}>
+                    <SecondaryButton type="submit" className="text-xs text-bad">
+                      Remove signature
+                    </SecondaryButton>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {isManagement && (
+              <form
+                action={uploadEmployeeSignatureAction.bind(null, employee.id)}
+                className="space-y-3 pt-1 border-t border-line"
+              >
+                <Field
+                  label={
+                    employee.signature_path
+                      ? "Replace signature image (PNG / JPEG)"
+                      : "Upload signature image (PNG / JPEG)"
+                  }
+                  hint="Transparent PNG or crisp JPEG scan under 2 MB"
+                >
+                  <input
+                    type="file"
+                    name="signature_file"
+                    accept="image/png,image/jpeg,image/jpg"
+                    required
+                    className="w-full text-xs text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-xs file:text-ink"
+                  />
+                </Field>
+                <Button type="submit">
+                  {employee.signature_path ? "Replace signature" : "Upload signature"}
+                </Button>
+              </form>
+            )}
+          </Card>
         </div>
 
         {/* Right: NDT Qualifications & Certificates */}

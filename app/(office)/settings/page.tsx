@@ -82,12 +82,20 @@ export default async function SettingsPage({
   const { supabase, person } = await requireStaff();
   const isManagement = Boolean(person?.roles.includes("management"));
 
-  const [{ data: settings, error: settingsErr }, { data: options, error: optionsErr }, permissions] =
+  const [{ data: settings, error: settingsErr }, { data: options, error: optionsErr }, permissions, staffRes] =
     await Promise.all([
       listSettings(supabase),
       listSettingsOptions(supabase, { listKey: list }),
       getPermissionsMatrix(supabase),
+      supabase
+        .from("people")
+        .select("id, full_name, position, roles")
+        .is("deleted_at", null)
+        .eq("active", true)
+        .order("full_name"),
     ]);
+
+  const activeStaff = staffRes.data ?? [];
 
   const settingMap = new Map(settings.map((s) => [s.key, s.value]));
   const rawProfile =
@@ -131,6 +139,12 @@ export default async function SettingsPage({
     bankBranch: typeof rawProfile.bank_branch === "string" ? rawProfile.bank_branch : "",
     bankAccountNo: typeof rawProfile.bank_account_no === "string" ? rawProfile.bank_account_no : "",
     bankIfsc: typeof rawProfile.bank_ifsc === "string" ? rawProfile.bank_ifsc : "",
+    logoPath: typeof rawProfile.logo_path === "string" ? rawProfile.logo_path : "",
+    sealPath: typeof rawProfile.seal_path === "string" ? rawProfile.seal_path : "",
+    defaultSignatoryId:
+      typeof rawProfile.default_signatory_id === "string"
+        ? rawProfile.default_signatory_id
+        : "",
   };
 
   const rawNumbering =
@@ -242,7 +256,7 @@ export default async function SettingsPage({
             <p className="mb-3 text-xs text-ink-3">
               Printed on every BITA tax invoice, proforma invoice, and downloadable Word (.docx) invoice.
             </p>
-            <form action={saveCompanyProfileAction} className="space-y-3">
+            <form action={saveCompanyProfileAction} encType="multipart/form-data" className="space-y-3">
               <Field label="Company Name">
                 <Input name="name" defaultValue={companyProfile.name} required />
               </Field>
@@ -284,6 +298,89 @@ export default async function SettingsPage({
                   <Input name="bank_ifsc" defaultValue={companyProfile.bankIfsc} />
                 </Field>
               </div>
+
+              {/* Branding Section */}
+              <div className="border-t border-line pt-3 mt-3 space-y-3">
+                <SectionTitle>Branding: Logo, Seal & Default Signatory</SectionTitle>
+                <p className="text-xs text-ink-3">
+                  Logos, seals, and signatures are stored in private storage and embedded in reports and invoices only upon technical approval.
+                </p>
+
+                <input
+                  type="hidden"
+                  name="existing_logo_path"
+                  value={companyProfile.logoPath}
+                />
+                <input
+                  type="hidden"
+                  name="existing_seal_path"
+                  value={companyProfile.sealPath}
+                />
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    label="Company Logo (PNG / JPEG)"
+                    hint={
+                      companyProfile.logoPath
+                        ? `Uploaded: ${companyProfile.logoPath.split("/").pop()}`
+                        : "Using default BITA emblem"
+                    }
+                  >
+                    <input
+                      type="file"
+                      name="logo_file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      className="w-full text-xs text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-xs file:text-ink"
+                    />
+                    {companyProfile.logoPath && (
+                      <label className="mt-1 flex items-center gap-1.5 text-xs text-bad cursor-pointer">
+                        <input type="checkbox" name="remove_logo" value="1" />
+                        <span>Remove uploaded logo (revert to emblem)</span>
+                      </label>
+                    )}
+                  </Field>
+
+                  <Field
+                    label="Company Seal (PNG / JPEG)"
+                    hint={
+                      companyProfile.sealPath
+                        ? `Uploaded: ${companyProfile.sealPath.split("/").pop()}`
+                        : "Using placeholder seal upon approval"
+                    }
+                  >
+                    <input
+                      type="file"
+                      name="seal_file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      className="w-full text-xs text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-xs file:text-ink"
+                    />
+                    {companyProfile.sealPath && (
+                      <label className="mt-1 flex items-center gap-1.5 text-xs text-bad cursor-pointer">
+                        <input type="checkbox" name="remove_seal" value="1" />
+                        <span>Remove uploaded seal (revert to placeholder)</span>
+                      </label>
+                    )}
+                  </Field>
+                </div>
+
+                <Field
+                  label="Default Signatory (Reports)"
+                  hint="Used when an approved report's reviewer does not have a signature uploaded"
+                >
+                  <Select
+                    name="default_signatory_id"
+                    defaultValue={companyProfile.defaultSignatoryId}
+                  >
+                    <option value="">None (Current Approver / Technical Reviewer)</option>
+                    {activeStaff.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.full_name} {s.position ? `(${s.position})` : ""} [{s.roles.join(", ")}]
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+
               {isManagement && <Button type="submit">Save company profile</Button>}
             </form>
           </Card>

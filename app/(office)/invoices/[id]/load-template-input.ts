@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/types";
 import type { BitaInvoiceProfile, InvoiceTemplateInput } from "@/lib/invoices";
+import { downloadBrandingImageDataUrl } from "@/lib/reports/branding.server";
 import {
   invoiceLinesTable,
   invoicesTable,
@@ -55,6 +56,25 @@ export async function loadBitaInvoiceProfile(
   if (typeof v.terms === "string" && v.terms.trim()) {
     profile.termsPlaceholder = v.terms.trim();
   }
+
+  const logoPath =
+    typeof v.logo_path === "string" && v.logo_path.trim()
+      ? v.logo_path.trim()
+      : undefined;
+  if (logoPath) {
+    const url = await downloadBrandingImageDataUrl(supabase, logoPath);
+    if (url) profile.logoUrl = url;
+  }
+
+  const sealPath =
+    typeof v.seal_path === "string" && v.seal_path.trim()
+      ? v.seal_path.trim()
+      : undefined;
+  if (sealPath) {
+    const url = await downloadBrandingImageDataUrl(supabase, sealPath);
+    if (url) profile.sealUrl = url;
+  }
+
   return profile;
 }
 
