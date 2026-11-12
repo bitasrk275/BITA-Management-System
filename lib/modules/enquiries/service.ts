@@ -66,6 +66,7 @@ export async function createEnquiryRecord(
       customer_id: input.customer_id,
       status: input.status ?? (input.customer_id ? "linked" : "new"),
       ...(input.received_at ? { received_at: input.received_at } : {}),
+      ...(input.extracted ? { extracted: input.extracted } : {}),
     })
     .select("*")
     .single();

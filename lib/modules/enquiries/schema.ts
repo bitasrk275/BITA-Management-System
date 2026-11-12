@@ -1,4 +1,5 @@
-import { Constants, type Enums } from "../../db/types";
+import { Constants, type Enums, type Json } from "../../db/types";
+import { formatStructuredEnquiryNotes } from "./ai-assist";
 
 export interface EnquiryInput {
   source: Enums<"enquiry_source">;
@@ -9,6 +10,7 @@ export interface EnquiryInput {
   customer_id: string | null;
   status?: Enums<"enquiry_status">;
   received_at?: string;
+  extracted?: Json;
 }
 
 function readStr(
@@ -49,6 +51,55 @@ export function parseEnquiryInput(
     }
   }
 
+  const requirement = readStr(raw, "requirement");
+  const standard = readStr(raw, "standard");
+  const component = readStr(raw, "component");
+  const quantityRaw = readStr(raw, "quantity");
+  const quantity =
+    quantityRaw && !Number.isNaN(parseInt(quantityRaw, 10)) && parseInt(quantityRaw, 10) > 0
+      ? parseInt(quantityRaw, 10)
+      : null;
+  const site = readStr(raw, "site");
+  const testMethodsRaw = readStr(raw, "test_methods");
+  const testMethods = testMethodsRaw
+    ? testMethodsRaw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  let body = readStr(raw, "body");
+  if (!body && (requirement || standard || component || quantity !== null || site)) {
+    body =
+      formatStructuredEnquiryNotes({
+        requirement,
+        test_methods: testMethods,
+        standard,
+        component,
+        quantity,
+        site,
+      }) || null;
+  }
+
+  let extracted: Json | undefined;
+  if (
+    requirement ||
+    standard ||
+    component ||
+    quantity !== null ||
+    site ||
+    testMethods.length > 0
+  ) {
+    extracted = {
+      summary: requirement,
+      standard,
+      component,
+      quantity,
+      site,
+      test_methods: testMethods,
+    };
+  }
+
   return {
     ok: true,
     value: {
@@ -56,10 +107,11 @@ export function parseEnquiryInput(
       from_name: readStr(raw, "from_name"),
       from_address: readStr(raw, "from_address"),
       subject: readStr(raw, "subject"),
-      body: readStr(raw, "body"),
+      body,
       customer_id: customerId,
       status,
       ...(receivedAt ? { received_at: receivedAt } : {}),
+      ...(extracted ? { extracted } : {}),
     },
   };
 }
