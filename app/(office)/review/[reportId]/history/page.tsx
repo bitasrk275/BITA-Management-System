@@ -94,7 +94,7 @@ export default async function ReportHistoryPage({
         title={`Correction history · ${report.report_no}`}
         subtitle={`${report.jobs?.job_no ?? "Job"} · ${METHOD_LABEL[report.method]} · ${
           report.jobs?.customers?.name ?? "Customer"
-        } · Audit trail of every field and report change (R28, X3)`}
+        } · Audit trail of every field and report change`}
         action={
           <>
             <ButtonLink href={`/review/${report.id}`} variant="secondary" size="sm">

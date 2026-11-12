@@ -145,7 +145,7 @@ export async function approveQuotation(id: string) {
   if (!person || !person.roles.includes("management")) {
     redirect(
       `/quotations/${id}?error=` +
-        encodeURIComponent("Only management can approve a quotation (R10)."),
+        encodeURIComponent("Only management can approve a quotation."),
     );
   }
   const { error } = await supabase
@@ -358,7 +358,7 @@ export async function reviseQuotation(id: string) {
   if (!person || !person.roles.includes("management")) {
     redirect(
       `/quotations/${id}?error=` +
-        encodeURIComponent("Only management can revise a quotation (R11)."),
+        encodeURIComponent("Only management can revise a quotation."),
     );
   }
 

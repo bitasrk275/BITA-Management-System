@@ -92,7 +92,7 @@ export default async function NewQuotationPage({
         </Card>
 
         <div>
-          <SectionTitle>Past quoted rates (R9)</SectionTitle>
+          <SectionTitle>Past quoted rates</SectionTitle>
           <List>
             {sortedPastItems.length > 0 ? (
               sortedPastItems.map((it) => (

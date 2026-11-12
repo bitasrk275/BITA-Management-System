@@ -155,7 +155,7 @@ export default async function ReviewQueue({
         </Link>
       </div>
 
-      {/* Multi-report invoice builder for Invoice pending reports (P4a) */}
+      {/* Multi-report invoice builder for Invoice pending reports */}
       {(filterInvoicePending || (canBill && invoicePendingReports.length > 0)) && (
         <section className="mb-7">
           <SectionTitle>
@@ -285,7 +285,7 @@ export default async function ReviewQueue({
               )}
             </List>
             <p className="mt-3 text-xs text-ink-3">
-              Signatures and the company seal are added only after a reviewer approves (R26, R27).
+              Signatures and the company seal are added only after a reviewer approves.
             </p>
           </section>
 
@@ -366,7 +366,7 @@ export default async function ReviewQueue({
               <form action={prepareReport} className="space-y-4">
                 <Field
                   label="Submitted field inspection *"
-                  hint="Only submitted inspections with complete mandatory readings can be prepared into a report (R25, X2)."
+                  hint="Only submitted inspections with complete mandatory readings can be prepared into a report."
                 >
                   <Select
                     name="inspection_id"
@@ -395,7 +395,7 @@ export default async function ReviewQueue({
                 <div className="grid gap-4 sm:grid-cols-3">
                   <Field
                     label="BITA report number *"
-                    hint="Typed in per BITA's numbering (R16)."
+                    hint="Typed in per BITA's numbering."
                   >
                     <Input
                       name="report_no"

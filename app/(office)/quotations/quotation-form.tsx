@@ -138,7 +138,7 @@ export function QuotationForm({
         )}
       </Field>
 
-      <Field label="Terms and conditions" hint="No fixed expiry date (R11, R12)">
+      <Field label="Terms and conditions" hint="No fixed expiry date">
         <Textarea name="terms" defaultValue={quotation?.terms ?? DEFAULT_QUOTATION_TERMS} />
       </Field>
 

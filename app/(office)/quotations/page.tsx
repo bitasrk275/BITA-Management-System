@@ -81,7 +81,7 @@ export default async function QuotationsPage({
     <>
       <PageHeader
         title="Quotations"
-        subtitle="Uploaded quotations, priced items & total, customer acceptance, and past rates (R9)."
+        subtitle="Uploaded quotations, priced items & total, customer acceptance, and past rates."
         action={<ButtonLink href="/quotations/new">Upload / new quotation</ButtonLink>}
       />
 
@@ -104,7 +104,7 @@ export default async function QuotationsPage({
       {(rateTerm || (pastItems && pastItems.length > 0)) && (
         <div className="mb-6">
           <SectionTitle>
-            {rateTerm ? `Past rates matching "${rateTerm}"` : "Recent quoted rates (R9 reference)"}
+            {rateTerm ? `Past rates matching "${rateTerm}"` : "Recent quoted rates"}
           </SectionTitle>
           <List>
             {pastItems && pastItems.length > 0 ? (

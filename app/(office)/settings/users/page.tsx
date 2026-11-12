@@ -51,7 +51,7 @@ export default async function SettingsUsersPage({
     <>
       <PageHeader
         title="Users & logins"
-        subtitle="Manage BITA staff and technicians, assign roles, and link login emails (D-015)."
+        subtitle="Manage BITA staff and technicians, assign roles, and link login emails."
       />
 
       <ErrorNote message={error ?? queryError?.message} />

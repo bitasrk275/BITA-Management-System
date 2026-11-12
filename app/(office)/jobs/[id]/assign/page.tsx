@@ -167,7 +167,7 @@ export default async function AssignTechnicianPage({
                       {evalResult.warnings.length > 0 && (
                         <div className="mt-2 space-y-1">
                           {evalResult.warnings.map((w) => (
-                            <ErrorNote key={w} message={`Warning (R20): ${w}`} />
+                            <ErrorNote key={w} message={`Warning: ${w}`} />
                           ))}
                         </div>
                       )}
@@ -244,7 +244,7 @@ export default async function AssignTechnicianPage({
 
           <Card>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold">Qualification matrix for this job (R20)</h2>
+              <h2 className="font-semibold">Qualification matrix for this job</h2>
               <Link href="/registers" className="text-xs underline">
                 Open registers
               </Link>

@@ -257,7 +257,7 @@ export default async function JobPage({
               </form>
             </div>
             <p className="mb-2 text-xs text-ink-3">
-              Generated in-app from the approved report and accepted quotation (D-017).
+              Generated in-app from the approved report and accepted quotation.
             </p>
             <ul className="space-y-1 text-sm">
               {invoices.data?.map((i) => (

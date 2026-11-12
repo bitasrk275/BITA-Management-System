@@ -303,7 +303,7 @@ export default async function QuotationPage({
                     )}
 
                     <form action={reviseQuotation.bind(null, id)}>
-                      <SecondaryButton type="submit">Create revised quotation (R11)</SecondaryButton>
+                      <SecondaryButton type="submit">Create revised quotation</SecondaryButton>
                     </form>
                   </div>
 
@@ -450,7 +450,7 @@ export default async function QuotationPage({
 
           <Card className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <SectionTitle>Priced items, rates &amp; total (R9)</SectionTitle>
+              <SectionTitle>Priced items, rates &amp; total</SectionTitle>
               <div className="text-xs text-ink-2">
                 Total: <strong className="text-ink"><Mono>{formatINR(totalAmount)}</Mono></strong>
               </div>
@@ -501,7 +501,7 @@ export default async function QuotationPage({
           </Card>
 
           <div>
-            <SectionTitle>Jobs covered by this quotation (R13)</SectionTitle>
+            <SectionTitle>Jobs covered by this quotation</SectionTitle>
             <List>
               {linkedJobs.data?.map((j) => (
                 <ListRow
@@ -532,7 +532,7 @@ export default async function QuotationPage({
           </Card>
 
           <div>
-            <SectionTitle>Search past rates (R9)</SectionTitle>
+            <SectionTitle>Search past rates</SectionTitle>
             <form className="mb-3 flex gap-2">
               <Input name="rate_q" placeholder="Component, method or basis…" defaultValue={rate_q} />
               <SecondaryButton type="submit">Search</SecondaryButton>

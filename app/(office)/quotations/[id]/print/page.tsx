@@ -50,14 +50,14 @@ export default async function QuotationPrintPage({ params }: { params: Promise<{
           </Link>
           <Badge>{QUOTATION_STATUS_LABEL[quotation.status]}</Badge>
           {!isApproved && (
-            <Status tone="wait">Draft preview – management approval required before sending (R10)</Status>
+            <Status tone="wait">Draft preview – management approval required before sending</Status>
           )}
         </div>
         <PrintQuotationButton />
       </div>
 
       <article className="mx-auto max-w-3xl rounded-lg border border-neutral-300 bg-white p-6 text-neutral-900 shadow-sm sm:p-10 print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none">
-        {/* BITA Letterhead (R8) */}
+        {/* BITA Letterhead */}
         <header className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-neutral-900 pb-4">
           <div className="flex items-start gap-3">
             {logoUrl ? (
@@ -161,7 +161,7 @@ export default async function QuotationPrintPage({ params }: { params: Promise<{
           </table>
         </div>
 
-        {/* Terms & Conditions (R11, R12) */}
+        {/* Terms & Conditions */}
         <div className="mt-5 text-sm">
           <div className="font-semibold">Terms &amp; Conditions:</div>
           <p className="mt-1 whitespace-pre-wrap text-neutral-800">{quotation.terms || DEFAULT_QUOTATION_TERMS}</p>
@@ -189,7 +189,7 @@ export default async function QuotationPrintPage({ params }: { params: Promise<{
               </div>
             ) : (
               <div className="mt-6 text-xs italic text-neutral-500">
-                (Awaiting management approval – R10)
+                (Awaiting management approval)
               </div>
             )}
             <div className="mt-3 font-semibold">{approver?.data?.full_name ?? "Authorised Signatory"}</div>

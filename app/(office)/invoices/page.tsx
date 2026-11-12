@@ -175,7 +175,7 @@ export default async function InvoicesListPage({
         ]}
       />
 
-      {/* Prepare invoice from one or several Invoice pending reports (P4a) */}
+      {/* Prepare invoice from one or several Invoice pending reports */}
       <section className="mb-7">
         <SectionTitle>
           Prepare invoice from Invoice pending reports ({pendingReports.length})

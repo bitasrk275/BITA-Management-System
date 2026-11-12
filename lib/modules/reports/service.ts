@@ -190,7 +190,7 @@ export async function approveReportRecord(
     return {
       data: null,
       error:
-        "Only a technical reviewer can approve a report (AGENTS.md rule 6). Add the Reviewer role in Settings -> Users if needed.",
+        "Only a technical reviewer can approve a report. Add the Reviewer role in Settings -> Users if needed.",
     };
   }
 

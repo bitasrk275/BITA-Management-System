@@ -273,7 +273,7 @@ export default async function ReportReviewPage({
           <Card>
             <div className="space-y-2">
               <Status tone="bad">
-                Mandatory field readings are incomplete — approval is blocked (R25, X2)
+                Mandatory field readings are incomplete — approval is blocked
               </Status>
               <ul className="list-disc pl-5 text-[13px] text-ink-2">
                 {readiness.blockers.map((b) => (
@@ -284,11 +284,11 @@ export default async function ReportReviewPage({
           </Card>
         )}
 
-        {/* Booked Equipment & Calibration Check (A6) */}
+        {/* Booked Equipment & Calibration Check */}
         {bookedEquipment.length > 0 && (
           <Card className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <SectionTitle>Booked equipment for this job (A6)</SectionTitle>
+              <SectionTitle>Booked equipment for this job</SectionTitle>
               {expiredBookedEquipment.length > 0 ? (
                 <Status tone="bad">
                   {expiredBookedEquipment.length} expired calibration on job date
@@ -356,7 +356,7 @@ export default async function ReportReviewPage({
 
           {["in_review", "draft"].includes(report.status) && (
             <Card className="space-y-4">
-              <SectionTitle>Technical reviewer approval (R26, R27)</SectionTitle>
+              <SectionTitle>Technical reviewer approval</SectionTitle>
               <p className="text-[13px] text-ink-2">
                 Approving attaches the signatory&apos;s signature and company seal and generates the signed PDF in <Mono>reports/{report.job_id}/</Mono>.
               </p>
@@ -380,7 +380,7 @@ export default async function ReportReviewPage({
                 {expiredBookedEquipment.length > 0 && (
                   <div className="rounded-lg border border-bad/30 bg-bad/5 p-3 space-y-2">
                     <div className="text-xs font-semibold text-bad">
-                      Expired calibration guard (A6): Booked equipment{" "}
+                      Expired calibration guard: Booked equipment{" "}
                       {expiredBookedEquipment
                         .map((e) =>
                           [e.make, e.model, e.serial_no].filter(Boolean).join(" ")
@@ -404,7 +404,7 @@ export default async function ReportReviewPage({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   {!isReviewer && (
                     <span className="text-xs text-bad">
-                      Reviewer role required to approve (AGENTS.md rule 6).
+                      Reviewer role required to approve.
                     </span>
                   )}
                   <Button type="submit" disabled={!readiness.ready || !isReviewer}>
@@ -536,9 +536,9 @@ export default async function ReportReviewPage({
           />
         )}
 
-        {/* Photos & Attachments Selection (Phase 2 / A1) */}
+        {/* Photos & Attachments Selection */}
         <Card className="space-y-4">
-          <SectionTitle>Report photos & attachments (A1)</SectionTitle>
+          <SectionTitle>Report photos & attachments</SectionTitle>
           <p className="text-[13px] text-ink-2">
             Tick which inspection photos and drawing attachments to include in the final report PDF and Word download.
           </p>
@@ -601,9 +601,9 @@ export default async function ReportReviewPage({
         </Card>
       )}
 
-      {/* Field Data Checklist (X2) */}
+      {/* Field Data Checklist */}
       <div className="report-preview-controls mt-8 space-y-6">
-        <SectionTitle>Field readings & mandatory check (X2)</SectionTitle>
+        <SectionTitle>Field readings & mandatory check</SectionTitle>
 
         {supportedMethod(report.method) && (
           <List>

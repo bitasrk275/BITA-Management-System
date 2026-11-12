@@ -147,7 +147,7 @@ export function ReportEditor({
     <Card className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <SectionTitle>Edit report readings, observations &amp; items (T33)</SectionTitle>
+          <SectionTitle>Edit report readings, observations &amp; items</SectionTitle>
           <p className="text-[13px] text-ink-2">
             Every saved change updates <span className="font-mono text-xs">reports.content</span> and is recorded in the
             correction history log automatically.

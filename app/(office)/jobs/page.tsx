@@ -89,12 +89,12 @@ export default async function JobsPage({
         action={<ButtonLink href="/jobs/new">New job</ButtonLink>}
       />
 
-      {/* Export Jobs Register (R17) */}
+      {/* Export Jobs Register */}
       <Card className="mb-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold text-ink">
-              Export jobs register (R17 notebook format)
+              Export jobs register
             </h2>
             <p className="text-xs text-ink-3">
               Columns: Date of testing · Person who tested · Customer · Report no(s) · Component / Serial no · Details of testing · Invoice generated · Invoice no(s) · Remarks

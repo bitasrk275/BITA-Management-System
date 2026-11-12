@@ -72,7 +72,7 @@ export function AssignForm({
 
       {selectedPersonId && (
         <div className="space-y-2">
-          <p className="text-sm font-medium">Qualification check for job test methods (R20)</p>
+          <p className="text-sm font-medium">Qualification check for job test methods</p>
           {jobMethods.length === 0 ? (
             <p className="text-xs">No test methods set on this job yet.</p>
           ) : (
@@ -84,7 +84,7 @@ export function AssignForm({
           )}
 
           {evaluation.warnings.map((w) => (
-            <ErrorNote key={w} message={`Warning (R20): ${w}`} />
+            <ErrorNote key={w} message={`Warning: ${w}`} />
           ))}
 
           {personQualifications.length > 0 && (
