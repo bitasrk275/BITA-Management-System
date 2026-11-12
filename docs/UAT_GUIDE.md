@@ -61,12 +61,9 @@ flowchart TD
 3. Click **Sign in**.
 4. **What you should see:**
    - You are redirected to the main dashboard (`/`).
-   - The left sidebar displays role-specific navigation:
-     - **Office:** Customers, Enquiries, Quotations, Jobs, Calendar
-     - **Field & Review:** Field App, Review & Approvals
-     - **Finance & Accounts:** Invoices, Log Book, Price List
-     - **Operations & Registers:** Employees, Equipment, Recycle Bin
-     - **Management:** Settings, Users
+   - The left sidebar displays the complete management menu:
+     - **Main:** Home, Enquiries, Quotations, Calendar, Jobs, Reports, Invoices & payments, Finance, Log book
+     - **Records & Operations:** Price list, Employees, Customers, Equipment, Settings, CA GST files, Recycle bin, Users & logins, Technician phone app
    - Quick statistics cards show counts for Active Jobs, Unassigned Jobs, In Review, Invoice Pending, and Overdue Invoices.
 
 ---
