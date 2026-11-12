@@ -15,7 +15,9 @@ import {
   createEmployeeQualification,
   deleteEmployee,
   deleteEmployeeQualification,
+  removeEmployeeSignature,
   updateEmployee,
+  uploadEmployeeSignature,
 } from "@/lib/modules/employees/service";
 
 function fail(path: string, message: string): never {
@@ -241,4 +243,63 @@ export async function revokeEmployeePhoneAction(
   revalidatePath(path);
   revalidatePath("/employees");
   redirect(`${path}?saved=device_revoked`);
+}
+
+export async function uploadEmployeeSignatureAction(
+  employeeId: string,
+  formData: FormData
+) {
+  if (!isValidUuid(employeeId)) redirect("/employees");
+  const { supabase, person } = await requireStaff();
+  const isManagement = person?.roles.includes("management") ?? false;
+  const path = `/employees/${employeeId}`;
+
+  if (!isManagement) {
+    fail(path, "Only management can upload employee signatures.");
+  }
+
+  const file = formData.get("signature_file");
+  if (!(file instanceof File) || file.size === 0) {
+    fail(path, "Please select a signature image file (PNG or JPEG).");
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    fail(path, "Signature image must be under 2 MB.");
+  }
+
+  try {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    await uploadEmployeeSignature(supabase, employeeId, {
+      name: file.name,
+      type: file.type,
+      bytes,
+    });
+  } catch (err) {
+    fail(path, err instanceof Error ? err.message : "Failed to upload signature.");
+  }
+
+  revalidatePath(path);
+  revalidatePath("/employees");
+  redirect(`${path}?saved=signature_uploaded`);
+}
+
+export async function removeEmployeeSignatureAction(employeeId: string) {
+  if (!isValidUuid(employeeId)) redirect("/employees");
+  const { supabase, person } = await requireStaff();
+  const isManagement = person?.roles.includes("management") ?? false;
+  const path = `/employees/${employeeId}`;
+
+  if (!isManagement) {
+    fail(path, "Only management can remove employee signatures.");
+  }
+
+  try {
+    await removeEmployeeSignature(supabase, employeeId);
+  } catch (err) {
+    fail(path, err instanceof Error ? err.message : "Failed to remove signature.");
+  }
+
+  revalidatePath(path);
+  revalidatePath("/employees");
+  redirect(`${path}?saved=signature_removed`);
 }

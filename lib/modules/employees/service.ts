@@ -43,6 +43,7 @@ export type EmployeeWithSummary = {
   active: boolean;
   monthly_salary: number | null;
   per_job_allowance: number | null;
+  signature_path: string | null;
   qualifications: EmployeeQualificationItem[];
   active_devices_count: number;
   devices: EmployeeDeviceItem[];
@@ -95,7 +96,8 @@ export async function listEmployees(
       roles,
       active,
       monthly_salary,
-      per_job_allowance
+      per_job_allowance,
+      signature_path
     `)
     .is("deleted_at", null)
     .order("full_name", { ascending: true });
@@ -232,6 +234,7 @@ export async function listEmployees(
       active: p.active,
       monthly_salary: canViewSalaries ? p.monthly_salary : null,
       per_job_allowance: canViewSalaries ? p.per_job_allowance : null,
+      signature_path: p.signature_path ?? null,
       qualifications: quals,
       active_devices_count: activeDevs,
       devices: devs,
@@ -269,7 +272,8 @@ export async function getEmployeeDetail(
           roles,
           active,
           monthly_salary,
-          per_job_allowance
+          per_job_allowance,
+          signature_path
         `)
         .eq("id", personId)
         .is("deleted_at", null)
@@ -349,6 +353,7 @@ export async function getEmployeeDetail(
     active: p.active,
     monthly_salary: canViewSalaries ? p.monthly_salary : null,
     per_job_allowance: canViewSalaries ? p.per_job_allowance : null,
+    signature_path: p.signature_path ?? null,
     qualifications: quals,
     active_devices_count: devs.filter((d) => !d.revoked_at).length,
     devices: devs,
@@ -485,6 +490,63 @@ export async function deleteEmployeeQualification(
 
   if (error) {
     throw new Error("Failed to delete qualification: " + error.message);
+  }
+  return { success: true };
+}
+
+export async function uploadEmployeeSignature(
+  supabase: SupabaseClient<Database>,
+  personId: string,
+  file: { name: string; type: string; bytes: Buffer | Uint8Array }
+): Promise<{ signature_path: string }> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  if (!["png", "jpg", "jpeg"].includes(ext)) {
+    throw new Error("Only PNG or JPEG signature images are supported.");
+  }
+  const cleanExt = ext === "jpg" ? "jpeg" : ext;
+  const storagePath = `signatures/${personId}-${Date.now()}.${cleanExt}`;
+
+  let uploadErr: { message: string } | null = null;
+  const res1 = await supabase.storage.from("branding").upload(storagePath, file.bytes, {
+    contentType: file.type || `image/${cleanExt}`,
+    upsert: true,
+  });
+  if (res1.error) {
+    uploadErr = res1.error;
+    const res2 = await supabase.storage.from("documents").upload(`branding/${storagePath}`, file.bytes, {
+      contentType: file.type || `image/${cleanExt}`,
+      upsert: true,
+    });
+    if (res2.error) {
+      throw new Error(
+        "Failed to upload signature image: " + (uploadErr?.message || res2.error.message)
+      );
+    }
+  }
+
+  const { error: updateErr } = await supabase
+    .from("people")
+    .update({ signature_path: storagePath })
+    .eq("id", personId);
+
+  if (updateErr) {
+    throw new Error("Failed to update employee signature: " + updateErr.message);
+  }
+
+  return { signature_path: storagePath };
+}
+
+export async function removeEmployeeSignature(
+  supabase: SupabaseClient<Database>,
+  personId: string
+): Promise<{ success: boolean }> {
+  const { error } = await supabase
+    .from("people")
+    .update({ signature_path: null })
+    .eq("id", personId);
+
+  if (error) {
+    throw new Error("Failed to remove employee signature: " + error.message);
   }
   return { success: true };
 }

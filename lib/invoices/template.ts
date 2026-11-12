@@ -6,6 +6,7 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
+  ImageRun,
   Packer,
   Paragraph,
   ShadingType,
@@ -27,6 +28,23 @@ import {
 } from "./gst";
 import { amountInWordsINR } from "./words";
 
+function dataUrlToBuffer(
+  dataUrl?: string | null,
+): { buffer: Buffer; mime: string; type: "png" | "jpg" } | null {
+  if (!dataUrl || !dataUrl.startsWith("data:")) return null;
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  const mime = match[1];
+  if (mime !== "image/png" && mime !== "image/jpeg" && mime !== "image/jpg") {
+    return null;
+  }
+  return {
+    mime,
+    type: mime === "image/png" ? "png" : "jpg",
+    buffer: Buffer.from(match[2], "base64"),
+  };
+}
+
 export interface BitaInvoiceProfile {
   name: string;
   subtitle: string;
@@ -40,6 +58,8 @@ export interface BitaInvoiceProfile {
   defaultSac: string;
   bankDetailsPlaceholder: string;
   termsPlaceholder: string;
+  logoUrl?: string;
+  sealUrl?: string;
 }
 
 export const DEFAULT_BITA_INVOICE_PROFILE: BitaInvoiceProfile = {
@@ -596,10 +616,71 @@ export async function generateInvoiceDocxBytes(input: InvoiceTemplateInput): Pro
     new TableRow({
       children: [
         makeCell("Signatory", { widthTwips: 2000, bold: true, shaded: true }),
-        makeCell(`For ${spec.seller.name}\n\nAuthorised Signatory`, { widthTwips: 8466, bold: true }),
+        (() => {
+          const sealImg = !spec.isDraft ? dataUrlToBuffer(spec.seller.sealUrl) : null;
+          const cellChildren = [
+            new Paragraph({
+              children: [
+                new TextRun({ text: `For ${spec.seller.name}`, bold: true, font: "Arial", size: 18 }),
+              ],
+            }),
+          ];
+          if (sealImg && ["image/png", "image/jpeg", "image/jpg"].includes(sealImg.mime)) {
+            cellChildren.push(
+              new Paragraph({
+                spacing: { before: 40, after: 40 },
+                children: [
+                  new ImageRun({
+                    data: sealImg.buffer,
+                    transformation: { width: 75, height: 75 },
+                    type: sealImg.type,
+                  }),
+                ],
+              }),
+            );
+          } else {
+            cellChildren.push(
+              new Paragraph({
+                spacing: { before: 120, after: 20 },
+                children: [],
+              }),
+            );
+          }
+          cellChildren.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Authorised Signatory", bold: true, font: "Arial", size: 18 }),
+              ],
+            }),
+          );
+          return new TableCell({
+            width: { size: 8466, type: WidthType.DXA },
+            borders: CELL_BORDERS,
+            margins: { top: 60, bottom: 60, left: 80, right: 80 },
+            children: cellChildren,
+          });
+        })(),
       ],
     }),
   );
+
+  const logoImg = dataUrlToBuffer(spec.seller.logoUrl);
+  const headerLogoChildren =
+    logoImg && ["image/png", "image/jpeg", "image/jpg"].includes(logoImg.mime)
+      ? [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 60 },
+            children: [
+              new ImageRun({
+                data: logoImg.buffer,
+                transformation: { width: 70, height: 70 },
+                type: logoImg.type,
+              }),
+            ],
+          }),
+        ]
+      : [];
 
   const doc = new Document({
     sections: [
@@ -610,6 +691,7 @@ export async function generateInvoiceDocxBytes(input: InvoiceTemplateInput): Pro
           },
         },
         children: [
+          ...headerLogoChildren,
           new Paragraph({
             alignment: AlignmentType.CENTER,
             children: [

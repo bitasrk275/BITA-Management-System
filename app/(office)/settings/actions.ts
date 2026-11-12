@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireStaff } from "@/lib/auth";
-import type { Enums, Json } from "@/lib/db/types";
+import type { Database, Enums, Json } from "@/lib/db/types";
 import { friendlyError, text } from "@/lib/forms";
 import {
   PERMISSION_ACTIONS,
@@ -68,8 +69,78 @@ export async function removeDropdownOption(id: string) {
   redirect("/settings?saved=1");
 }
 
+async function uploadBrandingFile(
+  supabase: SupabaseClient<Database>,
+  file: File,
+  prefix: "logo" | "seal"
+): Promise<string> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  if (!["png", "jpg", "jpeg"].includes(ext)) {
+    throw new Error(`Only PNG or JPEG images are supported for ${prefix}.`);
+  }
+  const cleanExt = ext === "jpg" ? "jpeg" : ext;
+  const storagePath = `${prefix}-${Date.now()}.${cleanExt}`;
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  let uploadErr: { message: string } | null = null;
+  const res1 = await supabase.storage.from("branding").upload(storagePath, bytes, {
+    contentType: file.type || `image/${cleanExt}`,
+    upsert: true,
+  });
+  if (res1.error) {
+    uploadErr = res1.error;
+    const res2 = await supabase.storage
+      .from("documents")
+      .upload(`branding/${storagePath}`, bytes, {
+        contentType: file.type || `image/${cleanExt}`,
+        upsert: true,
+      });
+    if (res2.error) {
+      throw new Error(
+        `Failed to upload ${prefix}: ` + (uploadErr?.message || res2.error.message)
+      );
+    }
+  }
+  return storagePath;
+}
+
 export async function saveCompanyProfileAction(fd: FormData) {
   const { supabase, person } = await requireStaff();
+
+  let logoPath: string | null = text(fd, "existing_logo_path") || null;
+  if (fd.get("remove_logo") === "1") {
+    logoPath = null;
+  }
+  const logoFile = fd.get("logo_file");
+  if (logoFile instanceof File && logoFile.size > 0) {
+    try {
+      logoPath = await uploadBrandingFile(supabase, logoFile, "logo");
+    } catch (err) {
+      redirect(
+        "/settings?error=" +
+          encodeURIComponent(err instanceof Error ? err.message : "Logo upload failed")
+      );
+    }
+  }
+
+  let sealPath: string | null = text(fd, "existing_seal_path") || null;
+  if (fd.get("remove_seal") === "1") {
+    sealPath = null;
+  }
+  const sealFile = fd.get("seal_file");
+  if (sealFile instanceof File && sealFile.size > 0) {
+    try {
+      sealPath = await uploadBrandingFile(supabase, sealFile, "seal");
+    } catch (err) {
+      redirect(
+        "/settings?error=" +
+          encodeURIComponent(err instanceof Error ? err.message : "Seal upload failed")
+      );
+    }
+  }
+
+  const defaultSignatoryId = text(fd, "default_signatory_id") || null;
+
   const payload = {
     name: text(fd, "name") ?? "BANGALORE INSPECTION & TESTING AGENCY",
     address: text(fd, "address") ?? "",
@@ -82,13 +153,16 @@ export async function saveCompanyProfileAction(fd: FormData) {
     bank_branch: text(fd, "bank_branch") ?? "",
     bank_account_no: text(fd, "bank_account_no") ?? "",
     bank_ifsc: text(fd, "bank_ifsc") ?? "",
+    logo_path: logoPath,
+    seal_path: sealPath,
+    default_signatory_id: defaultSignatoryId,
   };
 
   const { error } = await upsertSetting(
     supabase,
     "company_profile",
     payload as unknown as Json,
-    "BITA company header, tax identifiers, default SAC 998393, and bank account details printed on invoices",
+    "BITA company header, tax identifiers, default SAC 998393, bank account details, and branding paths",
     person?.id ?? null,
   );
 
@@ -97,6 +171,7 @@ export async function saveCompanyProfileAction(fd: FormData) {
   }
   revalidatePath("/settings");
   revalidatePath("/invoices");
+  revalidatePath("/review");
   redirect("/settings?saved=1");
 }
 

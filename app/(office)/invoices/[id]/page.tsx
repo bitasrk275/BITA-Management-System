@@ -749,14 +749,23 @@ export default async function InvoiceDetailPage({
                 )}
               </div>
 
-              {/* Middle B [ITA] Emblem Box */}
+              {/* Middle B [ITA] Emblem or Uploaded Logo Box */}
               <div className="flex items-center justify-center border-r border-neutral-800 p-2">
-                <div className="relative flex h-20 w-20 items-center justify-center rounded border-2 border-neutral-900 font-serif text-4xl font-black tracking-tighter text-neutral-900">
-                  <span>B</span>
-                  <span className="ml-0.5 rounded bg-neutral-900 px-1 py-0.5 text-[11px] font-bold tracking-normal text-white">
-                    ITA
-                  </span>
-                </div>
+                {spec.seller.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={spec.seller.logoUrl}
+                    alt="Company Logo"
+                    className="max-h-20 max-w-[120px] object-contain"
+                  />
+                ) : (
+                  <div className="relative flex h-20 w-20 items-center justify-center rounded border-2 border-neutral-900 font-serif text-4xl font-black tracking-tighter text-neutral-900">
+                    <span>B</span>
+                    <span className="ml-0.5 rounded bg-neutral-900 px-1 py-0.5 text-[11px] font-bold tracking-normal text-white">
+                      ITA
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Top-Right Invoice No. & Date Stacked Boxes */}
@@ -917,11 +926,27 @@ export default async function InvoiceDetailPage({
 
               <div className="p-3 flex flex-col justify-between text-center">
                 <div className="text-[13.5px] font-semibold">
-                  For Bangalore Inspection &amp; Testing Agency
+                  For {spec.seller.name}
                 </div>
-                <div className="my-4 text-[11.5px] text-neutral-600 italic">
-                  Authorised Signatory
-                </div>
+                {!spec.isDraft && spec.seller.sealUrl ? (
+                  <div className="my-1 flex justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={spec.seller.sealUrl}
+                      alt="Approved company seal"
+                      className="h-16 w-16 object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="my-4 text-[11.5px] text-neutral-600 italic">
+                    Authorised Signatory
+                  </div>
+                )}
+                {!spec.isDraft && spec.seller.sealUrl && (
+                  <div className="text-[11.5px] font-semibold text-neutral-700">
+                    Authorised Signatory
+                  </div>
+                )}
               </div>
             </div>
           </div>
