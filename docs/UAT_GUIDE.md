@@ -178,7 +178,7 @@ flowchart TD
 ### Step 7: Technician Phone Pairing (Android APK or Mobile Browser)
 - [ ] **Step 7 Completed**
 
-1. On your office desktop, open **Employees / Registers** (`/registers` or `/employees`).
+1. On your office desktop, open **Employees** (`/employees`).
 2. Click on the assigned technician's name.
 3. Locate the **Linked Phones & Devices** card and click **Link a phone**.
 4. A large, high-visibility **6-digit pairing code** appears on screen (e.g. `834 912`, valid for 15 minutes).
@@ -240,7 +240,7 @@ flowchart TD
    - If any mandatory field was skipped, the system displays an amber notice highlighting the exact missing field.
    - Once all mandatory fields are present, the report submits successfully.
    - The status badge changes to **Submitted / In Review**.
-3. **Verify the pre-approval correction feature (Client Feature 7):**
+3. **Verify the pre-approval correction feature:**
    - While the report is waiting for technical review, tap **Edit submitted report**.
    - Modify the observation notes (e.g. change `"DAC attenuation within permissible limits"` to `"100% volumetric examination completed; DAC attenuation within permissible limits"`).
    - Tap **Resubmit Report**.
@@ -253,13 +253,13 @@ flowchart TD
 ### Step 10: Technical Office Review, Photo Selection & Technical Approval
 - [ ] **Step 10 Completed**
 
-1. Back on the office desktop, click **Review & Approvals** (`/review`) in the sidebar.
+1. Back on the office desktop, click **Reports** (`/review`) in the sidebar.
 2. The review queue lists the submitted report for Job `BITA/26-27/0001` with status badge `In Review`.
 3. Click on the report row to open the Technical Review screen (`/review/[reportId]`).
 4. **Verify the Review Screen components:**
    - **Side-by-side inspection data:** All 29 UT fields and repeating component rows are clearly laid out in BITA's official layout.
    - **Correction History:** Notice the audit log showing the technician's pre-approval edit with exact timestamps and diffs.
-   - **Photo Selection (Client Feature 6):** Each uploaded photograph has a checkbox **Include in final report**.
+   - **Photo Selection:** Each uploaded photograph has a checkbox **Include in final report**.
      - Check `[x]` for Photo 1 (e.g. component serial plate).
      - Uncheck `[ ]` for Photo 2 (to verify only selected photos appear in the final printed report).
 5. At the bottom, click **Approve Report**.
@@ -290,24 +290,23 @@ flowchart TD
 ### Step 12: Verify "Invoice Pending" Queue & Prepare Proforma Invoice
 - [ ] **Step 12 Completed**
 
-1. In the sidebar, click **Review & Approvals** (`/review`).
-2. Notice the filter tab **Invoice Pending (Client Feature 8)**:
+1. In the sidebar, click **Reports** (`/review`).
+2. Notice the filter tab **Invoice Pending**:
    - Job `BITA/26-27/0001` is clearly listed with badge `Invoice Pending`.
-3. In the sidebar, click **Invoices** (`/invoices`).
-4. Click **+ New Invoice** (`/invoices/new`).
-5. Fill in the invoice generation form:
-   - **Job:** Select `BITA/26-27/0001 (Apex Heavy Forge Pvt Ltd)`.
-   - **Invoice Type:** Select **Proforma Invoice** (since Apex uses proformas).
+3. Click on the approved report to open its detail view.
+4. Click **Prepare invoice** (or **Generate invoice**).
+5. The invoice creation screen opens at `/invoices/[id]`:
+   - Under **Invoice Series / Type**, select **Proforma Invoice** (or keep direct Tax Invoice).
    - **Invoice Date:** Today's date.
-   - **Due Date:** 30 days from today.
-6. Under **Line Items**, verify items are auto-populated from Quotation / Price List:
+   - **Due Date:** Automatically calculated per customer payment terms (30 days).
+6. Under **Line Items**, verify items are auto-populated from the approved report and accepted quotation:
    - Description: `Ultrasonic Examination of Forged Shafts (ASME Sec V)`
    - SAC Code: `998393` (BITA's official inspection SAC code)
    - Quantity: `4`, Rate: `₹ 3500.00`, Subtotal: `₹ 14,000.00`
    - CGST (9%): `₹ 1,260.00`
    - SGST (9%): `₹ 1,260.00`
    - Total Amount: `₹ 16,520.00`
-7. Click **Create Proforma Invoice**.
+7. Click **Issue Proforma Invoice** (or **Save Draft**).
 8. **What you should see:**  
    The Proforma invoice is created with number `BITA/26-27/PI-0001` and status badge `Issued (Proforma)`.
 
@@ -317,7 +316,7 @@ flowchart TD
 - [ ] **Step 13 Completed**
 
 1. On the Proforma Invoice detail page (`/invoices/[id]`), click the action button:  
-   **Convert to Tax Invoice (Client Feature 10)**.
+   **Convert to Tax Invoice**.
 2. A confirmation prompt explains that a permanent Tax Invoice number will be assigned.
 3. Click **Confirm Conversion**.
 4. **What you should see:**  
@@ -355,7 +354,7 @@ flowchart TD
 - [ ] **Step 15 Completed**
 
 1. In the sidebar, click **Settings** (`/settings`).
-2. Scroll to **Reminder Timings (Client Change 5)**:
+2. Scroll to **Reminder Timings**:
    - **Before Due Reminder:** `2 days before due date` (`before_due`)
    - **Due Date Reminder:** `On due date` (`on_due`)
    - **Grace Period:** `No reminders for 1–4 days after due date`
@@ -372,7 +371,7 @@ flowchart TD
 - [ ] **Step 16 Completed**
 
 1. Navigate to **Invoices** (`/invoices`) and click on any issued tax invoice.
-2. In the actions menu, click **Issue Credit Note (Client Feature 7)**.
+2. In the actions menu, click **Issue Credit Note**.
 3. Fill in the credit note modal:
    - **Reason:** Select `Price Correction` or `Discounts / Rate Difference`.
    - **Credit Amount (₹):** `1000.00`
@@ -389,8 +388,8 @@ flowchart TD
 ### Step 17: CA / GST Export (GSTR-1 Format)
 - [ ] **Step 17 Completed**
 
-1. In the sidebar, click **Invoices** (`/invoices`).
-2. Click the button **Export for CA / GST** in the top right.
+1. In the sidebar, click **Invoices & payments** (`/invoices`) or **CA GST files** (`/invoices/export`).
+2. Click **Export for CA / GST** in the top right.
 3. In the export dialog:
    - **Financial Year:** Select `2026-2027`
    - **Month:** Select `November` (or `All Months`)
@@ -500,22 +499,22 @@ Please print or copy this feedback table to record test observations during your
 
 ## 5. Known Limitations & Ongoing Enhancements
 
-The following items are documented from the Phase 2 requirements audit and are currently being finalized:
+The following ongoing enhancements are scheduled for the upcoming production update:
 
-1. **Executive Financial Analytics (X4 / G1):**  
-   Receivables ageing breakdown brackets (0–30, 31–60, 61–90, 90+ days) and customer-wise revenue vs expense comparison are being introduced in the dedicated **Finance** module.
-2. **Physical Notebook Register Export (R17 / G3):**  
-   An A3-formatted export matching BITA's historical inspection notebook format (date, customer, component, technician, report number, invoice number, remarks) is currently being added to `/jobs`.
-3. **Automatic Job Closure on Zero Balance (G4):**  
-   Once all tax invoices for a job are fully settled (bank payment + TDS + credit notes) and reports are sent, the job currently remains in `invoiced` status until manual transition or the automatic closure trigger runs.
-4. **Custom Company Logo & Signature Uploads (G7):**  
-   Reports and invoices currently render clean SVG placeholder logos and digital approval blocks. Dedicated image upload fields for the company logo, physical stamp/seal, and individual engineer signatures are being added to **Settings → Company Profile**.
-5. **AI Email Enquiry Paste-Assist (G5):**  
-   The Claude API extraction logic (`lib/ai/extract-enquiry.ts`) is fully tested and operational; the convenient "Paste email here" prefill box on `/enquiries/new` is being added to the UI.
-6. **Soft-Delete on Enquiries, Quotations, and Jobs (G6):**  
-   Soft-delete and the Recycle Bin currently protect Customers, Employees, Equipment, Log Book entries, and Price Items. Confirmation dialogs and permission guards for deleting Enquiries, Quotations, and Jobs are being finalized.
-7. **Custom Report Template Editor (G8):**  
-   The field API dynamically delivers the full 29-field UT report and MT/DPT schemas. A visual drag-and-drop template editor in **Settings** is being added for ad-hoc custom test methods.
+1. **Executive Financial Analytics:**  
+   Receivables ageing breakdown brackets (0–30, 31–60, 61–90, 90+ days) and customer-wise revenue vs expense comparison in the dedicated **Finance** module.
+2. **Physical Notebook Register Export:**  
+   An export matching BITA's historical inspection notebook format (date, customer, component, technician, report number, invoice number, remarks) on `/jobs`.
+3. **Automatic Job Closure on Zero Balance:**  
+   Once all tax invoices for a job are fully settled (bank payment + TDS + credit notes) and reports are sent, the job automatically transitions to `closed`.
+4. **Custom Company Logo & Signature Uploads:**  
+   Reports and invoices currently render clean SVG placeholder logos and digital approval blocks. Dedicated image upload fields for company logo, physical stamp/seal, and individual engineer signatures in **Settings → Company Profile**.
+5. **AI Email Enquiry Paste-Assist:**  
+   The enquiry extraction logic (`lib/ai/extract-enquiry.ts`) is fully tested and operational; a convenient "Paste email here" prefill box on `/enquiries/new` allows rapid enquiry entry.
+6. **Soft-Delete on Enquiries, Quotations, and Jobs:**  
+   Confirmation dialogs and permission guards for deleting Enquiries, Quotations, and Jobs with full audit logging and Recycle Bin restoration.
+7. **Custom Report Template Editor:**  
+   The field API dynamically delivers the full 29-field UT report and MT/DPT schemas. An editor in **Settings** allows customizing template fields for ad-hoc test methods.
 
 ---
 
@@ -531,5 +530,5 @@ Before transitioning from acceptance testing to daily commercial operations, BIT
 | **4** | **Supabase Auth Hardening** | IT / Admin | In the Supabase Dashboard, verify: (a) Public Sign-Up is turned **OFF**; (b) Leaked-Password Protection is turned **ON**. |
 | **5** | **SMTP Email Configuration** | IT / Admin | Provide outgoing SMTP credentials for BITA's official email domain (for password resets and automated customer payment reminders). |
 | **6** | **Telegram Executive Bot** | BITA Management | Create an official bot with `@BotFather` under BITA's Telegram account, provide the bot token, and register the webhook under **Settings → Telegram Executive Bot**. |
-| **7** | **Technician Phone Setup** | BITA Operations | Install `BITA-Technician.apk` (or bookmark `/field-app`) on field technicians' Android phones and pair using 6-digit codes. |
-| **8** | **Hosting Tier Upgrade** | Naveen / BITA | Upgrade Vercel from Hobby to **Vercel Pro** (or host on Netlify / dedicated Hostinger VPS) to comply with commercial usage terms. |
+| **7** | **Technician Phone Setup** | BITA Operations | Install `BITA-Technician.apk` (or bookmark `/field-app`) on each field technician's Android phone and pair using 6-digit codes. |
+| **8** | **Hosting Tier Upgrade** | Naveen / BITA | Upgrade Vercel from Hobby to **Vercel Pro** (or host on a dedicated Hostinger VPS) to comply with commercial usage terms. |
