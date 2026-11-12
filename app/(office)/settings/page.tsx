@@ -62,6 +62,7 @@ const ALL_ROLES: readonly Enums<"app_role">[] = [
 const PERMISSION_LABELS: Record<(typeof PERMISSION_ACTIONS)[number], string> = {
   delete: "Delete & restore records (Recycle bin)",
   view_salaries: "View employee salaries",
+  view_finance: "View financial reports (Finance)",
   approve_reports: "Approve inspection reports",
   issue_invoices: "Issue tax invoices & credit notes",
 };

@@ -44,6 +44,7 @@ function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; rec
         { href: "/jobs", label: "Jobs", icon: "jobs", count: c.jobs },
         { href: "/review", label: "Reports", icon: "reports", count: c.reports },
         { href: "/invoices", label: "Invoices & payments", icon: "money" },
+        { href: "/finance", label: "Finance", icon: "chart" },
         { href: "/log-book", label: "Log book", icon: "reports" },
       ],
       records: [

@@ -3,6 +3,7 @@ import type { Enums, Json } from "../../db/types";
 export const PERMISSION_ACTIONS = [
   "delete",
   "view_salaries",
+  "view_finance",
   "approve_reports",
   "issue_invoices",
 ] as const;
@@ -14,6 +15,7 @@ export type PermissionsMatrix = Record<PermissionAction, Enums<"app_role">[]>;
 export const DEFAULT_PERMISSIONS_MATRIX: PermissionsMatrix = {
   delete: ["management"],
   view_salaries: ["management"],
+  view_finance: ["management"],
   approve_reports: ["reviewer", "management"],
   issue_invoices: ["management", "office"],
 };
@@ -67,6 +69,7 @@ export function normalizePermissionsMatrix(value: Json | undefined | null): Perm
   const result: PermissionsMatrix = {
     delete: [...DEFAULT_PERMISSIONS_MATRIX.delete],
     view_salaries: [...DEFAULT_PERMISSIONS_MATRIX.view_salaries],
+    view_finance: [...DEFAULT_PERMISSIONS_MATRIX.view_finance],
     approve_reports: [...DEFAULT_PERMISSIONS_MATRIX.approve_reports],
     issue_invoices: [...DEFAULT_PERMISSIONS_MATRIX.issue_invoices],
   };
