@@ -1,4 +1,5 @@
 import { todayIST } from "../../dates";
+import { csvEscapeCell } from "../../invoices/gst-export";
 
 export type AgeingBucket =
   | "not_due"
@@ -317,19 +318,10 @@ export function classifyAgeingBucket(daysOverdue: number): AgeingBucket {
   return "days_90_plus";
 }
 
-function escapeCsvCell(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return "";
-  const str = String(value);
-  if (/[",\r\n]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
 function buildCsv(headers: readonly string[], rows: readonly (readonly (string | number | null | undefined)[])[]): string {
   const lines = [
-    headers.map(escapeCsvCell).join(","),
-    ...rows.map((r) => r.map(escapeCsvCell).join(",")),
+    headers.map(csvEscapeCell).join(","),
+    ...rows.map((r) => r.map(csvEscapeCell).join(",")),
   ];
   return lines.join("\r\n") + "\r\n";
 }

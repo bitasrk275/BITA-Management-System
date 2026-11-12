@@ -371,6 +371,18 @@ describe("G1 – Financial reports module (X4) with PGlite fixtures", () => {
     expect(pfCsv).toContain("Proforma No.,Date,Status,Job No.");
     expect(pfCsv).toContain("47200.00");
 
+    // Verify formula injection neutralization on CSV export (e.g. =HYPERLINK(...))
+    const injectedCsv = receivablesAgeingToCsv({
+      ...overview.ageing,
+      customers: [
+        {
+          ...overview.ageing.customers[0]!,
+          customer_name: '=HYPERLINK("http://evil.example","Click")',
+        },
+      ],
+    });
+    expect(injectedCsv).toContain('"\'=HYPERLINK(""http://evil.example"",""Click"")"');
+
     // Helper coverage
     expect(currentFinancialYear("2027-02-15")).toBe("2026-27");
     expect(parseFinancialYearRange("26-27").fy).toBe("2026-27");
