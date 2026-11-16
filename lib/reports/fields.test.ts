@@ -16,7 +16,10 @@ describe("mandatory report readings", () => {
 
   it("normalizes MT to the database MPT enum and refuses unsupported methods", () => {
     expect(reportMethod("MT")).toBe("MPT");
-    expect(() => missingFields("VT" as ReportMethodInput, {})).toThrow("Unsupported");
+    expect(() => reportMethod("VT" as ReportMethodInput)).toThrow("Unsupported");
+    // Since the Settings template editor, methods without a code template no longer throw here:
+    // they have no scalar fields, but the repeating technician and item rows are still required.
+    expect(missingFields("VT" as ReportMethodInput, {}).length).toBeGreaterThan(0);
   });
 
   it("finds missing or whitespace-only values without treating zero as empty", () => {
