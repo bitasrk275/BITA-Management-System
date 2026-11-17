@@ -250,6 +250,9 @@ describe("Telegram Executive Bot Service & Webhook Integration", () => {
           not: () => chain,
           in: () => chain,
           gt: () => chain,
+          lt: () => chain,
+          neq: () => chain,
+          or: () => chain,
           gte: () => chain,
           lte: () => chain,
           order: () => chain,
@@ -457,54 +460,28 @@ describe("Telegram Executive Bot Service & Webhook Integration", () => {
   });
 
   it("5. Answers executive queries (/help, /status, /jobs, /invoices, /overdue, /reports, /equipment, /schedule, and natural language)", async () => {
-    // /help
+    // /help lists every area
     const help = await answerTelegramExecutiveQuery(fakeSupabase, "/help");
-    expect(help).toContain("BITA Executive Assistant");
-    expect(help).toContain("/status");
-    expect(help).toContain("/jobs");
-    expect(help).toContain("/invoices");
+    for (const cmd of ["/status", "/jobs", "/invoices", "/finance", "/leave", "/enquiries", "/customer", "/field", "/problems", "/team"]) {
+      expect(help).toContain(cmd);
+    }
 
-    // /status
-    const status = await answerTelegramExecutiveQuery(fakeSupabase, "/status");
-    expect(status).toContain("BITA Executive Dashboard");
-
-    // /jobs
-    const jobs = await answerTelegramExecutiveQuery(fakeSupabase, "/jobs");
-    expect(jobs).toContain("Active Jobs");
-
-    // /invoices
-    const invoices = await answerTelegramExecutiveQuery(fakeSupabase, "/invoices");
-    expect(invoices).toContain("Receivables & Billing Summary");
-
-    // /overdue
-    const overdue = await answerTelegramExecutiveQuery(fakeSupabase, "/overdue");
-    expect(overdue.toLowerCase()).toMatch(/overdue|no overdue/);
-
-    // /reports
-    const reports = await answerTelegramExecutiveQuery(fakeSupabase, "/reports");
-    expect(reports.toLowerCase()).toMatch(/review|reviewed/);
-
-    // /equipment
-    const equipment = await answerTelegramExecutiveQuery(fakeSupabase, "/equipment");
-    expect(equipment.toLowerCase()).toMatch(/calibration|valid/);
-
-    // /schedule
-    const schedule = await answerTelegramExecutiveQuery(fakeSupabase, "/schedule");
-    expect(schedule.toLowerCase()).toMatch(/schedule|technician/);
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "/status")).toContain("BITA summary");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "/jobs")).toContain("Open jobs");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "/invoices")).toContain("Open tax invoices");
+    expect((await answerTelegramExecutiveQuery(fakeSupabase, "/overdue")).toLowerCase()).toContain("overdue");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "/reports")).toContain("Waiting for approval");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "/equipment")).toContain("Calibration due");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "/schedule")).toContain("On site");
 
     // /job lookup with unknown id
-    const unknownJob = await answerTelegramExecutiveQuery(fakeSupabase, "/job BITA/26-27/9999");
-    expect(unknownJob).toContain("Could not find an active job");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "/job BITA/26-27/9999")).toContain("No job found");
 
-    // Natural language questions
-    const nlMoney = await answerTelegramExecutiveQuery(fakeSupabase, "How much money is pending from customers?");
-    expect(nlMoney).toContain("Receivables & Billing Summary");
-
-    const nlJobs = await answerTelegramExecutiveQuery(fakeSupabase, "What are the active jobs?");
-    expect(nlJobs).toContain("Active Jobs");
-
-    const nlCal = await answerTelegramExecutiveQuery(fakeSupabase, "Check equipment calibration");
-    expect(nlCal.toLowerCase()).toMatch(/calibration|valid/);
+    // Plain words and menu buttons
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "How much money is outstanding from customers?")).toContain("Open tax invoices");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "What are the active jobs?")).toContain("Open jobs");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "Check equipment calibration")).toContain("Calibration due");
+    expect(await answerTelegramExecutiveQuery(fakeSupabase, "Field app")).toContain("Technician phone app");
   });
 });
 
