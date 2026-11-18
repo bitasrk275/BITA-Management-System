@@ -87,3 +87,37 @@ describe("Telegram Executive Bot Service (lib/modules/telegram/service.ts)", () 
     expect(msg).toContain("UT-01");
   });
 });
+
+import { clip, esc, resolveCommand, TELEGRAM_MENU_KEYBOARD } from "./queries";
+
+describe("Telegram bot command routing (lib/modules/telegram/queries.ts)", () => {
+  it("routes slash commands, bot-name suffixes and arguments", () => {
+    expect(resolveCommand("/finance 2025-26")).toEqual({ command: "finance", arg: "2025-26" });
+    expect(resolveCommand("/jobs@bita_executive_bot")).toEqual({ command: "jobs", arg: "" });
+    expect(resolveCommand("/invoice 5388")).toEqual({ command: "invoice", arg: "5388" });
+  });
+
+  it("routes every menu button to a command", () => {
+    for (const label of TELEGRAM_MENU_KEYBOARD.flat()) {
+      expect(resolveCommand(label).command, label).not.toBeNull();
+    }
+  });
+
+  it("routes plain words, most specific first", () => {
+    expect(resolveCommand("which invoices are overdue?").command).toBe("overdue");
+    expect(resolveCommand("payments received this month").command).toBe("payments");
+    expect(resolveCommand("who is on leave next week").command).toBe("leave");
+    expect(resolveCommand("who is on site today").command).toBe("today");
+    expect(resolveCommand("any problems from technicians").command).toBe("problems");
+    expect(resolveCommand("status of bita/26-27/0007 please")).toEqual({ command: "job", arg: "bita/26-27/0007" });
+    expect(resolveCommand("Apex Forge").command).toBeNull();
+  });
+
+  it("escapes Markdown in names and keeps replies under the Telegram limit", () => {
+    expect(esc("A_B *Ltd* [x] `y`")).toBe("A\\_B \\*Ltd\\* \\[x] \\`y\\`");
+    const long = Array.from({ length: 400 }, (_, i) => `• line ${i}`).join("\n");
+    const out = clip(long);
+    expect(out.length).toBeLessThan(4096);
+    expect(out).toContain("list shortened");
+  });
+});

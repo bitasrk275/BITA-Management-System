@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { todayIST } from "../../dates";
 import type { Database, Json } from "../../db/types";
+import { answerBotQuery, clip } from "./queries";
 
 export interface TelegramConfig {
   bot_token: string;
@@ -317,15 +318,14 @@ export async function buildExecutiveSnapshot(
       .limit(20),
     supabase
       .from("equipment")
-      .select("id, asset_code, name, calibration_due, status")
+      .select("id, make, model, serial_no, calibration_due, status")
       .is("deleted_at", null)
       .not("calibration_due", "is", null)
       .order("calibration_due", { ascending: true }),
     supabase
       .from("assignments")
-      .select("id, start_date, end_date, jobs(job_no, customers(name)), people!assignments_person_id_fkey(full_name)")
-      .lte("start_date", today)
-      .gte("end_date", today),
+      .select("id, work_date, end_date, jobs(job_no, customers(name)), people!assignments_person_id_fkey(full_name)")
+      .lte("work_date", today),
   ]);
 
   const jobs = (jobsRes.data ?? []) as Array<{
@@ -406,22 +406,27 @@ export async function buildExecutiveSnapshot(
   const horizonStr = alertHorizon.toISOString().slice(0, 10);
 
   const calibrationAlerts = ((eqRes.data ?? []) as unknown as Array<{
-    asset_code: string;
-    name: string;
+    make: string | null;
+    model: string | null;
+    serial_no: string | null;
     calibration_due: string | null;
   }>)
     .filter((e) => e.calibration_due && e.calibration_due <= horizonStr)
     .map((e) => ({
-      code: e.asset_code,
-      name: e.name,
+      code: e.serial_no ?? "—",
+      name: [e.make, e.model].filter(Boolean).join(" ") || "Equipment",
       due_date: e.calibration_due!,
       expired: e.calibration_due! < today,
     }));
 
   const todayAssignments = ((assignRes.data ?? []) as unknown as Array<{
+    work_date: string;
+    end_date: string | null;
     jobs?: { job_no?: string; customers?: { name?: string | null } | null } | null;
     people?: { full_name?: string | null } | null;
-  }>).map((a) => ({
+  }>)
+    .filter((a) => (a.end_date ?? a.work_date) >= today)
+    .map((a) => ({
     job_no: a.jobs?.job_no ?? "Job",
     technician_name: a.people?.full_name ?? "Technician",
     customer_name: a.jobs?.customers?.name ?? "Customer",
@@ -482,244 +487,46 @@ export function formatExecutiveDigestMessage(snap: ExecutiveSnapshot): string {
   return lines.join("\n");
 }
 
+/** Answers a message from a linked management chat (see ./queries.ts for every command). */
 export async function answerTelegramExecutiveQuery(
   supabase: SupabaseClient<Database>,
   rawText: string,
 ): Promise<string> {
-  const text = rawText.trim();
-  const lower = text.toLowerCase();
-
-  if (lower === "/help" || lower === "help" || lower === "/start") {
-    return [
-      "🤖 *BITA Executive Assistant*",
-      "",
-      "Ask me anything in plain English or use a quick command:",
-      "• `/status` or `/dashboard` — Live business & cashflow summary",
-      "• `/jobs` — Active jobs & unbilled completed inspections",
-      "• `/invoices` — Open receivables & unpaid tax invoices",
-      "• `/overdue` — Overdue invoices needing follow-up",
-      "• `/reports` — Inspection reports waiting for reviewer approval",
-      "• `/equipment` — Calibration expiry alerts",
-      "• `/schedule` — Today's technician site assignments",
-      "• `/job BITA/26-27/0001` — Full 360° status of any Job ID",
-      "",
-      "_To link a new phone, run_ `/start <6-digit-code>` _generated from BITA Settings._",
-    ].join("\n");
-  }
-
-  // Specific Job ID lookup (e.g. "/job BITA/26-27/0001" or message containing "BITA/")
-  const jobMatch = /bita\/[\w-]+\/\d+/i.exec(text);
-  if (lower.startsWith("/job ") || jobMatch) {
-    const queryNo = (jobMatch ? jobMatch[0] : text.slice(5).trim()).toUpperCase();
-    const { data: rawJob } = await supabase
-      .from("jobs")
-      .select(
-        "job_no, status, site, customer_po_number, customers(name), inspections(method, draft, submitted_at), invoices(invoice_no, number, kind, status, total, balance)",
-      )
-      .ilike("job_no", `%${queryNo}%`)
-      .is("deleted_at", null)
-      .limit(1)
-      .maybeSingle();
-
-    const job = rawJob as unknown as {
-      job_no: string;
-      status: string;
-      site: string | null;
-      customer_po_number: string | null;
-      customers?: { name?: string } | null;
-      inspections?: Array<{ method: string; draft: boolean; submitted_at: string | null }> | null;
-      invoices?: Array<{
-        invoice_no: string | null;
-        number: string | null;
-        kind: string;
-        status: string;
-        total: number;
-        balance: number;
-      }> | null;
-    } | null;
-
-    if (!job) {
-      return `Could not find an active job matching \`${queryNo}\`.`;
-    }
-
-    const custName = job.customers?.name ?? "Customer";
-    const reports = job.inspections ?? [];
-    const invoices = job.invoices ?? [];
-
-    return [
-      `📁 *Job \`${job.job_no}\`*`,
-      `• *Customer:* ${custName}`,
-      `• *Status:* ${job.status.replace(/_/g, " ")}`,
-      `• *Site:* ${job.site || "—"}`,
-      `• *PO No:* ${job.customer_po_number || "Without PO"}`,
-      `• *Reports (${reports.length}):* ${
-        reports.length === 0
-          ? "None yet"
-          : reports
-              .map((r) => `${r.method} (${r.draft ? "Draft" : "Submitted"})`)
-              .join(", ")
-      }`,
-      `• *Invoices (${invoices.length}):* ${
-        invoices.length === 0
-          ? "Not billed yet"
-          : invoices
-              .map(
-                (i) =>
-                  `${i.invoice_no ?? i.number ?? i.kind} [${i.status}, Bal ${formatInrPlain(Number(i.balance) || 0)}]`,
-              )
-              .join(", ")
-      }`,
-    ].join("\n");
-  }
-
-  const snap = await buildExecutiveSnapshot(supabase);
-
-  if (
-    lower.startsWith("/overdue") ||
-    lower.includes("overdue") ||
-    lower.includes("not paid") ||
-    lower.includes("unpaid")
-  ) {
-    if (snap.overdueInvoices.length === 0) {
-      return `✅ *No overdue tax invoices as of ${snap.today}!*\nOpen receivables: ${formatInrPlain(snap.openReceivablesTotal)} across ${snap.openInvoicesCount} invoice(s).`;
-    }
-    const totalOverdue = snap.overdueInvoices.reduce((s, i) => s + i.balance, 0);
-    return [
-      `⚠️ *Overdue Tax Invoices (${snap.overdueInvoices.length}) — Total ${formatInrPlain(totalOverdue)}*`,
-      "",
-      ...snap.overdueInvoices.map(
-        (inv) =>
-          `• \`${inv.invoice_no}\` · *${inv.customer_name}* · Bal *${formatInrPlain(inv.balance)}* (Due ${inv.due_date})`,
-      ),
-    ].join("\n");
-  }
-
-  if (
-    lower.startsWith("/invoices") ||
-    lower.startsWith("/receivables") ||
-    lower.includes("invoice") ||
-    lower.includes("money") ||
-    lower.includes("payment") ||
-    lower.includes("receivable")
-  ) {
-    return [
-      `💰 *Receivables & Billing Summary (${snap.today})*`,
-      `• *Open Tax Invoices:* ${snap.openInvoicesCount}`,
-      `• *Total Outstanding Balance:* ${formatInrPlain(snap.openReceivablesTotal)}`,
-      `• *Overdue Invoices:* ${snap.overdueInvoices.length}`,
-      `• *Completed Jobs Pending Invoice:* ${snap.unbilledDoneJobs.length}`,
-      ...(snap.unbilledDoneJobs.length > 0
-        ? [
-            "",
-            "*Unbilled Completed Jobs:*",
-            ...snap.unbilledDoneJobs
-              .slice(0, 8)
-              .map((j) => `  - \`${j.job_no}\` · ${j.customer_name}`),
-          ]
-        : []),
-    ].join("\n");
-  }
-
-  if (
-    lower.startsWith("/jobs") ||
-    lower.includes("active job") ||
-    lower.includes("unbilled")
-  ) {
-    return [
-      `📋 *Active Jobs (${snap.activeJobsCount})*`,
-      "",
-      ...snap.recentJobs.map(
-        (j) =>
-          `• \`${j.job_no}\` · *${j.customer_name}* — _${j.status.replace(/_/g, " ")}_${j.site ? ` (${j.site})` : ""}`,
-      ),
-      ...(snap.unbilledDoneJobs.length > 0
-        ? [
-            "",
-            `⚠️ *${snap.unbilledDoneJobs.length} job(s) have inspection done/report sent but no tax invoice yet.*`,
-          ]
-        : []),
-    ].join("\n");
-  }
-
-  if (
-    lower.startsWith("/reports") ||
-    lower.includes("report") ||
-    lower.includes("approval") ||
-    lower.includes("review")
-  ) {
-    if (snap.pendingReports.length === 0) {
-      return "✅ *All submitted inspection reports have been reviewed!*";
-    }
-    return [
-      `📝 *Reports Awaiting Technical Review (${snap.pendingReports.length})*`,
-      "",
-      ...snap.pendingReports.map(
-        (r) =>
-          `• \`${r.job_no}\` · Method *${r.method}* (Submitted ${r.submitted_at ? r.submitted_at.slice(0, 10) : "recently"})`,
-      ),
-    ].join("\n");
-  }
-
-  if (
-    lower.startsWith("/equipment") ||
-    lower.startsWith("/calibration") ||
-    lower.includes("equipment") ||
-    lower.includes("calibration")
-  ) {
-    if (snap.calibrationAlerts.length === 0) {
-      return "✅ *All equipment calibrations are valid for the next 30 days!*";
-    }
-    return [
-      `🔧 *Equipment Calibration Alerts (${snap.calibrationAlerts.length})*`,
-      "",
-      ...snap.calibrationAlerts.map(
-        (e) =>
-          `• \`${e.code}\` *${e.name}* — ${e.expired ? "🚨 *EXPIRED*" : "Expiring"} (${e.due_date})`,
-      ),
-    ].join("\n");
-  }
-
-  if (
-    lower.startsWith("/schedule") ||
-    lower.startsWith("/calendar") ||
-    lower.includes("schedule") ||
-    lower.includes("today") ||
-    lower.includes("technician") ||
-    lower.includes("site")
-  ) {
-    if (snap.todayAssignments.length === 0) {
-      return `📅 *No technicians are scheduled on site for today (${snap.today}).*`;
-    }
-    return [
-      `📅 *Today's Site Schedule (${snap.today})*`,
-      "",
-      ...snap.todayAssignments.map(
-        (a) => `• *${a.technician_name}* → \`${a.job_no}\` (${a.customer_name})`,
-      ),
-    ].join("\n");
-  }
-
-  return formatExecutiveDigestMessage(snap);
+  return answerBotQuery(supabase, rawText);
 }
 
 export async function sendTelegramMessage(
   botToken: string,
   chatId: string,
   text: string,
+  options?: { keyboard?: string[][] },
 ): Promise<{ ok: boolean; error?: string }> {
   if (!botToken) {
     return { ok: false, error: "TELEGRAM_BOT_TOKEN is not configured." };
   }
   try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: "Markdown",
-      }),
-    });
+    const send = (markdown: boolean) =>
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: clip(text),
+          ...(markdown ? { parse_mode: "Markdown" } : {}),
+          ...(options?.keyboard
+            ? {
+                reply_markup: {
+                  keyboard: options.keyboard.map((row) => row.map((t) => ({ text: t }))),
+                  resize_keyboard: true,
+                  is_persistent: true,
+                },
+              }
+            : {}),
+        }),
+      });
+    let res = await send(true);
+    // A name with an odd character can break Telegram's Markdown; resend as plain text.
+    if (res.status === 400) res = await send(false);
     if (!res.ok) {
       const errText = await res.text();
       return { ok: false, error: `Telegram API HTTP ${res.status}: ${errText}` };

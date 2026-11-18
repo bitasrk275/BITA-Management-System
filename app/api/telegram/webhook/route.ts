@@ -7,6 +7,9 @@ import {
   redeemTelegramLinkCode,
   sendTelegramMessage,
 } from "@/lib/modules/telegram/service";
+import { TELEGRAM_MENU_KEYBOARD } from "@/lib/modules/telegram/queries";
+
+const menu = { keyboard: TELEGRAM_MENU_KEYBOARD };
 
 export const runtime = "nodejs";
 
@@ -85,6 +88,7 @@ export async function POST(req: Request) {
             config.bot_token,
             chatId,
             `✅ *Connected to BITA Executive Bot as ${redeemed.personName}!*\n\n${statusMsg}\n\n${welcome}`,
+            menu,
           );
           return NextResponse.json({ ok: true, paired: true });
         }
@@ -98,6 +102,7 @@ export async function POST(req: Request) {
             config.bot_token,
             chatId,
             `✅ *Already connected to BITA Executive Bot as ${existingChat.person_name}!*\n\n${statusMsg}\n\n${welcome}`,
+            menu,
           );
           return NextResponse.json({ ok: true, paired: true, alreadyLinked: true });
         }
@@ -119,6 +124,7 @@ export async function POST(req: Request) {
           config.bot_token,
           chatId,
           `✅ *Connected to BITA Executive Bot as ${existingChat.person_name}!*\n\n${statusMsg}\n\n${welcome}`,
+          menu,
         );
         return NextResponse.json({ ok: true, paired: true, alreadyLinked: true });
       }
@@ -135,7 +141,7 @@ export async function POST(req: Request) {
     }
 
     const reply = await answerTelegramExecutiveQuery(supabase, text);
-    await sendTelegramMessage(config.bot_token, chatId, reply);
+    await sendTelegramMessage(config.bot_token, chatId, reply, menu);
 
     return NextResponse.json({ ok: true, replied: true });
   } catch (err) {
@@ -221,6 +227,7 @@ export async function GET(req: Request) {
           config.bot_token,
           chat.chat_id,
           `✅ *Connected to BITA Executive Bot as ${chat.person_name}!*\n\n${statusMsg}\n\n${helpMsg}`,
+          menu,
         );
         if (res.ok) sent++;
       }
