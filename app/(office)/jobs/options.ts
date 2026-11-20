@@ -37,3 +37,29 @@ export async function jobFormOptions(supabase: Supabase) {
     })),
   };
 }
+
+// Choices for scheduling on the new-job screen: active technicians and active equipment.
+export async function jobScheduleOptions(supabase: Supabase) {
+  const [{ data: techs }, { data: equipment }] = await Promise.all([
+    supabase
+      .from("people")
+      .select("id, full_name")
+      .contains("roles", ["technician"])
+      .eq("active", true)
+      .order("full_name"),
+    supabase
+      .from("equipment")
+      .select("id, make, model, serial_no, equipment_types(name)")
+      .is("deleted_at", null)
+      .eq("active", true)
+      .order("make"),
+  ]);
+  return {
+    technicians: (techs ?? []).map((t) => ({ id: t.id, label: t.full_name })),
+    equipment: (equipment ?? []).map((e) => {
+      const type = (e.equipment_types as unknown as { name?: string } | null)?.name;
+      const name = [e.make, e.model].filter(Boolean).join(" ") || type || "Equipment";
+      return { id: e.id, label: `${name}${e.serial_no ? ` (${e.serial_no})` : ""}` };
+    }),
+  };
+}

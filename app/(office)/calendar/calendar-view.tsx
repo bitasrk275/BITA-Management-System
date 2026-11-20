@@ -85,6 +85,9 @@ export function CalendarInteractiveView({
   const [assignEquipIds, setAssignEquipIds] = useState<string[]>([]);
   const [assignNotes, setAssignNotes] = useState("");
   const [forceOverride, setForceOverride] = useState(false);
+  const newJobHref = `/jobs/new?from=calendar&date=${encodeURIComponent(assignWorkDate)}${
+    targetTechId ? `&tech=${encodeURIComponent(targetTechId)}` : ""
+  }`;
 
   useEffect(() => {
     if (selectedJobId) {
@@ -333,19 +336,6 @@ export function CalendarInteractiveView({
                   {/* Technician Header Column */}
                   <td className="sticky left-0 z-10 border-r border-line bg-white p-3 shadow-[1px_0_0_0_#ebebeb]">
                     <div className="font-medium text-ink">{tech.fullName}</div>
-                    {tech.mobile && <div className="text-[11px] text-ink-3 font-mono">{tech.mobile}</div>}
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {tech.qualifications.map((q) => (
-                        <span
-                          key={q.method}
-                          className={`rounded px-1 text-[10px] ${
-                            q.isExpired ? "bg-bad/10 text-bad font-semibold" : "bg-side text-ink-2"
-                          }`}
-                        >
-                          {q.method} ({q.level})
-                        </span>
-                      ))}
-                    </div>
                   </td>
 
                   {/* Day Cells */}
@@ -657,10 +647,17 @@ export function CalendarInteractiveView({
                 <Select
                   name="job_id"
                   value={targetJobId}
-                  onChange={(e) => setTargetJobId(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value === "__new__") {
+                      router.push(newJobHref);
+                      return;
+                    }
+                    setTargetJobId(e.target.value);
+                  }}
                   required
                 >
                   <option value="">-- Choose a Job --</option>
+                  <option value="__new__">+ New job…</option>
                   {jobs.map((j) => (
                     <option key={j.id} value={j.id}>
                       {j.job_no} · {j.customerName} ({j.testMethods.join(", ")})
@@ -668,6 +665,14 @@ export function CalendarInteractiveView({
                   ))}
                 </Select>
               </Field>
+
+              <p className="-mt-1 text-[12.5px] text-ink-3">
+                Job not created yet?{" "}
+                <a href={newJobHref} className="font-medium text-info hover:underline">
+                  + New job
+                </a>{" "}
+                opens the full job form with this technician and date filled in.
+              </p>
 
               <Field label="Assign Technician">
                 <Select
@@ -678,7 +683,7 @@ export function CalendarInteractiveView({
                 >
                   {data.technicians.map((t) => (
                     <option key={t.personId} value={t.personId}>
-                      {t.fullName} ({t.qualifications.map((q) => q.method).join(", ") || "General"})
+                      {t.fullName}
                     </option>
                   ))}
                 </Select>

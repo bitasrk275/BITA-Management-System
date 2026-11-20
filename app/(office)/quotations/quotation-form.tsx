@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NewCustomerFields } from "@/components/new-customer-fields";
 import { Button, Field, Input, Mono, SecondaryButton, SectionTitle, Select, Textarea } from "@/components/ui";
 import { Constants, type Tables } from "@/lib/db/types";
 import { formatINR } from "../jobs/labels";
@@ -88,10 +89,8 @@ export function QuotationForm({
       </div>
 
       <Field label="Customer">
-        <Select name="customer_id" required defaultValue={quotation?.customer_id ?? defaults?.customer_id ?? ""}>
-          <option value="" disabled>
-            Choose a customer…
-          </option>
+        <Select name="customer_id" required={!!quotation} defaultValue={quotation?.customer_id ?? defaults?.customer_id ?? ""}>
+          <option value="">Choose a customer…</option>
           {customers.map((c) => (
             <option key={c.id} value={c.id}>
               {c.label}
@@ -100,16 +99,20 @@ export function QuotationForm({
         </Select>
       </Field>
 
-      <Field label="Enquiry (if any)">
-        <Select name="enquiry_id" defaultValue={quotation?.enquiry_id ?? defaults?.enquiry_id ?? ""}>
-          <option value="">None</option>
-          {enquiries.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      {!quotation && <NewCustomerFields />}
+
+      {enquiries.length > 0 || quotation?.enquiry_id || defaults?.enquiry_id ? (
+        <Field label="Enquiry (optional)">
+          <Select name="enquiry_id" defaultValue={quotation?.enquiry_id ?? defaults?.enquiry_id ?? ""}>
+            <option value="">Not from an enquiry</option>
+            {enquiries.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
 
       <Field label="Kind attention" hint="Contact person or department at the customer">
         <Input

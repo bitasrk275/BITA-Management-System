@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
-import { friendlyError } from "@/lib/forms";
+import { friendlyError, text } from "@/lib/forms";
+import { assignCalendarJob } from "@/lib/modules/calendar/service";
+import { resolveCustomerFromForm } from "@/lib/modules/customers/inline";
 import { parseJobInput } from "@/lib/modules/jobs/schema";
 import {
   closeJobRecord,
@@ -36,6 +38,11 @@ async function savePoFile(
 
 export async function createJob(fd: FormData) {
   const { supabase } = await requireStaff();
+  const customer = await resolveCustomerFromForm(supabase, fd);
+  if (!customer.ok) {
+    redirect("/jobs/new?error=" + encodeURIComponent(customer.error));
+  }
+  fd.set("customer_id", customer.customerId);
   const parsed = parseJobInput(fd);
   if (!parsed.ok) {
     redirect("/jobs/new?error=" + encodeURIComponent(parsed.error));
@@ -49,6 +56,7 @@ export async function createJob(fd: FormData) {
     );
   }
 
+  if (customer.created) revalidatePath("/customers");
   if (data.enquiry_id) {
     revalidatePath(`/enquiries/${data.enquiry_id}`);
     revalidatePath("/enquiries");
@@ -57,14 +65,44 @@ export async function createJob(fd: FormData) {
     revalidatePath(`/quotations/${data.quotation_id}`);
     revalidatePath("/quotations");
   }
+  const problems: string[] = [];
   const fileError = await savePoFile(supabase, data.id, fd);
-  redirect(
-    `/jobs/${data.id}` +
-      (fileError
-        ? "?error=" +
-          encodeURIComponent("Job saved, but the PO file was not: " + fileError)
-        : ""),
-  );
+  if (fileError) problems.push("the PO file was not saved: " + fileError);
+
+  // Schedule on the same screen: one assignment per technician, same dates and equipment.
+  const workDate = text(fd, "work_date");
+  const technicianIds = fd.getAll("technician_ids").map(String).filter(Boolean);
+  const equipmentIds = fd.getAll("equipment_ids").map(String).filter(Boolean);
+  if (workDate && technicianIds.length > 0) {
+    for (const [i, technicianId] of technicianIds.entries()) {
+      try {
+        await assignCalendarJob(supabase, {
+          jobId: data.id,
+          technicianId,
+          workDate,
+          endDate: text(fd, "end_date"),
+          // Equipment travels with the first technician, so it is booked once.
+          equipmentIds: i === 0 ? equipmentIds : [],
+          notes: null,
+          force: false,
+        });
+      } catch (err) {
+        problems.push(err instanceof Error ? err.message : "a technician could not be scheduled");
+      }
+    }
+    revalidatePath("/calendar");
+    revalidatePath("/dashboard");
+  } else if (technicianIds.length > 0 && !workDate) {
+    problems.push("no start date was given, so it is not on the calendar yet");
+  }
+
+  const note = problems.length
+    ? "?error=" + encodeURIComponent("Job created, but " + problems.join("; ") + ". Schedule it from the Calendar.")
+    : "";
+  if (!problems.length && text(fd, "return_to") === "calendar" && workDate) {
+    redirect(`/calendar?date=${workDate}&saved=1`);
+  }
+  redirect(`/jobs/${data.id}` + note);
 }
 
 export async function updateJob(id: string, fd: FormData) {

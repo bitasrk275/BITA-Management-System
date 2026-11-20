@@ -1,0 +1,22 @@
+name: Keep the live site warm
+
+# The free Vercel plan puts the server to sleep when idle, so the first click after a pause
+# takes 2-5 seconds. During BITA's working hours (Mon-Sat, 8:30 AM to 8:30 PM IST) this pings
+# the site every 5 minutes so pages and the technician app stay fast. Public URLs only, no secrets.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 3-14 * * 1-6"
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping pages and APIs
+        run: |
+          base="https://bita-management-system.vercel.app"
+          for path in /login /dashboard /api/field/assignments /api/telegram/webhook; do
+            curl -s -o /dev/null -w "$path %{http_code} %{time_total}s\n" "$base$path" || true
+          done

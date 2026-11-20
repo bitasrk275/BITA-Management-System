@@ -4,7 +4,7 @@ import { Constants } from "@/lib/db/types";
 import { prefillJobDefaultsFromQuotation } from "../../quotations/upload";
 import { createJob } from "../actions";
 import { JobForm } from "../job-form";
-import { jobFormOptions } from "../options";
+import { jobFormOptions, jobScheduleOptions } from "../options";
 
 export const metadata = { title: "New job – BITA" };
 
@@ -12,11 +12,30 @@ export const metadata = { title: "New job – BITA" };
 export default async function NewJobPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; enquiry?: string; quotation?: string; customer?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    enquiry?: string;
+    quotation?: string;
+    customer?: string;
+    tech?: string;
+    date?: string;
+    from?: string;
+  }>;
 }) {
-  const { error, enquiry: enquiryIdParam, quotation: quotationIdParam, customer: customerParam } = await searchParams;
+  const {
+    error,
+    enquiry: enquiryIdParam,
+    quotation: quotationIdParam,
+    customer: customerParam,
+    tech,
+    date,
+    from,
+  } = await searchParams;
   const { supabase } = await requireStaff();
-  const options = await jobFormOptions(supabase);
+  const [options, scheduleOptions] = await Promise.all([
+    jobFormOptions(supabase),
+    jobScheduleOptions(supabase),
+  ]);
 
   const quotationRes = quotationIdParam
     ? await supabase
@@ -48,8 +67,20 @@ export default async function NewJobPage({
     <>
       <PageHeader title="New job" />
       <ErrorNote message={error} />
-      <p className="mb-4 text-sm text-ink-2">The Job ID is given automatically when you save.</p>
-      <JobForm action={createJob} defaults={defaults} submitLabel="Create job" {...options} />
+      <p className="mb-4 text-sm text-ink-2">
+        The Job ID is given automatically when you save. Pick the technician, dates and equipment below and the job goes straight onto the calendar.
+      </p>
+      <JobForm
+        action={createJob}
+        defaults={defaults} submitLabel="Create job"
+        {...options}
+        schedule={{
+          ...scheduleOptions,
+          techId: tech,
+          date,
+          returnTo: from === "calendar" ? "calendar" : undefined,
+        }}
+      />
     </>
   );
 }
