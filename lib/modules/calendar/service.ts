@@ -600,7 +600,8 @@ export async function moveCalendarAssignment(
   }
 
   const targetTechId = input.newTechnicianId || current.person_id;
-  const equipmentIds = (current.assignment_equipment ?? []).map((ae) => ae.equipment_id);
+  const currentEquipmentIds = (current.assignment_equipment ?? []).map((ae) => ae.equipment_id);
+  const equipmentIds = input.newEquipmentIds ?? currentEquipmentIds;
 
   // 2. Check conflicts
   const conflicts = await checkCalendarConflicts(supabase, {
@@ -637,6 +638,35 @@ export async function moveCalendarAssignment(
 
   if (updateErr) {
     throw new Error("Failed to update assignment: " + updateErr.message);
+  }
+
+  // 3b. Equipment changed from the calendar: replace the booked equipment.
+  if (input.newEquipmentIds) {
+    const removed = currentEquipmentIds.filter((id) => !equipmentIds.includes(id));
+    const added = equipmentIds.filter((id) => !currentEquipmentIds.includes(id));
+    if (removed.length > 0) {
+      const { error: delErr } = await supabase
+        .from("assignment_equipment")
+        .delete()
+        .eq("assignment_id", assignmentId)
+        .in("equipment_id", removed);
+      if (delErr) throw new Error("Failed to update equipment: " + delErr.message);
+      await supabase
+        .from("equipment")
+        .update({ current_job_id: null, status: "in_office" })
+        .in("id", removed)
+        .eq("current_job_id", current.job_id);
+    }
+    if (added.length > 0) {
+      const { error: insErr } = await supabase
+        .from("assignment_equipment")
+        .insert(added.map((equipment_id) => ({ assignment_id: assignmentId, equipment_id })));
+      if (insErr) throw new Error("Failed to update equipment: " + insErr.message);
+      await supabase
+        .from("equipment")
+        .update({ current_job_id: current.job_id, status: "at_site" })
+        .in("id", added);
+    }
   }
 
   // 4. Send notification

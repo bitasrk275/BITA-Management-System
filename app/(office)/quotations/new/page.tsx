@@ -12,6 +12,7 @@ import {
   SectionTitle,
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
+import { listPriceItems } from "@/lib/modules/price-items/service";
 import { resolveEnquiryAttention } from "../../jobs/closure";
 import { formatINR } from "../../jobs/labels";
 import { createQuotation } from "../actions";
@@ -29,7 +30,10 @@ export default async function NewQuotationPage({
 }) {
   const { error, enquiry: enquiryId, customer: customerIdParam, rate } = await searchParams;
   const { supabase } = await requireStaff();
-  const options = await quotationFormOptions(supabase);
+  const [options, priceItems] = await Promise.all([
+    quotationFormOptions(supabase),
+    listPriceItems(supabase, { activeOnly: true }),
+  ]);
 
   let defaults: { customer_id?: string; enquiry_id?: string; subject?: string; attention?: string } | undefined;
   if (enquiryId) {
@@ -105,6 +109,7 @@ export default async function NewQuotationPage({
             action={createQuotation}
             defaults={defaults}
             includeFirstItem
+            priceItems={priceItems.data}
             submitLabel="Create quotation"
             {...options}
           />

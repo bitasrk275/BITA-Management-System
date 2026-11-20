@@ -563,6 +563,29 @@ export function CalendarInteractiveView({
                 </Select>
               </Field>
 
+              {equipmentList.length > 0 && (
+                <div>
+                  <input type="hidden" name="equipment_edit" value="1" />
+                  <div className="mb-1 text-[13px] font-medium text-ink-2">Equipment</div>
+                  <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-line bg-side/30 p-2">
+                    {equipmentList.map((eq) => (
+                      <label key={eq.id} className="flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          name="equipment_ids"
+                          value={eq.id}
+                          defaultChecked={activeAssignment.equipment.some((b) => b.id === eq.id)}
+                          className="h-3.5 w-3.5 accent-ink"
+                        />
+                        <span className="text-ink">
+                          {eq.make} {eq.model} {eq.serial_no ? `(#${eq.serial_no})` : ""}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {modalError && (
                 <label className="flex items-center gap-2 text-xs text-ink-2">
                   <input type="checkbox" name="force" value="1" className="h-3.5 w-3.5 accent-ink" />

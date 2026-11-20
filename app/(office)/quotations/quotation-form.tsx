@@ -27,6 +27,7 @@ export function QuotationForm({
   enquiries,
   includeFirstItem = false,
   submitLabel,
+  priceItems = [],
 }: {
   action: (fd: FormData) => Promise<void>;
   quotation?: Tables<"quotations">;
@@ -40,6 +41,8 @@ export function QuotationForm({
   enquiries: Option[];
   includeFirstItem?: boolean;
   submitLabel: string;
+  // Price list, so items are picked instead of typed (same list as on invoices).
+  priceItems?: Array<{ id: string; name: string; description: string | null; unit: string; default_rate: number }>;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const existingFileName = quotationFileName(quotation?.pdf_path);
@@ -171,6 +174,30 @@ export function QuotationForm({
                   </button>
                 )}
               </div>
+              {priceItems.length > 0 && (
+                <Field label="Pick from Price list (or type below)">
+                  <Select
+                    value=""
+                    onChange={(e) => {
+                      const pi = priceItems.find((p) => p.id === e.target.value);
+                      if (!pi) return;
+                      updateRow(idx, {
+                        description: pi.description ? `${pi.name} – ${pi.description}` : pi.name,
+                        rate: String(pi.default_rate ?? ""),
+                        basis: pi.unit ? `per ${pi.unit}` : row.basis,
+                      });
+                    }}
+                  >
+                    <option value="">Choose a price list item…</option>
+                    {priceItems.map((pi) => (
+                      <option key={pi.id} value={pi.id}>
+                        {pi.name} · {formatINR(pi.default_rate)}
+                        {pi.unit ? ` per ${pi.unit}` : ""}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
               <Field label="Component / scope description">
                 <Input
                   name="item_description"
