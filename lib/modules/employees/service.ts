@@ -550,3 +550,176 @@ export async function removeEmployeeSignature(
   }
   return { success: true };
 }
+
+export type LeaveRequestWithPerson = {
+  id: string;
+  person_id: string;
+  person_name: string;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected";
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+};
+
+function toYmdString(val: unknown): string {
+  if (val instanceof Date) {
+    return val.toISOString().slice(0, 10);
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (trimmed.includes("T")) return trimmed.slice(0, 10);
+    return trimmed.slice(0, 10);
+  }
+  return String(val ?? "").slice(0, 10);
+}
+
+export function expandDateRangeInclusive(startDate: string | Date, endDate: string | Date, maxDays = 60): string[] {
+  const startStr = toYmdString(startDate);
+  const endStr = toYmdString(endDate) || startStr;
+  const start = new Date(`${startStr}T00:00:00Z`);
+  const end = new Date(`${endStr}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return [startStr];
+  }
+  const dates: string[] = [];
+  const cur = new Date(start);
+  let count = 0;
+  while (cur <= end && count < maxDays) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+    count++;
+  }
+  return dates;
+}
+
+export async function listLeaveRequests(
+  supabase: SupabaseClient<Database>,
+  options: { status?: "pending" | "approved" | "rejected" | "all"; limit?: number } = {}
+): Promise<LeaveRequestWithPerson[]> {
+  try {
+    let query = supabase
+      .from("leave_requests")
+      .select("id, person_id, start_date, end_date, reason, status, reviewed_by, reviewed_at, review_note, created_at, people!leave_requests_person_id_fkey(full_name)")
+      .order("created_at", { ascending: false })
+      .limit(options.limit ?? 30);
+
+    if (options.status && options.status !== "all") {
+      query = query.eq("status", options.status);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+
+    return data.map((r) => {
+      const personObj = r.people as unknown as { full_name?: string } | null;
+      return {
+        id: r.id,
+        person_id: r.person_id,
+        person_name: personObj?.full_name ?? "Technician",
+        start_date: toYmdString(r.start_date),
+        end_date: toYmdString(r.end_date),
+        reason: r.reason,
+        status: (r.status as "pending" | "approved" | "rejected") || "pending",
+        reviewed_by: r.reviewed_by,
+        reviewed_at: r.reviewed_at,
+        review_note: r.review_note,
+        created_at: r.created_at,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function approveLeaveRequest(
+  supabase: SupabaseClient<Database>,
+  requestId: string,
+  params: {
+    reviewedByPersonId?: string | null;
+    reviewedByUserId?: string | null;
+    reviewNote?: string | null;
+  } = {}
+): Promise<{ ok: true; addedDates: string[] }> {
+  const { data: reqRow, error: fetchErr } = await supabase
+    .from("leave_requests")
+    .select("id, person_id, start_date, end_date, reason, status")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (fetchErr || !reqRow) {
+    throw new Error(fetchErr?.message || "Leave request not found.");
+  }
+
+  const now = new Date().toISOString();
+  const { error: updErr } = await supabase
+    .from("leave_requests")
+    .update({
+      status: "approved",
+      reviewed_by: params.reviewedByPersonId ?? null,
+      reviewed_at: now,
+      review_note: params.reviewNote?.trim() || null,
+    })
+    .eq("id", requestId);
+
+  if (updErr) {
+    throw new Error("Failed to approve leave request: " + updErr.message);
+  }
+
+  const startIso = toYmdString(reqRow.start_date);
+  const endIso = toYmdString(reqRow.end_date);
+  const dates = expandDateRangeInclusive(startIso, endIso);
+  const { data: existingDays } = await supabase
+    .from("leave_days")
+    .select("leave_date")
+    .eq("person_id", reqRow.person_id)
+    .gte("leave_date", startIso)
+    .lte("leave_date", endIso);
+
+  const existingSet = new Set((existingDays ?? []).map((d) => toYmdString(d.leave_date)));
+  const addedDates: string[] = [];
+
+  for (const dt of dates) {
+    if (existingSet.has(dt)) continue;
+    const { error: insErr } = await supabase.from("leave_days").insert({
+      person_id: reqRow.person_id,
+      leave_date: dt,
+      reason: reqRow.reason || "Approved leave",
+      created_by: params.reviewedByUserId ?? null,
+    });
+    if (!insErr) {
+      addedDates.push(dt);
+    }
+  }
+
+  return { ok: true, addedDates };
+}
+
+export async function rejectLeaveRequest(
+  supabase: SupabaseClient<Database>,
+  requestId: string,
+  params: {
+    reviewedByPersonId?: string | null;
+    reviewNote?: string | null;
+  } = {}
+): Promise<{ ok: true }> {
+  const now = new Date().toISOString();
+  const { error: updErr } = await supabase
+    .from("leave_requests")
+    .update({
+      status: "rejected",
+      reviewed_by: params.reviewedByPersonId ?? null,
+      reviewed_at: now,
+      review_note: params.reviewNote?.trim() || null,
+    })
+    .eq("id", requestId);
+
+  if (updErr) {
+    throw new Error("Failed to reject leave request: " + updErr.message);
+  }
+
+  return { ok: true };
+}

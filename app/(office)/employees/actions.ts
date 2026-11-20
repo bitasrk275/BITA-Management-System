@@ -11,10 +11,12 @@ import {
   parseQualificationInput,
 } from "@/lib/modules/employees/schema";
 import {
+  approveLeaveRequest,
   createEmployee,
   createEmployeeQualification,
   deleteEmployee,
   deleteEmployeeQualification,
+  rejectLeaveRequest,
   removeEmployeeSignature,
   updateEmployee,
   uploadEmployeeSignature,
@@ -302,4 +304,48 @@ export async function removeEmployeeSignatureAction(employeeId: string) {
   revalidatePath(path);
   revalidatePath("/employees");
   redirect(`${path}?saved=signature_removed`);
+}
+
+export async function approveLeaveRequestAction(requestId: string) {
+  if (!isValidUuid(requestId)) redirect("/employees");
+  const { supabase, person, user } = await requireStaff();
+  const canManage = person?.roles.some((r) => r === "management" || r === "office") ?? false;
+  if (!canManage) {
+    fail("/employees", "Only office or management can approve leave requests.");
+  }
+
+  try {
+    await approveLeaveRequest(supabase, requestId, {
+      reviewedByPersonId: person?.id ?? null,
+      reviewedByUserId: user?.id ?? null,
+    });
+  } catch (err) {
+    fail("/employees", err instanceof Error ? err.message : "Failed to approve leave request.");
+  }
+
+  revalidatePath("/employees");
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  redirect("/employees?saved=leave_approved");
+}
+
+export async function rejectLeaveRequestAction(requestId: string) {
+  if (!isValidUuid(requestId)) redirect("/employees");
+  const { supabase, person } = await requireStaff();
+  const canManage = person?.roles.some((r) => r === "management" || r === "office") ?? false;
+  if (!canManage) {
+    fail("/employees", "Only office or management can reject leave requests.");
+  }
+
+  try {
+    await rejectLeaveRequest(supabase, requestId, {
+      reviewedByPersonId: person?.id ?? null,
+    });
+  } catch (err) {
+    fail("/employees", err instanceof Error ? err.message : "Failed to reject leave request.");
+  }
+
+  revalidatePath("/employees");
+  revalidatePath("/dashboard");
+  redirect("/employees?saved=leave_rejected");
 }

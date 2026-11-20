@@ -13,6 +13,7 @@ import {
   Mono,
   PageHeader,
   SavedNote,
+  SecondaryButton,
   SectionTitle,
   Select,
   Stats,
@@ -21,9 +22,13 @@ import {
 import { requireStaff } from "@/lib/auth";
 import type { Enums } from "@/lib/db/types";
 import { APP_ROLES, currentMonthIST } from "@/lib/modules/employees/schema";
-import { listEmployees } from "@/lib/modules/employees/service";
+import { listEmployees, listLeaveRequests } from "@/lib/modules/employees/service";
 import { formatINR } from "../jobs/labels";
-import { createEmployeeAction } from "./actions";
+import {
+  approveLeaveRequestAction,
+  createEmployeeAction,
+  rejectLeaveRequestAction,
+} from "./actions";
 
 export const metadata = { title: "Employees – BITA" };
 export const dynamic = "force-dynamic";
@@ -56,13 +61,20 @@ export default async function EmployeesPage({
       : "active";
   const searchTerm = params.q || undefined;
 
-  const { month, employees } = await listEmployees(supabase, {
-    month: selectedMonth,
-    role: selectedRole,
-    status: selectedStatus,
-    search: searchTerm,
-    canViewSalaries: isManagement,
-  });
+  const [{ month, employees }, leaveRequests] = await Promise.all([
+    listEmployees(supabase, {
+      month: selectedMonth,
+      role: selectedRole,
+      status: selectedStatus,
+      search: searchTerm,
+      canViewSalaries: isManagement,
+    }),
+    listLeaveRequests(supabase, { status: "all", limit: 20 }),
+  ]);
+
+  const pendingLeaveRequests = leaveRequests.filter((lr) => lr.status === "pending");
+  const canManageLeave =
+    person?.roles.some((r) => r === "management" || r === "office") ?? false;
 
   const totalActive = employees.filter((e) => e.active).length;
   const technicianCount = employees.filter((e) =>
@@ -228,6 +240,61 @@ export default async function EmployeesPage({
           </div>
         </form>
       </Card>
+
+      <section id="leave-requests" className="space-y-3">
+        <SectionTitle>
+          Leave requests ({pendingLeaveRequests.length} pending)
+        </SectionTitle>
+        <List>
+          {leaveRequests.length === 0 ? (
+            <EmptyRow>
+              No leave requests submitted from the technician phone app yet.
+            </EmptyRow>
+          ) : (
+            leaveRequests.map((lr) => {
+              const dateRange =
+                lr.start_date === lr.end_date
+                  ? lr.start_date
+                  : `${lr.start_date} to ${lr.end_date}`;
+              const tone =
+                lr.status === "approved"
+                  ? "ok"
+                  : lr.status === "rejected"
+                    ? "bad"
+                    : "wait";
+
+              return (
+                <ListRow
+                  key={lr.id}
+                  tone={tone}
+                  title={
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink">{lr.person_name}</span>
+                      <Badge>
+                        <Mono>{dateRange}</Mono>
+                      </Badge>
+                      <Status tone={tone}>{lr.status}</Status>
+                    </div>
+                  }
+                  detail={lr.reason || "No reason specified"}
+                  action={
+                    lr.status === "pending" && canManageLeave ? (
+                      <div className="flex items-center gap-2">
+                        <form action={approveLeaveRequestAction.bind(null, lr.id)}>
+                          <Button type="submit">Approve</Button>
+                        </form>
+                        <form action={rejectLeaveRequestAction.bind(null, lr.id)}>
+                          <SecondaryButton type="submit">Reject</SecondaryButton>
+                        </form>
+                      </div>
+                    ) : undefined
+                  }
+                />
+              );
+            })
+          )}
+        </List>
+      </section>
 
       <section className="space-y-3">
         <SectionTitle>Employees ({employees.length})</SectionTitle>
