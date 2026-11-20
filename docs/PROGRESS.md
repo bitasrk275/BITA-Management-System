@@ -82,6 +82,19 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-20 15:30 – Naveen – Claude Code (Orion)
+Task: Round 3 – BITA's change list after their first review (8 areas), released the same day
+Done:
+- Released to main @ 899dcd3 (PRs 39–44); Vercel deployed; live smoke check of every new screen passed.
+- All three Round 3 migrations applied to bita-dev: 20261120000000_leave_requests_and_job_notes, 20261120010000_reports_optional_job, 20261120020000_r3_money_receipts_and_numbering.
+- Speed: keep-warm workflow (Mon–Sat 8:30–20:30 IST) and Vercel fluid compute; warm pages load in about 0.3 s.
+- New job with technician, dates and equipment on one screen; "+ New job" in the calendar; "+ New customer" on job and quotation; Reports page with Create report and reports without a job.
+- Cross-checked every point of BITA's list against the code; two partial points fixed in PR 45 (price-list picker on New quotation items, equipment editable from the calendar).
+- New technician APK built (direct upload to storage, up to 25 MB); User Guide updated.
+Files changed: see PRs 39, 40, 43, 45 (Orion), 41, 44 (Atlas), 42 (Apollo)
+Next: merge PR 45 and push main again; BITA installs the new APK and retests; reset invoice counters after testing.
+Blockers / questions: none
+
 ### 2026-11-20 14:25 – Naveen – Claude
 Task: Round 3 (R3-3 Money) – Invoice from Job, Days Since Invoice Date, Quotation Price-List Picker & Multi-Job Payments Received
 Done:
