@@ -679,7 +679,7 @@ const VALID_ATTACHMENT_KINDS = new Set([
 
 function resolveAttachmentKind(
   explicitKind: string | undefined | null,
-  contentType: string,
+  contentType: string | undefined | null,
   fileName: string,
 ): string {
   if (explicitKind && VALID_ATTACHMENT_KINDS.has(explicitKind)) {
@@ -779,6 +779,147 @@ export async function uploadFieldAttachment(
 
   if (dbError || !att) {
     return { error: `Failed to save attachment metadata: ${dbError?.message || "Unknown error"}`, status: 500 };
+  }
+
+  return {
+    ok: true,
+    attachmentId: att.id,
+    storagePath,
+    kind,
+    fileName: cleanName,
+  };
+}
+
+/**
+ * Creates a signed upload URL for a technician assignment file.
+ * Directly uploads to Supabase storage bypassing Vercel's 4.5 MB request body limit,
+ * supporting files up to 25 MB.
+ */
+export async function createDirectUploadUrl(
+  supabase: SupabaseClient<Database>,
+  assignmentId: string,
+  personId: string,
+  params: {
+    fileName: string;
+    contentType?: string | null;
+  },
+): Promise<
+  | {
+      ok: true;
+      signedUrl: string;
+      token: string;
+      storagePath: string;
+      jobId: string;
+    }
+  | { error: string; status: number }
+> {
+  const assignment = await verifyTechnicianAssignment(supabase, assignmentId, personId);
+  if (!assignment) {
+    return { error: "Assignment not found", status: 404 };
+  }
+
+  const rawName = (params.fileName || "").trim() || "upload";
+  const cleanName = rawName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const storagePath = `jobs/${assignment.job_id}/${Date.now()}-${cleanName}`;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from("documents")
+      .createSignedUploadUrl(storagePath, { upsert: false });
+
+    if (error || !data) {
+      return {
+        error: `Failed to create signed upload URL: ${error?.message || "Storage error"}`,
+        status: 500,
+      };
+    }
+
+    return {
+      ok: true,
+      signedUrl: data.signedUrl,
+      token: data.token,
+      storagePath,
+      jobId: assignment.job_id,
+    };
+  } catch (err) {
+    return {
+      error: `Storage error: ${err instanceof Error ? err.message : "Unknown error"}`,
+      status: 500,
+    };
+  }
+}
+
+/**
+ * Confirms a direct storage upload and records the attachment row in the database.
+ * Strictly verifies that the storagePath belongs under this job's folder (`jobs/${job_id}/`).
+ */
+export async function confirmDirectUpload(
+  supabase: SupabaseClient<Database>,
+  assignmentId: string,
+  personId: string,
+  params: {
+    storagePath: string;
+    kind?: string | null;
+    caption?: string | null;
+    linkInspection?: boolean;
+    contentType?: string | null;
+  },
+): Promise<
+  | {
+      ok: true;
+      attachmentId: string;
+      storagePath: string;
+      kind: string;
+      fileName: string;
+    }
+  | { error: string; status: number }
+> {
+  const assignment = await verifyTechnicianAssignment(supabase, assignmentId, personId);
+  if (!assignment) {
+    return { error: "Assignment not found", status: 404 };
+  }
+
+  const storagePath = (params.storagePath || "").trim();
+  const expectedPrefix = `jobs/${assignment.job_id}/`;
+  if (!storagePath.startsWith(expectedPrefix)) {
+    return {
+      error: "Invalid storage path: file must be located inside the assigned job directory.",
+      status: 403,
+    };
+  }
+
+  let inspectionId: string | null = null;
+  if (params.linkInspection) {
+    const { data: insp } = await supabase
+      .from("inspections")
+      .select("id")
+      .eq("assignment_id", assignmentId)
+      .maybeSingle();
+    inspectionId = insp?.id ?? null;
+  }
+
+  const rawFileName = storagePath.split("/").pop() || "file";
+  const cleanName = rawFileName.replace(/^\d+-/, "");
+  const kind = resolveAttachmentKind(params.kind, params.contentType, cleanName);
+
+  const { data: att, error: dbError } = await supabase
+    .from("attachments")
+    .insert({
+      job_id: assignment.job_id,
+      inspection_id: inspectionId,
+      kind,
+      caption: params.caption ?? null,
+      storage_path: storagePath,
+      uploaded_by: personId,
+    })
+    .select("id")
+    .single();
+
+  if (dbError || !att) {
+    return {
+      error: `Failed to save attachment metadata: ${dbError?.message || "Unknown error"}`,
+      status: 500,
+    };
   }
 
   return {

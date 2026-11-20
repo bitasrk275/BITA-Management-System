@@ -239,21 +239,71 @@ export function TechnicianWebApp() {
     setError(null);
     setNotice(null);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const caption = (fileCaptions[job.id] || "").trim();
-      if (caption) formData.append("caption", caption);
-      if (defaultKind) formData.append("kind", defaultKind);
+      const caption = (fileCaptions[job.id] || "").trim() || null;
+      let uploadedDirectly = false;
 
-      const res = await fetch(`/api/field/assignments/${job.id}/files`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${creds.deviceId}.${creds.secret}`,
-        },
-        body: formData,
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Failed to upload file");
+      // Direct upload URL (bypasses Vercel 4.5 MB function payload limit)
+      try {
+        const urlRes = await fetch(`/api/field/assignments/${job.id}/upload-url`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${creds.deviceId}.${creds.secret}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type || "application/octet-stream",
+          }),
+        });
+        if (urlRes.ok) {
+          const urlJson = await urlRes.json().catch(() => ({}));
+          if (urlJson.ok && urlJson.signedUrl && urlJson.storagePath) {
+            const putRes = await fetch(urlJson.signedUrl, {
+              method: "PUT",
+              headers: { "Content-Type": file.type || "application/octet-stream" },
+              body: file,
+            });
+            if (putRes.ok) {
+              const confirmRes = await fetch(`/api/field/assignments/${job.id}/upload-confirm`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${creds.deviceId}.${creds.secret}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  storagePath: urlJson.storagePath,
+                  kind: defaultKind || "site_file",
+                  caption,
+                  contentType: file.type || "application/octet-stream",
+                }),
+              });
+              if (confirmRes.ok) {
+                uploadedDirectly = true;
+              }
+            }
+          }
+        }
+      } catch {
+        // Fall back to multipart
+      }
+
+      if (!uploadedDirectly) {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (caption) formData.append("caption", caption);
+        if (defaultKind) formData.append("kind", defaultKind);
+
+        const res = await fetch(`/api/field/assignments/${job.id}/files`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${creds.deviceId}.${creds.secret}`,
+          },
+          body: formData,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || "Failed to upload file");
+      }
+
       setFileCaptions((prev) => ({ ...prev, [job.id]: "" }));
       setNotice(`Uploaded ${file.name} to ${job.jobNo}.`);
       await loadJobs();

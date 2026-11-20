@@ -179,12 +179,80 @@ export async function uploadSiteFile(
     name: string;
     type: string;
     caption?: string;
-    kind?: "site_photo" | "defect_photo" | "drawing" | "supporting_document" | "other";
+    kind?: "site_photo" | "defect_photo" | "drawing" | "supporting_document" | "other" | "site_file";
   },
 ): Promise<{ ok: boolean; attachmentId: string; storagePath: string; kind: string; fileName: string }> {
   const creds = await getStoredCredentials();
   if (!creds) throw new ApiError("Device not linked", 401);
 
+  // Attempt 1: Direct signed upload URL to Supabase Storage (up to 25 MB, bypasses Vercel 4.5 MB limit)
+  try {
+    const urlRes = await fetch(`${API_BASE_URL}/api/field/assignments/${assignmentId}/upload-url`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${creds.deviceId}.${creds.secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fileName: params.name,
+        contentType: params.type || "application/octet-stream",
+      }),
+    });
+
+    if (urlRes.status === 401) {
+      await clearCredentials();
+      throw new ApiError("Device revoked", 401);
+    }
+
+    if (urlRes.ok) {
+      const urlJson = await urlRes.json().catch(() => ({}));
+      if (urlJson.ok && urlJson.signedUrl && urlJson.storagePath) {
+        // Fetch binary data from local uri
+        const blobRes = await fetch(params.uri);
+        const fileBlob = await blobRes.blob();
+
+        const putRes = await fetch(urlJson.signedUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": params.type || "application/octet-stream",
+          },
+          body: fileBlob,
+        });
+
+        if (putRes.ok) {
+          // Confirm upload metadata and insert attachment row
+          const confirmRes = await fetch(
+            `${API_BASE_URL}/api/field/assignments/${assignmentId}/upload-confirm`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${creds.deviceId}.${creds.secret}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                storagePath: urlJson.storagePath,
+                kind: params.kind || "site_file",
+                caption: params.caption || null,
+                contentType: params.type || "application/octet-stream",
+              }),
+            },
+          );
+
+          if (confirmRes.ok) {
+            const confirmJson = await confirmRes.json().catch(() => ({}));
+            if (confirmJson.ok) {
+              return confirmJson;
+            }
+          }
+        }
+      }
+    }
+  } catch (directErr) {
+    if (directErr instanceof ApiError && directErr.status === 401) throw directErr;
+    // Fall back cleanly to multipart upload route
+  }
+
+  // Attempt 2: Standard multipart FormData upload (for smaller files / fallback)
   const formData = new FormData();
   formData.append("file", {
     uri: params.uri,

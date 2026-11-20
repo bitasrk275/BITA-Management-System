@@ -12,7 +12,9 @@ import {
 import { authenticateDevice } from "../lib/field/auth";
 import {
   acknowledgeAssignment,
+  confirmDirectUpload,
   createAssignmentJobNote,
+  createDirectUploadUrl,
   createTechnicianMessage,
   listAssignmentFiles,
   listAssignmentJobNotes,
@@ -234,6 +236,16 @@ function createPgliteSupabaseAdapter(pgDb: PGlite): SupabaseClient<Database> {
               const message = err instanceof Error ? err.message : String(err);
               return { data: null, error: { message } };
             }
+          },
+          async createSignedUploadUrl(path: string) {
+            return {
+              data: {
+                signedUrl: `https://fake-supabase.storage/object/upload/sign/${bucket}/${path}?token=fake-token`,
+                token: "fake-token",
+                path,
+              },
+              error: null,
+            };
           },
         };
       },
@@ -776,6 +788,48 @@ describe("Field API tests on PGlite (T42)", () => {
         [rejectReq.request.id],
       );
       expect(dbReq.rows[0].status).toBe("rejected");
+    }
+  });
+
+  it("8. Round 3 Task R3-4b: direct Supabase storage signed upload URL & confirm route (up to 25 MB)", async () => {
+    // 8a. createDirectUploadUrl verifies assignment and creates path under jobs/<job_id>/
+    const urlRes = await createDirectUploadUrl(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
+      fileName: "large_calibration_scan.pdf",
+      contentType: "application/pdf",
+    });
+    expect("ok" in urlRes && urlRes.ok).toBe(true);
+    if ("ok" in urlRes) {
+      expect(urlRes.storagePath).toContain(`jobs/${JOB_ID}/`);
+      expect(urlRes.signedUrl).toBeDefined();
+      expect(urlRes.token).toBeDefined();
+
+      // 8b. confirmDirectUpload refuses path outside job folder (403)
+      const badConfirm = await confirmDirectUpload(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
+        storagePath: "jobs/99999999-9999-9999-9999-999999999999/forged_file.pdf",
+        caption: "Forged path outside assigned job",
+      });
+      expect("error" in badConfirm).toBe(true);
+      if ("error" in badConfirm) {
+        expect(badConfirm.status).toBe(403);
+      }
+
+      // 8c. confirmDirectUpload creates attachment row under job with null inspection_id
+      const goodConfirm = await confirmDirectUpload(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
+        storagePath: urlRes.storagePath,
+        caption: "Large 15 MB equipment scan",
+        kind: "supporting_document",
+      });
+      expect("ok" in goodConfirm && goodConfirm.ok).toBe(true);
+      if ("ok" in goodConfirm) {
+        expect(goodConfirm.kind).toBe("supporting_document");
+        const dbAtt = await db.query<{ id: string; job_id: string; inspection_id: string | null }>(
+          "select id, job_id, inspection_id from attachments where id = $1",
+          [goodConfirm.attachmentId],
+        );
+        expect(dbAtt.rows.length).toBe(1);
+        expect(dbAtt.rows[0].job_id).toBe(JOB_ID);
+        expect(dbAtt.rows[0].inspection_id).toBeNull();
+      }
     }
   });
 });
