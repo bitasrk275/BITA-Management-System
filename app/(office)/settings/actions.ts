@@ -184,9 +184,11 @@ export async function saveCompanyProfileAction(fd: FormData) {
 
 export async function saveInvoiceNumberingAction(fd: FormData) {
   const { supabase, person } = await requireStaff();
+  const nextTax = Math.max(1, Number(text(fd, "next_tax_no") ?? "5388") || 5388);
   const payload = {
     tax_prefix: text(fd, "tax_prefix") ?? "",
-    next_tax_no: Math.max(1, Number(text(fd, "next_tax_no") ?? "5388") || 5388),
+    next_tax_no: nextTax,
+    next_tax_invoice_no: nextTax,
     proforma_prefix: text(fd, "proforma_prefix") ?? "PI/",
     next_proforma_no: Math.max(1, Number(text(fd, "next_proforma_no") ?? "1") || 1),
     credit_note_prefix: text(fd, "credit_note_prefix") ?? "CN/",

@@ -34,6 +34,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | G11 – Strip internal requirement codes from UI | Naveen | Done | feature/naveen-g11-remove-ui-codes | Removed internal codes (`R17`, `R20`, `P4a`, `A6`, etc.) from `.tsx` screens + added `tests/no-ui-requirement-codes.test.ts` guard |
 | G12 – UAT database kit (`demo.sql`, `uat-reset.sql`, `docs/UAT_SETUP.md`) | Naveen | Done | PR 34, feature/naveen-g12-uat-kit | Phase 2 UAT seed with non-fake customer guard, multi-state GSTINs (CGST/SGST & IGST), `uat-reset.sql`, `docs/UAT_SETUP.md`, and `tests/uat-seed-g12.test.ts` |
 | G14 – Release notes for BITA (`docs/RELEASE_NOTES.md`) | Naveen | Done | PR 35, feature/naveen-g14-release-notes | Plain-English summary of all 14 workflow steps, new post-7-Nov features, and excluded items with 6 Nov reasons |
+| R3-3 – Money (job invoice/report actions, days since invoice date, quotation price-list picker, multi-job payment receipts) | Naveen | Done | feature/naveen-r3-money | `<JobMoneyActions />` on `/jobs/[id]`, direct job invoice generator + one-click `Generate & issue invoice`, days since invoice date (`N days`), quotation price-list item picker, and multi-job `Paid` checkboxes + `payment_receipts` |
 | Glossary | Krishna | Done | PR 15, docs/GLOSSARY.md | NDT & inspection glossary for BITA workflows |
 | Test data | Krishna | Done | PR 15, scripts/seed/ | Deterministic fake seed data (`npm run seed`) |
 | Client inputs tracker | Krishna | Done | PR 15, docs/CLIENT_INPUTS.md | Tracks BITA-supplied templates, HSN/SAC codes, and pending credentials |
@@ -79,6 +80,18 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-20 14:25 – Naveen – Claude
+Task: Round 3 (R3-3 Money) – Invoice from Job, Days Since Invoice Date, Quotation Price-List Picker & Multi-Job Payments Received
+Done:
+- Added `<JobMoneyActions />` (`app/(office)/jobs/[id]/money-actions.tsx`) on `/jobs/[id]` with Generate report, Open report, Generate invoice (Tax or Proforma defaulting to customer preference), and Open invoice, plus clear report-approval guidance.
+- Added direct "Generate invoice for a job" card on `/invoices`, one-click "Generate & issue invoice (assigns number)" button in `InvoiceDraftEditor`, and normalized `private.next_invoice_no()` / `private.next_credit_note_no()` to support both `next_tax_no` and `next_tax_invoice_no` and strip duplicate `BITA/YY-YY/` prefixes.
+- Added days since invoice date (`N days`) on `/invoices`, `/invoices/[id]`, and `/jobs/[id]`.
+- Added price-list item picker (`QuotationItemFields`) on `/quotations/[id]` with inline `+ Add new item to price list…`.
+- Built multi-job "Payments received — Tick jobs paid" view on `/invoices` (`app/(office)/invoices/payments-received-section.tsx`, `lib/modules/invoices/payments-received.ts`, `/api/v1/payment-receipts`, and `/invoices/receipt-advice/[id]`) backed by `public.payment_receipts`, `payments.receipt_id`, and `jobs.paid_at`.
+Files changed: `supabase/migrations/20261120000000_r3_money_receipts_and_numbering.sql`, `lib/db/types.ts`, `lib/modules/invoices/payments-received.ts`, `app/(office)/jobs/[id]/money-actions.tsx`, `app/(office)/jobs/[id]/page.tsx`, `app/(office)/invoices/**`, `app/(office)/quotations/[id]/**`, `app/api/v1/payment-receipts/route.ts`, `tests/r3-money.test.ts`
+Next: Cross-review and merge Round 3 PRs (`R3-1`..`R3-5`) into `feature/naveen-integration` and apply additive migrations to `bita-dev`.
+Blockers / questions: none
 
 ### 2026-11-12 12:00 – Naveen – Claude
 Task: Pre-handover Gap Audit Round (G1–G6, G9, G10, G11)

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { Constants } from "@/lib/db/types";
+import { listPriceItems } from "@/lib/modules/price-items/service";
 import { hasPermissionForRoles } from "@/lib/modules/settings/service";
 import { formatIST } from "../../enquiries/labels";
 import { formatINR } from "../../jobs/labels";
@@ -47,6 +48,7 @@ import {
   quotationFileName,
   quotationStatusDisplay,
 } from "../upload";
+import { QuotationItemFields } from "./quotation-item-picker";
 
 export default async function QuotationPage({
   params,
@@ -75,7 +77,7 @@ export default async function QuotationPage({
     pastRatesQuery = pastRatesQuery.or(`description.ilike.%${rateTerm}%,basis.ilike.%${rateTerm}%`);
   }
 
-  const [customer, enquiry, items, approver, supersededBy, linkedJobs, pastRates, options, canDelete] = await Promise.all([
+  const [customer, enquiry, items, approver, supersededBy, linkedJobs, pastRates, options, canDelete, priceItems] = await Promise.all([
     supabase.from("customers").select("*").eq("id", quotation.customer_id).maybeSingle(),
     quotation.enquiry_id
       ? supabase.from("enquiries").select("id, subject, source, status, received_at").eq("id", quotation.enquiry_id).maybeSingle()
@@ -96,6 +98,7 @@ export default async function QuotationPage({
     pastRatesQuery,
     quotationFormOptions(supabase),
     hasPermissionForRoles(supabase, person?.roles, "delete"),
+    listPriceItems(supabase, { activeOnly: true }),
   ]);
 
   const uploadedFileName = quotationFileName(quotation.pdf_path);
@@ -468,7 +471,7 @@ export default async function QuotationPage({
                       </div>
                     </summary>
                     <form action={updateQuotationItem.bind(null, id, it.id)} className="mt-3 space-y-3">
-                      <ItemFields item={it} />
+                      <QuotationItemFields item={it} priceItems={priceItems.data} />
                       <div className="flex flex-wrap gap-2">
                         <Button type="submit">Save item</Button>
                         <SecondaryButton formAction={deleteQuotationItem.bind(null, id, it.id)}>
@@ -494,7 +497,7 @@ export default async function QuotationPage({
             <details className="pt-2" open={(items.data?.length ?? 0) === 0}>
               <summary className="cursor-pointer text-sm font-semibold underline">Add a priced item</summary>
               <form action={addQuotationItem.bind(null, id)} className="mt-3 space-y-3">
-                <ItemFields defaultPosition={nextPosition} />
+                <QuotationItemFields defaultPosition={nextPosition} priceItems={priceItems.data} />
                 <Button type="submit">Add item</Button>
               </form>
             </details>
@@ -567,53 +570,6 @@ export default async function QuotationPage({
           </div>
         </div>
       </div>
-    </>
-  );
-}
-
-function ItemFields({
-  item,
-  defaultPosition = 1,
-}: {
-  item?: {
-    position: number;
-    description: string;
-    basis: string | null;
-    rate: number | null;
-    minimum_charge: number | null;
-    notes: string | null;
-  };
-  defaultPosition?: number;
-}) {
-  return (
-    <>
-      <div className="grid gap-3 sm:grid-cols-[5rem_1fr]">
-        <Field label="Sl. No.">
-          <Input name="position" type="number" min="1" required defaultValue={item?.position ?? defaultPosition} />
-        </Field>
-        <Field label="Component / inspection description">
-          <Input
-            name="description"
-            required
-            placeholder="Ultrasonic testing of forged shafts"
-            defaultValue={item?.description ?? ""}
-          />
-        </Field>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Rate (INR)">
-          <Input name="rate" type="number" step="0.01" min="0" defaultValue={item?.rate ?? ""} />
-        </Field>
-        <Field label="Basis" hint="e.g. per shaft, per ring, per visit">
-          <Input name="basis" placeholder="per shaft" defaultValue={item?.basis ?? ""} />
-        </Field>
-        <Field label="Minimum charge (INR)">
-          <Input name="minimum_charge" type="number" step="0.01" min="0" defaultValue={item?.minimum_charge ?? ""} />
-        </Field>
-      </div>
-      <Field label="Notes">
-        <Input name="notes" placeholder="Optional item note or conveyance detail" defaultValue={item?.notes ?? ""} />
-      </Field>
     </>
   );
 }

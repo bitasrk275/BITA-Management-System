@@ -1053,6 +1053,8 @@ export type Database = {
           enquiry_id: string | null
           id: string
           job_no: string
+          paid_at: string | null
+          paid_receipt_id: string | null
           po_date: string | null
           po_number: string | null
           po_path: string | null
@@ -1072,6 +1074,8 @@ export type Database = {
           enquiry_id?: string | null
           id?: string
           job_no?: string
+          paid_at?: string | null
+          paid_receipt_id?: string | null
           po_date?: string | null
           po_number?: string | null
           po_path?: string | null
@@ -1091,6 +1095,8 @@ export type Database = {
           enquiry_id?: string | null
           id?: string
           job_no?: string
+          paid_at?: string | null
+          paid_receipt_id?: string | null
           po_date?: string | null
           po_number?: string | null
           po_path?: string | null
@@ -1114,6 +1120,13 @@ export type Database = {
             columns: ["enquiry_id"]
             isOneToOne: false
             referencedRelation: "enquiries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_paid_receipt_id_fkey"
+            columns: ["paid_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "payment_receipts"
             referencedColumns: ["id"]
           },
           {
@@ -1272,6 +1285,63 @@ export type Database = {
           },
         ]
       }
+      payment_receipts: {
+        Row: {
+          advice_path: string | null
+          amount: number
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          id: string
+          job_ids: string[]
+          mode: string | null
+          notes: string | null
+          received_on: string
+          reference: string | null
+        }
+        Insert: {
+          advice_path?: string | null
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          job_ids?: string[]
+          mode?: string | null
+          notes?: string | null
+          received_on?: string
+          reference?: string | null
+        }
+        Update: {
+          advice_path?: string | null
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          job_ids?: string[]
+          mode?: string | null
+          notes?: string | null
+          received_on?: string
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_receipts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_reminders: {
         Row: {
           from_mailbox: string | null
@@ -1318,6 +1388,7 @@ export type Database = {
           invoice_id: string
           mode: string | null
           paid_on: string
+          receipt_id: string | null
           reference: string | null
           tds_amount: number
         }
@@ -1328,6 +1399,7 @@ export type Database = {
           invoice_id: string
           mode?: string | null
           paid_on?: string
+          receipt_id?: string | null
           reference?: string | null
           tds_amount?: number
         }
@@ -1338,6 +1410,7 @@ export type Database = {
           invoice_id?: string
           mode?: string | null
           paid_on?: string
+          receipt_id?: string | null
           reference?: string | null
           tds_amount?: number
         }
@@ -1347,6 +1420,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "payment_receipts"
             referencedColumns: ["id"]
           },
         ]

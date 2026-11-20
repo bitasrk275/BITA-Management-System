@@ -11,6 +11,7 @@ import { isJobReadyToClose } from "../closure";
 import { JobForm } from "../job-form";
 import { formatINR, JOB_STATUS_LABEL, METHOD_LABEL } from "../labels";
 import { jobFormOptions } from "../options";
+import { JobMoneyActions } from "./money-actions";
 
 // R18: one page shows everything for a Job ID.
 export default async function JobPage({
@@ -248,6 +249,8 @@ export default async function JobPage({
               </>
             )}
           </Card>
+
+          <JobMoneyActions job={job} customer={customer.data} reports={reports.data ?? []} invoices={invoices.data ?? []} />
 
           <Card>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

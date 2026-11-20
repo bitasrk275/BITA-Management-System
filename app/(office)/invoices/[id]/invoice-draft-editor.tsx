@@ -585,7 +585,12 @@ export function InvoiceDraftEditor({
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <Button type="submit">Save draft invoice</Button>
+        <Button type="submit" name="intent" value="save_and_issue">
+          Generate &amp; issue invoice (assigns number)
+        </Button>
+        <SecondaryButton type="submit" name="intent" value="save_draft">
+          Save draft invoice
+        </SecondaryButton>
       </div>
     </form>
   );

@@ -11,6 +11,7 @@ import {
   ListRow,
   Mono,
   PageHeader,
+  SavedNote,
   SectionTitle,
   Select,
   Stats,
@@ -19,11 +20,20 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { shortDate, todayIST } from "@/lib/dates";
+import {
+  formatDaysSinceInvoiceDate,
+  formatUnpaidInvoiceDaysLabel,
+  listJobsForPaymentsReceived,
+} from "@/lib/modules/invoices/payments-received";
 import { listInvoicePendingReports } from "@/lib/modules/invoices/service";
 import { homeFor } from "@/lib/roles";
 import { formatINR, METHOD_LABEL } from "../jobs/labels";
-import { generateInvoiceFromSelectedReports } from "./actions";
+import {
+  generateInvoiceForSelectedJob,
+  generateInvoiceFromSelectedReports,
+} from "./actions";
 import { invoicesTable, type InvoiceWithRelations } from "./db";
+import { PaymentsReceivedSection } from "./payments-received-section";
 
 export const metadata = { title: "Invoices & Payments – BITA" };
 
@@ -52,9 +62,9 @@ function statusDisplay(inv: InvoiceWithRelations, today: string): { label: strin
 export default async function InvoicesListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{ status?: string; error?: string; saved?: string }>;
 }) {
-  const { status: statusFilter, error: actionError } = await searchParams;
+  const { status: statusFilter, error: actionError, saved } = await searchParams;
   const { supabase, person } = await requireStaff();
   if (!person?.roles.some((r) => r === "management" || r === "office")) {
     redirect(homeFor(person?.roles));
@@ -62,7 +72,7 @@ export default async function InvoicesListPage({
 
   const today = todayIST();
 
-  const [invoicesRes, pendingReports] = await Promise.all([
+  const [invoicesRes, pendingReports, paymentsData, customersRes] = await Promise.all([
     invoicesTable(supabase)
       .select(
         "*, jobs(id, job_no, po_number, po_date, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), invoice_reports(report_id, reports(id, report_no, method, status)), quotations(id, ref_no, status)",
@@ -71,6 +81,12 @@ export default async function InvoicesListPage({
       data: InvoiceWithRelations[] | null;
     }>,
     listInvoicePendingReports(supabase).catch(() => []),
+    listJobsForPaymentsReceived(supabase, { today }).catch(() => ({ jobs: [], receipts: [] })),
+    supabase
+      .from("customers")
+      .select("id, name")
+      .is("deleted_at", null)
+      .order("name", { ascending: true }),
   ]);
 
   const allInvoices = invoicesRes.data ?? [];
@@ -141,6 +157,7 @@ export default async function InvoicesListPage({
       />
 
       <ErrorNote message={actionError} />
+      {saved && <SavedNote />}
 
       <Stats
         items={[
@@ -173,6 +190,44 @@ export default async function InvoicesListPage({
                 : "all approved reports billed",
           },
         ]}
+      />
+
+      {/* Generate invoice directly for a job */}
+      <section className="mb-7">
+        <SectionTitle>Generate invoice for a job</SectionTitle>
+        <Card className="space-y-3">
+          <p className="text-[13px] text-ink-2">
+            Pick a Job ID and choose Tax invoice or Proforma invoice to generate (or open) the invoice linked to that job.
+          </p>
+          <form
+            action={generateInvoiceForSelectedJob}
+            className="flex flex-wrap items-center gap-3"
+          >
+            <input type="hidden" name="return_to" value="/invoices" />
+            <Select name="job_id" required className="min-w-[260px] flex-1">
+              <option value="">Choose a job…</option>
+              {paymentsData.jobs.map((j) => (
+                <option key={j.job_id} value={j.job_id}>
+                  {j.job_no} — {j.customer_name}
+                  {j.po_number ? ` (PO ${j.po_number})` : ""}
+                </option>
+              ))}
+            </Select>
+            <Select name="kind" defaultValue="tax_invoice" className="w-56">
+              <option value="tax_invoice">Tax invoice (BITA/YY-YY/INV-xxxx)</option>
+              <option value="proforma">Proforma invoice (BITA/YY-YY/PI-xxxx)</option>
+            </Select>
+            <Button type="submit">Generate invoice</Button>
+          </form>
+        </Card>
+      </section>
+
+      {/* Payments received (D-R3a): multi-job Paid checkboxes + receipt details */}
+      <PaymentsReceivedSection
+        jobs={paymentsData.jobs}
+        receipts={paymentsData.receipts}
+        customers={customersRes.data ?? []}
+        today={today}
       />
 
       {/* Prepare invoice from one or several Invoice pending reports */}
@@ -283,11 +338,15 @@ export default async function InvoicesListPage({
                 : linkedReportNos.length === 1
                   ? `Report ${linkedReportNos[0]}`
                   : null;
+            const invoiceAge = formatDaysSinceInvoiceDate(inv.invoice_date, today);
+            const unpaidDaysLabel = formatUnpaidInvoiceDaysLabel(inv, today);
             const detailParts = [
               jobNo,
               reportPart,
               inv.customer_po_number ? `PO ${inv.customer_po_number}` : null,
-              inv.invoice_date ? `Dated ${shortDate(inv.invoice_date)}` : null,
+              inv.invoice_date
+                ? `Dated ${shortDate(inv.invoice_date)}${invoiceAge ? ` (${invoiceAge.label})` : ""}`
+                : null,
               inv.due_date ? `Due ${shortDate(inv.due_date)}` : null,
               inv.reminders_paused ? "Reminders paused" : null,
             ].filter(Boolean);
@@ -301,6 +360,7 @@ export default async function InvoicesListPage({
                     <Mono>{displayNo}</Mono>
                     {inv.kind === "proforma" && <Badge>Proforma</Badge>}
                     <Status tone={st.tone}>{st.label}</Status>
+                    {unpaidDaysLabel && <Badge>{unpaidDaysLabel}</Badge>}
                     <span className="font-normal text-ink-2">{customerName}</span>
                   </span>
                 }

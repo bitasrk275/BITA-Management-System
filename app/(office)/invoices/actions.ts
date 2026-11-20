@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { todayIST } from "@/lib/dates";
+import type { Database } from "@/lib/db/types";
 import { text as str } from "@/lib/forms";
+import type { ReportReadings } from "@/lib/reports/fields";
 import {
   calculateInvoiceGst,
   computeLineAmount,
@@ -22,11 +24,18 @@ import {
   createDraftInvoiceFromReports,
   recordInvoicePayment,
 } from "@/lib/modules/invoices/service";
+import { recordMultiJobPaymentReceipt } from "@/lib/modules/invoices/payments-received";
+import { loadBookedJobEquipmentForReport } from "@/lib/modules/reports/service";
 import {
   parseCreateCreditNoteInput,
   parseRecordPaymentInput,
 } from "@/lib/modules/invoices/schema";
-import { validUuid } from "@/lib/reports/review";
+import {
+  buildReportContent,
+  extractReadings,
+  prefillReadingsFromBookedEquipment,
+  validUuid,
+} from "@/lib/reports/review";
 import { homeFor } from "@/lib/roles";
 import {
   invoiceLinesTable,
@@ -52,24 +61,13 @@ async function createDraftInvoiceForJobAndReport(
   supabase: Awaited<ReturnType<typeof requireStaff>>["supabase"],
   jobId: string,
   preferredReportId?: string | null,
+  preferredKind?: "proforma" | "tax_invoice" | null,
 ): Promise<{ id?: string; error?: string }> {
-  // 1. Check if an active tax_invoice already exists for this job
-  const { data: existing } = (await invoicesTable(supabase)
-    .select("id, status")
-    .eq("job_id", jobId)
-    .eq("kind", "tax_invoice")
-    .neq("status", "cancelled")
-    .maybeSingle()) as { data: { id: string; status: string } | null };
-
-  if (existing?.id) {
-    return { id: existing.id };
-  }
-
-  // 2. Load job + customer
+  // 1. Load job + customer + quotation items
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, job_no, customer_id, enquiry_id, quotation_id, po_number, po_date, scope, test_methods, customers(id, name, gstin, billing_address, payment_terms_days)",
+      "id, job_no, customer_id, enquiry_id, quotation_id, po_number, po_date, po_value, scope, test_methods, customers(id, name, gstin, billing_address, payment_terms_days, uses_proforma), quotations(id, ref_no, quotation_items(position, description, basis, rate, minimum_charge))",
     )
     .eq("id", jobId)
     .maybeSingle();
@@ -78,7 +76,28 @@ async function createDraftInvoiceForJobAndReport(
     return { error: jobErr?.message ?? "Job not found." };
   }
 
-  // 3. Load approved report (preferredReportId if given, otherwise latest approved report on the job)
+  const targetKind: "proforma" | "tax_invoice" =
+    preferredKind === "proforma" || preferredKind === "tax_invoice"
+      ? preferredKind
+      : job.customers?.uses_proforma
+        ? "proforma"
+        : "tax_invoice";
+
+  // 2. Check if an active invoice of this kind already exists for this job
+  const { data: existingList } = (await invoicesTable(supabase)
+    .select("id, status, kind")
+    .eq("job_id", jobId)
+    .eq("kind", targetKind)
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(1)) as { data: Array<{ id: string; status: string; kind: string }> | null };
+
+  const existing = existingList?.[0] ?? null;
+  if (existing?.id) {
+    return { id: existing.id };
+  }
+
+  // 3. Load approved reports (preferredReportId if given, otherwise all approved reports on the job)
   let reportQuery = supabase
     .from("reports")
     .select("id, job_id, inspection_id, report_no, method, status, approved_at, content")
@@ -87,27 +106,69 @@ async function createDraftInvoiceForJobAndReport(
   if (preferredReportId) {
     reportQuery = reportQuery.eq("id", preferredReportId);
   } else {
-    reportQuery = reportQuery.not("approved_at", "is", null).order("approved_at", { ascending: false }).limit(1);
+    reportQuery = reportQuery
+      .or("approved_at.not.is.null,status.in.(approved,sent)")
+      .order("approved_at", { ascending: false });
   }
 
   const { data: reports } = await reportQuery;
-  const report = reports?.[0] ?? null;
+  const approvedReports = (reports ?? []).filter(
+    (r) => Boolean(r.approved_at) || r.status === "approved" || r.status === "sent",
+  );
+  const report = approvedReports[0] ?? null;
 
-  if (preferredReportId && (!report || !report.approved_at)) {
+  if (preferredReportId && !report) {
     return { error: "Report must be approved by a technical reviewer before generating an invoice." };
   }
 
-  // 4. Phase 2 (P3 / Map Change 3): Fill initial draft line from the price list (never from quotation rates).
-  // The office picks services from the price list dropdown and can adjust rates per invoice.
+  // 4. Fill initial draft line from the price list (or fallback to quotation items / PO value if price list rate is 0)
   const quotationId = job.quotation_id;
   const { data: priceItems } = await listPriceItems(supabase, { activeOnly: true });
-  const builtLines = buildDraftInvoiceLinesFromPriceList({
+  let builtLines = buildDraftInvoiceLinesFromPriceList({
     priceItems,
     method: report?.method ?? job.test_methods?.[0] ?? null,
     reportNo: report?.report_no ?? null,
     fallbackDescription:
-      job.scope || (report ? `${report.method} Inspection (${report.report_no})` : "NDT Inspection Services"),
+      job.scope || (report ? `${report.method} Inspection (${report.report_no})` : `Inspection services (${job.job_no})`),
   });
+
+  const quotationObj = job.quotations as unknown as {
+    id: string;
+    ref_no: string | null;
+    quotation_items?: Array<{
+      position: number;
+      description: string;
+      basis: string | null;
+      rate: number | null;
+      minimum_charge: number | null;
+    }>;
+  } | null;
+
+  if (
+    sumTaxableValue(builtLines) === 0 &&
+    quotationObj?.quotation_items &&
+    quotationObj.quotation_items.some((qi) => (Number(qi.rate) || 0) > 0)
+  ) {
+    const defaultSac = priceItems[0]?.sac ?? "998393";
+    builtLines = quotationObj.quotation_items
+      .filter((qi) => qi.description?.trim())
+      .map((qi, idx) => {
+        const rate = roundPaise(Number(qi.rate) || 0);
+        const minCharge = qi.minimum_charge ? Number(qi.minimum_charge) : null;
+        const calc = computeLineAmount(1, rate, minCharge);
+        return {
+          position: idx + 1,
+          description: qi.description.trim(),
+          sac: defaultSac,
+          qty: calc.qty,
+          unit: qi.basis?.trim() || "nos",
+          rate: calc.rate,
+          amount: calc.amount,
+          minimum_charge: calc.minimum_charge,
+          minimum_charge_applied: calc.minimum_charge_applied,
+        };
+      });
+  }
 
   const taxableValue = sumTaxableValue(builtLines);
   const customer = job.customers;
@@ -122,7 +183,7 @@ async function createDraftInvoiceForJobAndReport(
   const { data: created, error: createErr } = (await invoicesTable(supabase)
     .insert({
       job_id: job.id,
-      kind: "tax_invoice",
+      kind: targetKind,
       report_id: report?.id ?? null,
       quotation_id: quotationId,
       place_of_supply: gst.place_of_supply,
@@ -143,6 +204,18 @@ async function createDraftInvoiceForJobAndReport(
 
   if (createErr || !created) {
     return { error: createErr?.message ?? "Failed to create draft invoice." };
+  }
+
+  if (approvedReports.length > 0) {
+    await supabase
+      .from("invoice_reports")
+      .upsert(
+        approvedReports.map((r) => ({
+          invoice_id: created.id,
+          report_id: r.id,
+        })),
+        { onConflict: "invoice_id,report_id" },
+      );
   }
 
   const linePayloads = builtLines.map((line, index) => ({
@@ -260,11 +333,15 @@ export async function generateInvoiceFromSelectedReports(formData: FormData) {
   redirect(`/invoices/${invoiceId}?saved=1`);
 }
 
-export async function generateInvoiceFromJob(jobId: string) {
+export async function generateInvoiceFromJob(jobId: string, formData?: FormData) {
   if (!validUuid(jobId)) redirect("/jobs");
   const { supabase } = await requireBillingStaff();
 
-  const res = await createDraftInvoiceForJobAndReport(supabase, jobId, null);
+  const kindRaw = formData ? str(formData, "kind") : null;
+  const preferredKind: "proforma" | "tax_invoice" | null =
+    kindRaw === "proforma" || kindRaw === "tax_invoice" ? kindRaw : null;
+
+  const res = await createDraftInvoiceForJobAndReport(supabase, jobId, null, preferredKind);
   if (res.error || !res.id) {
     redirect(errUrl(`/jobs/${jobId}`, res.error ?? "Could not generate invoice."));
   }
@@ -272,19 +349,146 @@ export async function generateInvoiceFromJob(jobId: string) {
   redirect(`/invoices/${res.id}?saved=1`);
 }
 
+export async function generateInvoiceForSelectedJob(formData: FormData) {
+  const { supabase } = await requireBillingStaff();
+  const returnTo = str(formData, "return_to") ?? "/invoices";
+  const jobId = str(formData, "job_id") ?? "";
+  if (!validUuid(jobId)) {
+    redirect(errUrl(returnTo, "Select a job to generate an invoice."));
+  }
+
+  const kindRaw = str(formData, "kind");
+  const preferredKind: "proforma" | "tax_invoice" | null =
+    kindRaw === "proforma" || kindRaw === "tax_invoice" ? kindRaw : null;
+
+  const res = await createDraftInvoiceForJobAndReport(supabase, jobId, null, preferredKind);
+  if (res.error || !res.id) {
+    redirect(errUrl(returnTo, res.error ?? "Could not generate invoice."));
+  }
+
+  redirect(`/invoices/${res.id}?saved=1`);
+}
+
+export async function generateReportFromJob(jobId: string, formData?: FormData) {
+  if (!validUuid(jobId)) redirect("/jobs");
+  const { supabase, person } = await requireStaff();
+  if (!person) redirect("/login");
+
+  const { data: job } = await supabase
+    .from("jobs")
+    .select(
+      "id, job_no, site, scope, test_methods, customers(name), reports(id, report_no, method), inspections(id, method, readings, observations, submitted_at, missing_fields)",
+    )
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (!job) {
+    redirect(errUrl("/jobs", "Job not found."));
+  }
+
+  const requestedMethodRaw = formData ? str(formData, "method") : null;
+  const method = (requestedMethodRaw || job.test_methods?.[0] || "UT") as Database["public"]["Enums"]["test_method"];
+
+  const existingReports = (job.reports ?? []) as Array<{
+    id: string;
+    report_no: string;
+    method: string;
+  }>;
+
+  // If a report already exists for this method and no custom report_no was entered, open it
+  const typedReportNo = formData ? str(formData, "report_no")?.trim() : null;
+  if (!typedReportNo) {
+    const existingForMethod = existingReports.find((r) => r.method === method) ?? existingReports[0];
+    if (existingForMethod) {
+      redirect(`/review/${existingForMethod.id}`);
+    }
+  }
+
+  const nextIndex = existingReports.length + 1;
+  const defaultReportNo =
+    nextIndex === 1
+      ? `${job.job_no}/R-01`
+      : `${job.job_no}/R-${String(nextIndex).padStart(2, "0")}`;
+  const reportNo = typedReportNo || defaultReportNo;
+  const reportDate = (formData ? str(formData, "report_date") : null) || todayIST();
+
+  const inspections = (job.inspections ?? []) as Array<{
+    id: string;
+    method: string;
+    readings: Database["public"]["Tables"]["inspections"]["Row"]["readings"];
+    observations: string | null;
+    submitted_at: string | null;
+    missing_fields: string[];
+  }>;
+
+  const readyInspection =
+    inspections.find(
+      (i) => i.method === method && i.submitted_at && (i.missing_fields?.length ?? 0) === 0,
+    ) ?? null;
+
+  const bookedEquipment = await loadBookedJobEquipmentForReport(supabase, job.id);
+  const custName = (job.customers as unknown as { name?: string } | null)?.name ?? "";
+  const baseReadings: ReportReadings = readyInspection
+    ? extractReadings(readyInspection.readings)
+    : {
+        client: custName,
+        inspection_site: job.site ?? "",
+        inspection_date: reportDate,
+      };
+
+  const prefilledReadings = prefillReadingsFromBookedEquipment(baseReadings, bookedEquipment);
+  const content = buildReportContent(
+    prefilledReadings,
+    readyInspection?.observations ?? job.scope ?? null,
+    readyInspection?.submitted_at ?? null,
+  );
+
+  const { data: created, error: insertErr } = await supabase
+    .from("reports")
+    .insert({
+      job_id: job.id,
+      inspection_id: readyInspection?.id ?? null,
+      method,
+      report_no: reportNo,
+      report_date: reportDate,
+      content,
+      status: "draft",
+      prepared_by: person.id,
+    })
+    .select("id")
+    .single();
+
+  if (insertErr || !created) {
+    redirect(
+      errUrl(
+        `/jobs/${job.id}`,
+        insertErr?.message ?? "Could not create report for this job.",
+      ),
+    );
+  }
+
+  revalidatePath(`/jobs/${job.id}`);
+  revalidatePath("/review");
+  redirect(`/review/${created.id}?saved=1`);
+}
+
 export async function updateDraftInvoice(invoiceId: string, formData: FormData) {
   if (!validUuid(invoiceId)) redirect("/invoices");
   const { supabase } = await requireBillingStaff();
 
   const { data: invoice } = (await invoicesTable(supabase)
-    .select("id, job_id, status, jobs(customers(gstin, billing_address))")
+    .select("id, job_id, status, jobs(id, status, customers(gstin, billing_address))")
     .eq("id", invoiceId)
     .maybeSingle()) as {
     data: {
       id: string;
       job_id: string;
       status: string;
-      jobs?: { customers?: { gstin: string | null; billing_address: string | null } | null } | null;
+      jobs?: {
+        id: string;
+        status: string;
+        customers?: { gstin: string | null; billing_address: string | null } | null;
+      } | null;
     } | null;
   };
 
@@ -292,6 +496,9 @@ export async function updateDraftInvoice(invoiceId: string, formData: FormData) 
   if (invoice.status !== "draft") {
     redirect(errUrl(`/invoices/${invoiceId}`, "Issued or cancelled invoices cannot be edited."));
   }
+
+  const intent = str(formData, "intent");
+  const shouldIssueNow = intent === "save_and_issue";
 
   const invoiceDate = str(formData, "invoice_date") ?? todayIST();
   const dueDate = str(formData, "due_date");
@@ -375,6 +582,7 @@ export async function updateDraftInvoice(invoiceId: string, formData: FormData) 
       round_off: gst.round_off,
       total: gst.total,
       balance: gst.total,
+      ...(shouldIssueNow ? { status: "issued" } : {}),
     })
     .eq("id", invoiceId);
 
@@ -382,9 +590,14 @@ export async function updateDraftInvoice(invoiceId: string, formData: FormData) 
     redirect(errUrl(`/invoices/${invoiceId}`, updErr.message));
   }
 
+  if (shouldIssueNow && invoice.jobs && invoice.jobs.status !== "closed" && invoice.jobs.status !== "invoiced") {
+    await supabase.from("jobs").update({ status: "invoiced" }).eq("id", invoice.job_id);
+  }
+
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath(`/jobs/${invoice.job_id}`);
+  revalidatePath("/dashboard");
   redirect(`/invoices/${invoiceId}?saved=1`);
 }
 
@@ -621,4 +834,82 @@ export async function toggleInvoiceReminders(invoiceId: string, pause: boolean) 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${invoiceId}`);
   redirect(`/invoices/${invoiceId}?saved=1`);
+}
+
+export async function recordMultiJobPaymentAction(formData: FormData) {
+  const { supabase, person } = await requireBillingStaff();
+  const returnTo = str(formData, "return_to") ?? "/invoices";
+
+  const jobIds = formData
+    .getAll("job_ids")
+    .map((v) => String(v ?? "").trim())
+    .filter((v) => validUuid(v));
+
+  if (jobIds.length === 0) {
+    redirect(errUrl(returnTo, "Tick at least one Job ID checkbox to mark as paid."));
+  }
+
+  const receivedOn = str(formData, "received_on") ?? todayIST();
+  const amountRaw = str(formData, "amount");
+  const amountNum = amountRaw && amountRaw.trim() !== "" ? Number(amountRaw) : null;
+  const mode = str(formData, "mode") ?? "NEFT";
+  const reference = str(formData, "reference");
+  const customerId = str(formData, "customer_id");
+  const notes = str(formData, "notes");
+
+  const tdsByJobId: Record<string, number> = {};
+  for (const jobId of jobIds) {
+    const rawTds = str(formData, `tds_${jobId}`);
+    if (rawTds && Number.isFinite(Number(rawTds)) && Number(rawTds) > 0) {
+      tdsByJobId[jobId] = Number(rawTds);
+    }
+  }
+
+  let advicePath: string | null = null;
+  const adviceFile = formData.get("advice_file");
+  if (adviceFile instanceof File && adviceFile.size > 0) {
+    const safeName = adviceFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `payment-advice/${Date.now()}-${safeName}`;
+    const bytes = Buffer.from(await adviceFile.arrayBuffer());
+    const { error: uploadErr } = await supabase.storage
+      .from("documents")
+      .upload(storagePath, bytes, {
+        contentType: adviceFile.type || "application/octet-stream",
+        upsert: true,
+      });
+    if (!uploadErr) {
+      advicePath = storagePath;
+    }
+  }
+
+  try {
+    await recordMultiJobPaymentReceipt(supabase, {
+      job_ids: jobIds,
+      customer_id: customerId && validUuid(customerId) ? customerId : null,
+      received_on: receivedOn,
+      amount: amountNum,
+      mode,
+      reference,
+      advice_path: advicePath,
+      tds_by_job_id: tdsByJobId,
+      notes,
+      created_by: person?.id ?? null,
+    });
+  } catch (err) {
+    redirect(
+      errUrl(
+        returnTo,
+        err instanceof Error ? err.message : "Could not record payment receipt.",
+      ),
+    );
+  }
+
+  revalidatePath("/invoices");
+  revalidatePath("/jobs");
+  revalidatePath("/finance");
+  revalidatePath("/dashboard");
+  for (const jobId of jobIds) {
+    revalidatePath(`/jobs/${jobId}`);
+  }
+  redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}saved=1`);
 }

@@ -27,6 +27,10 @@ import {
   buildInvoiceDocumentSpec,
   formatPlaceOfSupply,
 } from "@/lib/invoices";
+import {
+  formatDaysSinceInvoiceDate,
+  formatUnpaidInvoiceDaysLabel,
+} from "@/lib/modules/invoices/payments-received";
 import { checkPoUtilization } from "@/lib/modules/po/service";
 import { listPriceItems } from "@/lib/modules/price-items/service";
 import { validUuid } from "@/lib/reports/review";
@@ -247,6 +251,9 @@ export default async function InvoiceDetailPage({
     .reduce((sum, cn) => sum + (Number(cn.total) || 0), 0);
   const totalSettled = totalPaid + totalTds + totalCredited;
   const remainingBalance = Number(invoice.balance) || 0;
+  const today = todayIST();
+  const invoiceAge = formatDaysSinceInvoiceDate(invoice.invoice_date, today);
+  const unpaidDaysLabel = formatUnpaidInvoiceDaysLabel(invoice, today);
 
   return (
     <div className="space-y-6">
@@ -256,12 +263,14 @@ export default async function InvoiceDetailPage({
           <span className="inline-flex flex-wrap items-center gap-3">
             {isProforma && <Badge>Proforma</Badge>}
             <Status tone={statusInfo.tone}>{statusInfo.label}</Status>
+            {unpaidDaysLabel && <Badge>{unpaidDaysLabel}</Badge>}
             <span>
               {customer?.name ?? "Customer"} · {job?.job_no ?? "Job"}
               {combinedReportNos
                 ? ` · Report${linkedReports.length > 1 ? "s" : ""} ${combinedReportNos}`
                 : ""}
               {invoice.invoice_date ? ` · Dated ${shortDate(invoice.invoice_date)}` : ""}
+              {invoiceAge ? ` (${invoiceAge.label} ago)` : ""}
             </span>
           </span>
         }
@@ -362,7 +371,7 @@ export default async function InvoiceDetailPage({
                 ? " Proforma invoices are excluded from CA GST exports and payment reminders."
                 : ""}
             </p>
-            <dl className="grid grid-cols-1 gap-2 rounded-lg border border-line bg-surface-2/40 p-3 text-[12.5px] sm:grid-cols-3 sm:gap-3">
+            <dl className="grid grid-cols-1 gap-2 rounded-lg border border-line bg-surface-2/40 p-3 text-[12.5px] sm:grid-cols-4 sm:gap-3">
               <div>
                 <dt className="text-ink-3">Invoice Total</dt>
                 <dd className="font-semibold text-ink tabular-nums">{formatINR(Number(invoice.total) || 0)}</dd>
@@ -383,6 +392,12 @@ export default async function InvoiceDetailPage({
               <div>
                 <dt className="text-ink-3">Balance Due</dt>
                 <dd className="font-semibold text-ink tabular-nums">{formatINR(remainingBalance)}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-3">Days since invoice date</dt>
+                <dd className="font-semibold text-ink tabular-nums">
+                  {invoiceAge ? invoiceAge.label : "—"}
+                </dd>
               </div>
             </dl>
             <div className="flex flex-wrap items-center gap-2.5">
