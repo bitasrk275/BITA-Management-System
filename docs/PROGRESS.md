@@ -38,6 +38,7 @@ Everyone adds a log entry at the end of every session (newest at the top of the 
 | Test data | Krishna | Done | PR 15, scripts/seed/ | Deterministic fake seed data (`npm run seed`) |
 | Client inputs tracker | Krishna | Done | PR 15, docs/CLIENT_INPUTS.md | Tracks BITA-supplied templates, HSN/SAC codes, and pending credentials |
 | Excel import | Naveen | Done | PR 13, scripts/import/ | Customer, price-item, and equipment import scripts (`scripts/import/`) |
+| R3-4 – Technician phone app + office side | Naveen | Done | feature/naveen-r3-tech-app | Persistent tabs (Jobs, Calendar, Leave), camera/doc file picker uploads to job, scope-only (no prices/rates), leave request -> office approval -> calendar, site-files.tsx & site-notes.tsx, release APK |
 | Smoke tests | Naveen | Done | PR 22, PR 24, feature/naveen-atlas-audit | 49 Vitest suites (PGlite RLS + API v1 + DOCX/PDF + UI code guard) + `scripts/smoke-test-live.mjs` |
 | User guide | Krishna | Done | PR 15, PR 25, docs/guide/ & docs/UAT_GUIDE.md | Office, reviewer, and technician user guides + 18-step UAT guide |
 
@@ -79,6 +80,19 @@ Files changed: <main files or folders>
 Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
+
+### 2026-11-20 14:25 – Naveen – Antigravity
+Task: Round 3 Task R3-4 (Technician Phone App & Office Side)
+Done:
+- Technician phone app upgraded with persistent bottom navigation tabs across My Jobs, My Calendar, and Leave.
+- Job detail screen displays scope of work only (sanitized of quotation numbers, rates, and prices), with instant camera photo capture and document file picker uploads directly against the job (`attachments` with `job_id` and null `inspection_id`).
+- Office job page (`app/(office)/jobs/[id]`) updated with `site-files.tsx` (open & download signed URLs) and `site-notes.tsx` (notes feed) adhering strictly to merge-conflict isolation.
+- Technician leave workflow: technicians submit requests with start/end dates and reason; office approves or rejects in `/employees` or dashboard attention items; approval automatically populates `leave_days` on the calendar.
+- Rebuilt standalone release APK `BITA-Technician.apk` (27.28 MB) in `apps/technician/android` in 2m 38s and copied to `C:\BITA\BITA-Technician.apk`.
+- Quality gates: 54 test files / 440 tests passing in Vitest, TypeScript clean across root and mobile app, ESLint clean (0 errors, 0 warnings), and Next.js production build passing with 53 routes.
+Files changed: `apps/technician/src/`, `apps/technician/App.tsx`, `app/(office)/jobs/[id]/site-files.tsx`, `app/(office)/jobs/[id]/site-notes.tsx`, `app/(office)/employees/`, `lib/field/assignments.ts`, `lib/modules/employees/service.ts`, `tests/field-api.test.ts`, `supabase/migrations/20261120000000_leave_requests_and_job_notes.sql`
+Next: PR cross-review with Apollo and Orion release.
+Blockers / questions: none.
 
 ### 2026-11-12 12:00 – Naveen – Claude
 Task: Pre-handover Gap Audit Round (G1–G6, G9, G10, G11)

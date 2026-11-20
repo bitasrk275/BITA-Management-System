@@ -1125,6 +1125,58 @@ export type Database = {
           },
         ]
       }
+      job_notes: {
+        Row: {
+          assignment_id: string | null
+          author_name: string | null
+          created_at: string
+          id: string
+          job_id: string
+          note: string
+          person_id: string | null
+        }
+        Insert: {
+          assignment_id?: string | null
+          author_name?: string | null
+          created_at?: string
+          id?: string
+          job_id: string
+          note: string
+          person_id?: string | null
+        }
+        Update: {
+          assignment_id?: string | null
+          author_name?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string
+          note?: string
+          person_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_notes_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_notes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_notes_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_days: {
         Row: {
           created_at: string
@@ -1154,6 +1206,60 @@ export type Database = {
           {
             foreignKeyName: "leave_days_person_id_fkey"
             columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_requests: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          person_id: string
+          reason: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          start_date: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          person_id: string
+          reason?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          person_id?: string
+          reason?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "people"
             referencedColumns: ["id"]
@@ -2037,6 +2143,7 @@ export type Database = {
         | "leave"
         | "equipment_problem"
         | "site_issue"
+        | "note"
         | "other"
       test_method:
         | "UT"
@@ -2200,6 +2307,7 @@ export const Constants = {
         "leave",
         "equipment_problem",
         "site_issue",
+        "note",
         "other",
       ],
       test_method: [

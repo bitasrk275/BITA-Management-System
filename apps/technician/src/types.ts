@@ -19,6 +19,39 @@ export type InspectionStatus = {
   submittedAt: string | null;
 };
 
+export type SiteFileItem = {
+  id: string;
+  kind: string;
+  caption: string | null;
+  storagePath: string;
+  fileName: string;
+  uploadedAt: string;
+};
+
+export type JobNoteItem = {
+  id: string;
+  kind: string;
+  body: string;
+  receivedAt: string;
+};
+
+export type LeaveRequestItem = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected";
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
+export type ApprovedLeaveDayItem = {
+  id: string;
+  leaveDate: string;
+  reason: string | null;
+};
+
 export type JobAssignment = {
   id: string;
   jobId: string;
@@ -26,6 +59,7 @@ export type JobAssignment = {
   customerName: string;
   site: string | null;
   scope: string | null;
+  standard?: string | null;
   testMethods: TestMethod[];
   workDate: string;
   endDate?: string | null;
@@ -35,6 +69,8 @@ export type JobAssignment = {
   completedAt: string | null;
   equipment: EquipmentItem[];
   inspection: InspectionStatus | null;
+  attachments?: SiteFileItem[];
+  jobNotes?: JobNoteItem[];
 };
 
 export type FieldDefinition = {
@@ -69,4 +105,5 @@ export type ProblemKind =
   | "leave"
   | "equipment_problem"
   | "site_issue"
+  | "note"
   | "other";

@@ -5,7 +5,16 @@ import {
   getCachedJobs,
   setCachedJobs,
 } from "./storage";
-import type { JobAssignment, ProblemKind, ReportTemplate, TestMethod } from "./types";
+import type {
+  ApprovedLeaveDayItem,
+  JobAssignment,
+  JobNoteItem,
+  LeaveRequestItem,
+  ProblemKind,
+  ReportTemplate,
+  SiteFileItem,
+  TestMethod,
+} from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -163,16 +172,16 @@ export async function submitReport(
   return json;
 }
 
-export async function uploadPhoto(
+export async function uploadSiteFile(
   assignmentId: string,
   params: {
     uri: string;
     name: string;
     type: string;
     caption?: string;
-    kind?: "site_photo" | "defect_photo" | "drawing";
+    kind?: "site_photo" | "defect_photo" | "drawing" | "supporting_document" | "other";
   },
-): Promise<{ ok: boolean; attachmentId: string; storagePath: string }> {
+): Promise<{ ok: boolean; attachmentId: string; storagePath: string; kind: string; fileName: string }> {
   const creds = await getStoredCredentials();
   if (!creds) throw new ApiError("Device not linked", 401);
 
@@ -180,13 +189,13 @@ export async function uploadPhoto(
   formData.append("file", {
     uri: params.uri,
     name: params.name,
-    type: params.type || "image/jpeg",
+    type: params.type || "application/octet-stream",
   } as unknown as Blob);
 
   if (params.caption) formData.append("caption", params.caption);
   if (params.kind) formData.append("kind", params.kind);
 
-  const res = await fetch(`${API_BASE_URL}/api/field/assignments/${assignmentId}/photos`, {
+  const res = await fetch(`${API_BASE_URL}/api/field/assignments/${assignmentId}/files`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${creds.deviceId}.${creds.secret}`,
@@ -201,7 +210,134 @@ export async function uploadPhoto(
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(json.error || "Photo upload failed", res.status);
+    throw new ApiError(json.error || "File upload failed", res.status);
+  }
+  return json;
+}
+
+export async function uploadPhoto(
+  assignmentId: string,
+  params: {
+    uri: string;
+    name: string;
+    type: string;
+    caption?: string;
+    kind?: "site_photo" | "defect_photo" | "drawing";
+  },
+): Promise<{ ok: boolean; attachmentId: string; storagePath: string }> {
+  return uploadSiteFile(assignmentId, params);
+}
+
+export async function fetchAssignmentFiles(
+  assignmentId: string,
+): Promise<SiteFileItem[]> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/field/assignments/${assignmentId}/files`, {
+    method: "GET",
+    headers,
+  });
+
+  if (res.status === 401) {
+    await clearCredentials();
+    throw new ApiError("Device revoked", 401);
+  }
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(json.error || "Failed to load files", res.status);
+  }
+  return Array.isArray(json.files) ? json.files : [];
+}
+
+export async function fetchAssignmentNotes(
+  assignmentId: string,
+): Promise<JobNoteItem[]> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/field/assignments/${assignmentId}/notes`, {
+    method: "GET",
+    headers,
+  });
+
+  if (res.status === 401) {
+    await clearCredentials();
+    throw new ApiError("Device revoked", 401);
+  }
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(json.error || "Failed to load notes", res.status);
+  }
+  return Array.isArray(json.notes) ? json.notes : [];
+}
+
+export async function submitAssignmentNote(
+  assignmentId: string,
+  body: string,
+): Promise<{ ok: boolean; noteId: string; receivedAt: string }> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/field/assignments/${assignmentId}/notes`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ body }),
+  });
+
+  if (res.status === 401) {
+    await clearCredentials();
+    throw new ApiError("Device revoked", 401);
+  }
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(json.error || "Failed to save note", res.status);
+  }
+  return json;
+}
+
+export async function fetchLeaveData(): Promise<{
+  requests: LeaveRequestItem[];
+  approvedDays: ApprovedLeaveDayItem[];
+}> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/field/leave`, {
+    method: "GET",
+    headers,
+  });
+
+  if (res.status === 401) {
+    await clearCredentials();
+    throw new ApiError("Device revoked", 401);
+  }
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(json.error || "Failed to load leave requests", res.status);
+  }
+  return {
+    requests: Array.isArray(json.requests) ? json.requests : [],
+    approvedDays: Array.isArray(json.approvedDays) ? json.approvedDays : [],
+  };
+}
+
+export async function submitLeaveRequest(params: {
+  startDate: string;
+  endDate: string;
+  reason: string;
+}): Promise<{ ok: boolean; request: LeaveRequestItem }> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/field/leave`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(params),
+  });
+
+  if (res.status === 401) {
+    await clearCredentials();
+    throw new ApiError("Device revoked", 401);
+  }
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(json.error || "Failed to submit leave request", res.status);
   }
   return json;
 }

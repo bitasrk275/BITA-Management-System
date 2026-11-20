@@ -23,6 +23,39 @@ type InspectionStatus = {
   submittedAt: string | null;
 };
 
+type SiteFileItem = {
+  id: string;
+  kind: string;
+  caption: string | null;
+  storagePath: string;
+  fileName: string;
+  uploadedAt: string;
+};
+
+type JobNoteItem = {
+  id: string;
+  kind: string;
+  body: string;
+  receivedAt: string;
+};
+
+type LeaveRequestItem = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected";
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
+type ApprovedLeaveDayItem = {
+  id: string;
+  leaveDate: string;
+  reason: string | null;
+};
+
 type JobAssignment = {
   id: string;
   jobId: string;
@@ -30,6 +63,7 @@ type JobAssignment = {
   customerName: string;
   site: string | null;
   scope: string | null;
+  standard?: string | null;
   testMethods: TestMethod[];
   workDate: string;
   endDate?: string | null;
@@ -39,6 +73,8 @@ type JobAssignment = {
   completedAt: string | null;
   equipment: EquipmentItem[];
   inspection: InspectionStatus | null;
+  attachments?: SiteFileItem[];
+  jobNotes?: JobNoteItem[];
 };
 
 type FieldDefinition = {
@@ -86,7 +122,18 @@ export function TechnicianWebApp() {
 
   const [jobs, setJobs] = useState<JobAssignment[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobAssignment | null>(null);
-  const [activeTab, setActiveTab] = useState<"jobs" | "report" | "problem">("jobs");
+  const [activeTab, setActiveTab] = useState<"jobs" | "calendar" | "leave" | "report" | "problem">("jobs");
+
+  // File & note state per assignment
+  const [fileCaptions, setFileCaptions] = useState<Record<string, string>>({});
+  const [noteInputs, setNoteInputs] = useState<Record<string, string>>({});
+
+  // Leave state
+  const [leaveStartDate, setLeaveStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [leaveEndDate, setLeaveEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [leaveReason, setLeaveReason] = useState("");
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequestItem[]>([]);
+  const [approvedLeaveDays, setApprovedLeaveDays] = useState<ApprovedLeaveDayItem[]>([]);
 
   // Report state
   const [selectedMethod, setSelectedMethod] = useState<TestMethod>("UT");
@@ -157,11 +204,123 @@ export function TechnicianWebApp() {
     [authHeaders, creds, selectedJob],
   );
 
+  const loadLeave = useCallback(
+    async (currentCreds: StoredCreds | null = creds) => {
+      if (!currentCreds) return;
+      try {
+        const res = await fetch("/api/field/leave", {
+          headers: authHeaders(currentCreds),
+        });
+        if (!res.ok) return;
+        const json = await res.json().catch(() => ({}));
+        setLeaveRequests(Array.isArray(json.requests) ? json.requests : []);
+        setApprovedLeaveDays(Array.isArray(json.approvedDays) ? json.approvedDays : []);
+      } catch {
+        // ignore
+      }
+    },
+    [authHeaders, creds],
+  );
+
   useEffect(() => {
     if (creds) {
       void loadJobs(creds);
+      void loadLeave(creds);
     }
-  }, [creds, loadJobs]);
+  }, [creds, loadJobs, loadLeave]);
+
+  async function handleUploadSiteFile(
+    job: JobAssignment,
+    file: File | null,
+    defaultKind?: string,
+  ) {
+    if (!file || !creds) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const caption = (fileCaptions[job.id] || "").trim();
+      if (caption) formData.append("caption", caption);
+      if (defaultKind) formData.append("kind", defaultKind);
+
+      const res = await fetch(`/api/field/assignments/${job.id}/files`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${creds.deviceId}.${creds.secret}`,
+        },
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to upload file");
+      setFileCaptions((prev) => ({ ...prev, [job.id]: "" }));
+      setNotice(`Uploaded ${file.name} to ${job.jobNo}.`);
+      await loadJobs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload file");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAddJobNote(job: JobAssignment) {
+    const body = (noteInputs[job.id] || "").trim();
+    if (!body) {
+      setError("Please type a note or comment first.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/field/assignments/${job.id}/notes`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ body }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to save note");
+      setNoteInputs((prev) => ({ ...prev, [job.id]: "" }));
+      setNotice(`Saved note on ${job.jobNo}.`);
+      await loadJobs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save note");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleApplyLeave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!leaveReason.trim()) {
+      setError("Please enter a reason for your leave request.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/field/leave", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          startDate: leaveStartDate,
+          endDate: leaveEndDate,
+          reason: leaveReason.trim(),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to submit leave request");
+      setLeaveReason("");
+      setNotice("Leave request sent to office. Once approved, it will show on the calendar automatically.");
+      await loadLeave();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit leave request");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handlePair(e: React.FormEvent) {
     e.preventDefault();
@@ -529,7 +688,7 @@ export function TechnicianWebApp() {
       ) : (
         <>
           {/* Navigation Tabs */}
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setActiveTab("jobs")}
@@ -539,7 +698,29 @@ export function TechnicianWebApp() {
                   : "border border-line bg-white text-ink-2 hover:bg-side"
               }`}
             >
-              Assigned Jobs ({jobs.length})
+              1. My Jobs & Files ({jobs.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("calendar")}
+              className={`rounded-xl px-4 py-2 text-[13px] font-medium ${
+                activeTab === "calendar"
+                  ? "bg-ink text-white"
+                  : "border border-line bg-white text-ink-2 hover:bg-side"
+              }`}
+            >
+              2. My Calendar
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("leave")}
+              className={`rounded-xl px-4 py-2 text-[13px] font-medium ${
+                activeTab === "leave"
+                  ? "bg-ink text-white"
+                  : "border border-line bg-white text-ink-2 hover:bg-side"
+              }`}
+            >
+              3. Apply for Leave
             </button>
             {selectedJob && (
               <button
@@ -551,7 +732,7 @@ export function TechnicianWebApp() {
                     : "border border-line bg-white text-ink-2 hover:bg-side"
                 }`}
               >
-                Field Report ({selectedJob.jobNo})
+                Report ({selectedJob.jobNo})
               </button>
             )}
             <button
@@ -563,19 +744,18 @@ export function TechnicianWebApp() {
                   : "border border-line bg-white text-ink-2 hover:bg-side"
               }`}
             >
-              Report Delay / Issue
+              Delay / Issue
             </button>
           </div>
 
-          {/* Tab 1: Assigned Jobs */}
+          {/* Tab 1: Assigned Jobs (Files first, Scope only, Notes, Report secondary) */}
           {activeTab === "jobs" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {jobs.length === 0 ? (
                 <div className="rounded-2xl border border-line bg-white p-8 text-center">
                   <div className="text-[14px] font-medium text-ink">No active job assignments yet</div>
                   <p className="mt-1 text-[12.5px] text-ink-3">
-                    Assign a job to <strong>{creds.technicianName}</strong> in the Office Dashboard (
-                    <strong>Jobs → Assign Technician & Equipment</strong>), then tap{" "}
+                    Assign a job to <strong>{creds.technicianName}</strong> in the Office Dashboard, then tap{" "}
                     <strong>Refresh Jobs</strong>.
                   </p>
                 </div>
@@ -583,7 +763,7 @@ export function TechnicianWebApp() {
                 jobs.map((job) => (
                   <div
                     key={job.id}
-                    className="rounded-2xl border border-line bg-white p-5 shadow-sm"
+                    className="rounded-2xl border border-line bg-white p-5 shadow-sm space-y-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
@@ -594,7 +774,10 @@ export function TechnicianWebApp() {
                           {job.customerName}
                         </h3>
                         <p className="text-[12.5px] text-ink-3">
-                          Site: {job.site || "At Vendor's Works"} · Date: {job.workDate}
+                          Site: {job.site || "At customer works"} · Date:{" "}
+                          {job.endDate && job.endDate !== job.workDate
+                            ? `${job.workDate} to ${job.endDate}`
+                            : job.workDate}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -609,78 +792,334 @@ export function TechnicianWebApp() {
                       </div>
                     </div>
 
-                    {job.scope && (
-                      <p className="mt-2 rounded-lg bg-paper px-3 py-2 text-[12.5px] text-ink-2">
-                        {job.scope}
-                      </p>
-                    )}
-
-                    {job.equipment.length > 0 && (
-                      <div className="mt-2.5 text-[12px] text-ink-3">
-                        <strong>Assigned Equipment:</strong>{" "}
-                        {job.equipment
-                          .map((e) => `${e.model || e.kind} (${e.serialNo || "no S/N"})`)
-                          .join(", ")}
+                    {/* 1. FILES FOR THIS JOB (Priority #1) */}
+                    <div className="rounded-xl border border-line bg-paper p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] font-semibold text-ink">
+                          1. Upload photos & files for {job.jobNo}
+                        </span>
+                        <span className="text-[11.5px] text-ink-3">
+                          {(job.attachments || []).length} uploaded
+                        </span>
                       </div>
-                    )}
-
-                    {/* Status badges */}
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px]">
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 font-medium ${
-                          job.acknowledgedAt
-                            ? "bg-good-soft text-good"
-                            : "bg-warn-soft text-warn"
-                        }`}
-                      >
-                        {job.acknowledgedAt ? "✓ Acknowledged" : "Pending Acknowledgement"}
-                      </span>
-                      {job.startedAt && (
-                        <span className="rounded-full bg-info-soft px-2.5 py-0.5 font-medium text-info">
-                          ✓ Work Started
-                        </span>
-                      )}
-                      {job.inspection && (
-                        <span className="rounded-full bg-side px-2.5 py-0.5 font-medium text-ink">
-                          Report: {job.inspection.status.toUpperCase()}
-                        </span>
+                      <input
+                        type="text"
+                        value={fileCaptions[job.id] || ""}
+                        onChange={(e) =>
+                          setFileCaptions((prev) => ({ ...prev, [job.id]: e.target.value }))
+                        }
+                        placeholder="Optional label / caption (e.g. Weld joint photo, Gate pass PDF)"
+                        className="w-full rounded-lg border border-line bg-white px-3 py-1.5 text-[12.5px] text-ink"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <label className="cursor-pointer rounded-xl bg-ink px-3.5 py-2 text-[12.5px] font-medium text-white hover:bg-ink/90">
+                          Take photo with camera
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            disabled={busy}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0] || null;
+                              void handleUploadSiteFile(job, f, "site_photo");
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <label className="cursor-pointer rounded-xl border border-line bg-white px-3.5 py-2 text-[12.5px] font-medium text-ink hover:bg-side">
+                          Upload file from phone (Photo / PDF / Doc)
+                          <input
+                            type="file"
+                            accept="image/*,.pdf,.doc,.docx,*/*"
+                            className="hidden"
+                            disabled={busy}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0] || null;
+                              void handleUploadSiteFile(job, f);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {(job.attachments || []).length > 0 && (
+                        <ul className="divide-y divide-line-2 pt-1 text-[12px]">
+                          {(job.attachments || []).map((att) => (
+                            <li key={att.id} className="flex items-center justify-between py-1">
+                              <span className="truncate font-medium text-ink">
+                                {att.caption || att.fileName.replace(/^\d+-/, "")}
+                              </span>
+                              <span className="shrink-0 text-[11px] text-ink-3">
+                                {att.kind.replace("_", " ")} · {att.uploadedAt.slice(0, 10)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
-                      {!job.acknowledgedAt && (
+                    {/* 2. SCOPE OF WORK ONLY (No quotation, no rates) */}
+                    <div className="rounded-xl border border-line bg-paper px-3.5 py-2.5 text-[12.5px] space-y-1">
+                      <div className="font-semibold text-ink">2. Scope of work</div>
+                      <div>
+                        <strong className="text-ink-2">What to test:</strong>{" "}
+                        {job.scope || "NDT Inspection"}
+                      </div>
+                      <div>
+                        <strong className="text-ink-2">Where (Site):</strong>{" "}
+                        {job.site || "At customer works"}
+                      </div>
+                      <div>
+                        <strong className="text-ink-2">Method & Standard:</strong>{" "}
+                        {job.testMethods.join(", ")} · {job.standard || "ASME Sec V / IS Standard"}
+                      </div>
+                      {job.equipment.length > 0 && (
+                        <div>
+                          <strong className="text-ink-2">Assigned Equipment:</strong>{" "}
+                          {job.equipment
+                            .map((e) => `${e.model || e.kind} (${e.serialNo || "no S/N"})`)
+                            .join(", ")}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3. NOTES & COMMENTS FOR OFFICE */}
+                    <div className="rounded-xl border border-line bg-paper p-3.5 space-y-2">
+                      <div className="text-[13px] font-semibold text-ink">
+                        3. Notes & comments for office
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={noteInputs[job.id] || ""}
+                          onChange={(e) =>
+                            setNoteInputs((prev) => ({ ...prev, [job.id]: e.target.value }))
+                          }
+                          placeholder="Add a site note or comment for the office…"
+                          className="flex-1 rounded-lg border border-line bg-white px-3 py-1.5 text-[12.5px] text-ink"
+                        />
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => void handleAcknowledge(job)}
-                          className="rounded-xl border border-line bg-paper px-3.5 py-2 text-[12.5px] font-medium text-ink hover:bg-side"
+                          onClick={() => void handleAddJobNote(job)}
+                          className="rounded-lg bg-ink px-3 py-1.5 text-[12px] font-medium text-white hover:bg-ink/90"
                         >
-                          1. Acknowledge Job
+                          Send note
                         </button>
+                      </div>
+                      {(job.jobNotes || []).length > 0 && (
+                        <ul className="divide-y divide-line-2 pt-1 text-[12px]">
+                          {(job.jobNotes || []).map((n) => (
+                            <li key={n.id} className="py-1">
+                              <span className="text-ink">{n.body}</span>
+                              <span className="ml-2 text-[11px] text-ink-3">
+                                {n.receivedAt.slice(0, 16).replace("T", " ")}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
                       )}
-                      {!job.startedAt && (
+                    </div>
+
+                    {/* Status & Secondary Report Action buttons */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+                      <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 font-medium ${
+                            job.acknowledgedAt
+                              ? "bg-good-soft text-good"
+                              : "bg-warn-soft text-warn"
+                          }`}
+                        >
+                          {job.acknowledgedAt ? "✓ Acknowledged" : "Pending Acknowledgement"}
+                        </span>
+                        {job.startedAt && (
+                          <span className="rounded-full bg-info-soft px-2.5 py-0.5 font-medium text-info">
+                            ✓ Work Started
+                          </span>
+                        )}
+                        {job.inspection && (
+                          <span className="rounded-full bg-side px-2.5 py-0.5 font-medium text-ink">
+                            Report: {job.inspection.status.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {!job.acknowledgedAt && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void handleAcknowledge(job)}
+                            className="rounded-xl border border-line bg-paper px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-side"
+                          >
+                            Acknowledge Job
+                          </button>
+                        )}
+                        {!job.startedAt && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void handleStartWork(job)}
+                            className="rounded-xl border border-line bg-paper px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-side"
+                          >
+                            Start Work
+                          </button>
+                        )}
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => void handleStartWork(job)}
-                          className="rounded-xl bg-ink px-3.5 py-2 text-[12.5px] font-medium text-white hover:bg-ink/90"
+                          onClick={() => void openReportEditor(job)}
+                          className="rounded-xl border border-line bg-white px-3.5 py-1.5 text-[12px] font-medium text-ink hover:bg-side"
                         >
-                          2. Start Work on Site
+                          Fill {job.testMethods[0] || "UT"} Report (Secondary) →
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void openReportEditor(job)}
-                        className="rounded-xl bg-accent px-4 py-2 text-[12.5px] font-medium text-white hover:opacity-95"
-                      >
-                        3. Fill 29-Field {job.testMethods[0] || "UT"} Report →
-                      </button>
+                      </div>
                     </div>
                   </div>
                 ))
               )}
+            </div>
+          )}
+
+          {/* Tab 2: My Calendar */}
+          {activeTab === "calendar" && (
+            <div className="rounded-2xl border border-line bg-white p-5 shadow-sm space-y-3">
+              <h2 className="text-[15px] font-semibold text-ink">
+                My Calendar (Assigned Jobs & Approved Leave)
+              </h2>
+              {jobs.length === 0 && approvedLeaveDays.length === 0 ? (
+                <p className="text-[13px] text-ink-3">
+                  No upcoming assignments or leave days scheduled yet.
+                </p>
+              ) : (
+                <div className="space-y-2.5">
+                  {jobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-paper p-3"
+                    >
+                      <div>
+                        <div className="font-mono text-[12px] font-semibold text-ink">
+                          {job.endDate && job.endDate !== job.workDate
+                            ? `${job.workDate} to ${job.endDate}`
+                            : job.workDate}{" "}
+                          · {job.jobNo}
+                        </div>
+                        <div className="text-[13.5px] font-medium text-ink">
+                          {job.customerName}
+                        </div>
+                        <div className="text-[12px] text-ink-3">
+                          {job.site || "At customer works"} · {job.scope || "NDT Inspection"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("jobs")}
+                        className="rounded-lg border border-line bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-side"
+                      >
+                        Open Job
+                      </button>
+                    </div>
+                  ))}
+                  {approvedLeaveDays.map((ld) => (
+                    <div
+                      key={ld.id}
+                      className="flex items-center justify-between rounded-xl border border-line bg-warn-soft/40 p-3 text-[12.5px]"
+                    >
+                      <span className="font-mono font-semibold text-ink">{ld.leaveDate}</span>
+                      <span className="text-ink-2">On leave · {ld.reason || "Approved leave"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 3: Apply for Leave */}
+          {activeTab === "leave" && (
+            <div className="space-y-4">
+              <form
+                onSubmit={handleApplyLeave}
+                className="rounded-2xl border border-line bg-white p-5 shadow-sm space-y-3"
+              >
+                <h2 className="text-[15px] font-semibold text-ink">Apply for Leave</h2>
+                <p className="text-[12.5px] text-ink-3">
+                  The office will approve or reject your request. Approved leave is added to the calendar automatically.
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-[12px] font-medium text-ink-2">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={leaveStartDate}
+                      onChange={(e) => setLeaveStartDate(e.target.value)}
+                      className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-[13px] text-ink"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[12px] font-medium text-ink-2">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={leaveEndDate}
+                      onChange={(e) => setLeaveEndDate(e.target.value)}
+                      className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-[13px] text-ink"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium text-ink-2">
+                    Reason
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={leaveReason}
+                    onChange={(e) => setLeaveReason(e.target.value)}
+                    placeholder="e.g. Personal work / medical appointment"
+                    className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-[13px] text-ink"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-xl bg-ink px-4 py-2 text-[13px] font-medium text-white hover:bg-ink/90"
+                >
+                  {busy ? "Submitting…" : "Submit Leave Request"}
+                </button>
+              </form>
+
+              <div className="rounded-2xl border border-line bg-white p-5 shadow-sm space-y-2">
+                <h3 className="text-[14px] font-semibold text-ink">
+                  My Leave Requests ({leaveRequests.length})
+                </h3>
+                {leaveRequests.length === 0 ? (
+                  <p className="text-[12.5px] text-ink-3">No leave requests submitted yet.</p>
+                ) : (
+                  <ul className="divide-y divide-line-2 text-[12.5px]">
+                    {leaveRequests.map((lr) => (
+                      <li key={lr.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                        <div>
+                          <span className="font-mono font-semibold text-ink">
+                            {lr.startDate === lr.endDate
+                              ? lr.startDate
+                              : `${lr.startDate} to ${lr.endDate}`}
+                          </span>
+                          {lr.reason && <span className="ml-2 text-ink-2">· {lr.reason}</span>}
+                        </div>
+                        <span className="rounded-full bg-side px-2.5 py-0.5 text-[11px] font-medium uppercase text-ink">
+                          {lr.status}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
 

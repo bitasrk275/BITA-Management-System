@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { daysBetween, greeting, longDateIST, shortDate, todayIST } from "@/lib/dates";
+import { listLeaveRequests } from "@/lib/modules/employees/service";
 import { listInvoicePendingReports } from "@/lib/modules/invoices/service";
 import { homeFor } from "@/lib/roles";
 import type { Enums } from "@/lib/db/types";
@@ -49,6 +50,7 @@ export default async function ManagementHome() {
     equipmentAlert,
     recentEdits,
     invoicePendingReports,
+    pendingLeaveRequests,
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -91,6 +93,7 @@ export default async function ManagementHome() {
       .order("edited_at", { ascending: false })
       .limit(5),
     listInvoicePendingReports(supabase).catch(() => []),
+    listLeaveRequests(supabase, { status: "pending", limit: 10 }).catch(() => []),
   ]);
 
   const openJobs = jobs.data ?? [];
@@ -223,6 +226,19 @@ export default async function ManagementHome() {
         label: "View diff",
       };
     }),
+    ...pendingLeaveRequests.map((lr) => ({
+      key: "leave_req_" + lr.id,
+      tone: "wait" as const,
+      title: `Leave request from ${lr.person_name}`,
+      detail: [
+        lr.start_date === lr.end_date ? lr.start_date : `${lr.start_date} to ${lr.end_date}`,
+        lr.reason,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      href: "/employees#leave-requests",
+      label: "Review",
+    })),
   ];
 
   return (
