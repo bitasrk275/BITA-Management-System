@@ -23,6 +23,9 @@ import { evaluateAndAutoCloseJob } from "../jobs/service";
 import { resolveFieldsForMethod } from "../settings/templates";
 import type { ApproveReportInput } from "./schema";
 
+// Matches no row: used for lookups by job when a report is not linked to a job yet.
+const NO_JOB_ID = "00000000-0000-0000-0000-000000000000";
+
 export type ReportRow = Tables<"reports">;
 
 function getServiceClient() {
@@ -202,6 +205,7 @@ export async function approveReportRecord(
     .maybeSingle();
 
   if (!report) return { data: null, error: "Report not found." };
+  if (!report.job_id) return { data: null, error: "Link this report to a job first (Reports → the report → Link to a job)." };
   if (!["in_review", "draft"].includes(report.status)) {
     return { data: null, error: "This report is not waiting for approval." };
   }
@@ -344,6 +348,7 @@ export async function returnReportRecord(
     .maybeSingle();
 
   if (!report) return { data: null, error: "Report not found." };
+  if (!report.job_id) return { data: null, error: "Link this report to a job first (Reports → the report → Link to a job)." };
   if (report.status === "sent") {
     return { data: null, error: "A sent report cannot be returned." };
   }
@@ -445,6 +450,9 @@ export async function markReportSentRecord(
   if (!report) {
     return { data: null, jobClosed: false, error: "Report not found." };
   }
+  if (!report.job_id) {
+    return { data: null, jobClosed: false, error: "Link this report to a job first (Reports → the report → Link to a job)." };
+  }
   if (!report.approved_at || !["approved", "sent"].includes(report.status)) {
     return {
       data: null,
@@ -510,6 +518,8 @@ export async function generateReportPdfDownload(
   if (!report) {
     return { ok: false, status: 404, error: "Report not found" };
   }
+  // A report not yet linked to a job still downloads as a draft, with no job details.
+  const reportJobId = report.job_id ?? NO_JOB_ID;
 
   const isApproved =
     (report.status === "approved" || report.status === "sent") &&
@@ -520,7 +530,7 @@ export async function generateReportPdfDownload(
 
   if (isApproved) {
     const storagePath =
-      report.pdf_path || reportPdfStoragePath(report.job_id, report.report_no);
+      report.pdf_path || reportPdfStoragePath(reportJobId, report.report_no);
     const { data: storedBlob } = await supabase.storage
       .from("reports")
       .download(storagePath);
@@ -542,12 +552,12 @@ export async function generateReportPdfDownload(
     supabase
       .from("jobs")
       .select("job_no, customers(name)")
-      .eq("id", report.job_id)
+      .eq("id", reportJobId)
       .maybeSingle(),
     supabase
       .from("attachments")
       .select("kind, caption, storage_path")
-      .eq("job_id", report.job_id)
+      .eq("job_id", reportJobId)
       .eq("include_in_report", true)
       .order("uploaded_at", { ascending: true }),
     resolveFieldsForMethod(supabase, report.method),
@@ -566,7 +576,7 @@ export async function generateReportPdfDownload(
     reportNo: report.report_no,
     reportDate: report.report_date,
     method: report.method,
-    jobNo: jobRes.data?.job_no ?? report.job_id,
+    jobNo: jobRes.data?.job_no ?? (report.job_id ? report.job_id : "Not linked to a job"),
     customerName:
       jobRes.data?.customers?.name ?? String(readings.client ?? "Customer"),
     readings,
@@ -603,6 +613,8 @@ export async function generateReportDocxDownload(
   if (!report) {
     return { ok: false, status: 404, error: "Report not found" };
   }
+  // A report not yet linked to a job still downloads as a draft, with no job details.
+  const reportJobId = report.job_id ?? NO_JOB_ID;
 
   if (!supportedMethod(report.method)) {
     return {
@@ -623,7 +635,7 @@ export async function generateReportDocxDownload(
     supabase
       .from("attachments")
       .select("kind, caption, storage_path")
-      .eq("job_id", report.job_id)
+      .eq("job_id", reportJobId)
       .eq("include_in_report", true)
       .order("uploaded_at", { ascending: true }),
     resolveFieldsForMethod(supabase, report.method),

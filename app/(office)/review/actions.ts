@@ -4,7 +4,7 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
-import type { Database } from "@/lib/db/types";
+import { Constants, type Database, type Enums } from "@/lib/db/types";
 import { text } from "@/lib/forms";
 import { parseApproveReportInput, parseReturnReportInput } from "@/lib/modules/reports/schema";
 import {
@@ -41,7 +41,7 @@ function redirectError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(friendlyReportError(message))}`);
 }
 
-function revalidateReportPaths(reportId: string, jobId?: string) {
+function revalidateReportPaths(reportId: string, jobId?: string | null) {
   revalidatePath("/review");
   revalidatePath(`/review/${reportId}`);
   revalidatePath(`/review/${reportId}/history`);
@@ -60,16 +60,16 @@ export async function prepareReport(fd: FormData) {
   const signatoryId = text(fd, "signatory_id");
 
   if (!validUuid(inspectionId)) {
-    redirectError("/review", "Choose a submitted inspection to prepare a report.");
+    redirectError("/review/new", "Choose a submitted inspection to prepare a report.");
   }
   if (!reportNo.trim()) {
-    redirectError("/review", "Enter the BITA report number.");
+    redirectError("/review/new", "Enter the BITA report number.");
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) {
-    redirectError("/review", "Enter a valid report date (YYYY-MM-DD).");
+    redirectError("/review/new", "Enter a valid report date (YYYY-MM-DD).");
   }
   if (signatoryId && !validUuid(signatoryId)) {
-    redirectError("/review", "Choose a valid signatory.");
+    redirectError("/review/new", "Choose a valid signatory.");
   }
 
   const { data: inspection, error: inspErr } = await supabase
@@ -79,13 +79,13 @@ export async function prepareReport(fd: FormData) {
     .maybeSingle();
 
   if (inspErr || !inspection) {
-    redirectError("/review", inspErr?.message ?? "The selected inspection could not be found.");
+    redirectError("/review/new", inspErr?.message ?? "The selected inspection could not be found.");
   }
 
   try {
     reportPdfStoragePath(inspection.job_id, reportNo);
   } catch (err) {
-    redirectError("/review", err instanceof Error ? err.message : "Invalid report number.");
+    redirectError("/review/new", err instanceof Error ? err.message : "Invalid report number.");
   }
 
   const [bookedEquipment, methodFields] = await Promise.all([
@@ -98,7 +98,7 @@ export async function prepareReport(fd: FormData) {
   );
   const readiness = checkReportReadiness(inspection.method, inspection, readings, methodFields);
   if (!readiness.ready) {
-    redirectError("/review", readiness.blockers.join(" "));
+    redirectError("/review/new", readiness.blockers.join(" "));
   }
 
   const content = buildReportContent(readings, inspection.observations, inspection.submitted_at);
@@ -120,7 +120,7 @@ export async function prepareReport(fd: FormData) {
     .single();
 
   if (insertErr || !created) {
-    redirectError("/review", insertErr?.message ?? "Could not prepare report.");
+    redirectError("/review/new", insertErr?.message ?? "Could not prepare report.");
   }
 
   revalidateReportPaths(created.id, inspection.job_id);
@@ -158,7 +158,7 @@ export async function refreshReportFromInspection(reportId: string) {
   }
 
   const [bookedEquipment, methodFields] = await Promise.all([
-    loadBookedJobEquipment(supabase, report.job_id),
+    report.job_id ? loadBookedJobEquipment(supabase, report.job_id) : Promise.resolve([]),
     resolveFieldsForMethod(supabase, report.method),
   ]);
   const readings = prefillReadingsFromBookedEquipment(
@@ -275,6 +275,9 @@ export async function sendReportForReview(reportId: string) {
   if (!report) redirect("/review");
   if (!["draft", "returned"].includes(report.status)) {
     redirectError(path, "Only a draft or returned report can be sent for technical review.");
+  }
+  if (!report.job_id) {
+    redirectError(path, "Link this report to a job before sending it for review.");
   }
 
   const { data: inspection } = report.inspection_id
@@ -394,4 +397,71 @@ export async function toggleAttachmentInclude(
 
   revalidatePath(path);
   redirect(`${path}?saved=photo`);
+}
+
+// "Create report" on its own: no field data needed, and the job can be chosen now or linked later.
+export async function createBlankReport(fd: FormData) {
+  const { supabase, person } = await requireStaff();
+  if (!person) redirect("/login");
+  const back = "/review/new";
+
+  const method = text(fd, "method") ?? "";
+  const reportNo = (text(fd, "report_no") ?? "").trim();
+  const reportDate = text(fd, "report_date") ?? new Date().toISOString().slice(0, 10);
+  const jobId = text(fd, "job_id");
+  const signatoryId = text(fd, "signatory_id");
+
+  if (!(Constants.public.Enums.test_method as readonly string[]).includes(method)) {
+    redirectError(back, "Choose the test method.");
+  }
+  if (!reportNo) redirectError(back, "Enter the BITA report number.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) redirectError(back, "Enter a valid report date.");
+  if (jobId && !validUuid(jobId)) redirectError(back, "Choose a valid job.");
+  if (signatoryId && !validUuid(signatoryId)) redirectError(back, "Choose a valid signatory.");
+
+  const { data: created, error } = await supabase
+    .from("reports")
+    .insert({
+      job_id: jobId || null,
+      inspection_id: null,
+      method: method as Enums<"test_method">,
+      report_no: reportNo,
+      report_date: reportDate,
+      content: buildReportContent({}, null, null),
+      status: "draft",
+      prepared_by: person.id,
+      signatory_id: signatoryId || null,
+    })
+    .select("id")
+    .single();
+  if (error || !created) redirectError(back, error?.message ?? "Could not create the report.");
+
+  revalidateReportPaths(created.id, jobId);
+  redirect(`/review/${created.id}?saved=prepared`);
+}
+
+// Link a report that was created on its own to a job (or move it to another job before approval).
+export async function linkReportToJob(reportId: string, fd: FormData) {
+  if (!validUuid(reportId)) redirect("/review");
+  const { supabase } = await requireStaff();
+  const path = `/review/${reportId}`;
+  const jobId = text(fd, "job_id");
+  if (!jobId || !validUuid(jobId)) redirectError(path, "Choose the job to link this report to.");
+
+  const { data: report } = await supabase
+    .from("reports")
+    .select("id, status, job_id")
+    .eq("id", reportId)
+    .maybeSingle();
+  if (!report) redirect("/review");
+  if (report.status === "approved" || report.status === "sent") {
+    redirectError(path, "An approved report cannot be moved to another job.");
+  }
+
+  const { error } = await supabase.from("reports").update({ job_id: jobId }).eq("id", reportId);
+  if (error) redirectError(path, error.message);
+
+  revalidateReportPaths(reportId, jobId);
+  if (report.job_id) revalidatePath(`/jobs/${report.job_id}`);
+  redirect(`${path}?saved=linked`);
 }

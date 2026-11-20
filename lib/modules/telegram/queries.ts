@@ -239,7 +239,7 @@ export async function reportsReply(supabase: DB): Promise<string> {
   const drafts = group(["draft", "returned"]);
   const approvedNotSent = group(["approved"]);
   const invoicePending = group(["approved", "sent"]).filter((r) => !billed.has(r.id));
-  const list = (rows: Array<{ report_no: string; job_id: string; status: string }>) =>
+  const list = (rows: Array<{ report_no: string; job_id: string | null; status: string }>) =>
     rows.slice(0, 8).map((r) => `• ${esc(r.report_no)} · ${jobLabel(l, r.job_id)}${r.status === "returned" ? " _(returned to technician)_" : ""}`);
   return [
     "*Reports*",
