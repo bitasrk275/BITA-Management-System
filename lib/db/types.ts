@@ -1672,7 +1672,7 @@ export type Database = {
           created_at: string
           id: string
           inspection_id: string | null
-          job_id: string
+          job_id: string | null
           method: Database["public"]["Enums"]["test_method"]
           pdf_path: string | null
           prepared_by: string | null
@@ -1693,7 +1693,7 @@ export type Database = {
           created_at?: string
           id?: string
           inspection_id?: string | null
-          job_id: string
+          job_id?: string | null
           method: Database["public"]["Enums"]["test_method"]
           pdf_path?: string | null
           prepared_by?: string | null
@@ -1714,7 +1714,7 @@ export type Database = {
           created_at?: string
           id?: string
           inspection_id?: string | null
-          job_id?: string
+          job_id?: string | null
           method?: Database["public"]["Enums"]["test_method"]
           pdf_path?: string | null
           prepared_by?: string | null

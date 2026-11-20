@@ -45,6 +45,7 @@ import type { ReportDocument } from "@/templates/reports/types";
 import { METHOD_LABEL } from "../../jobs/labels";
 import {
   approveReport,
+  linkReportToJob,
   markReportSent,
   refreshReportFromInspection,
   returnReportToTechnician,
@@ -88,6 +89,19 @@ export default async function ReportReviewPage({
     .maybeSingle();
 
   if (!report) notFound();
+  const linkableJobs = report.job_id
+    ? []
+    : (
+        await supabase
+          .from("jobs")
+          .select("id, job_no, customers(name)")
+          .is("deleted_at", null)
+          .neq("status", "closed")
+          .order("created_at", { ascending: false })
+          .limit(200)
+      ).data ?? [];
+  // Not linked to a job yet: job lookups match nothing.
+  const reportJobId = report.job_id ?? "00000000-0000-0000-0000-000000000000";
 
   const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes, activeInvoiceMap, bookedAssignmentsRes, methodFields] =
     await Promise.all([
@@ -97,7 +111,7 @@ export default async function ReportReviewPage({
       supabase
         .from("jobs")
         .select("id, job_no, status, customers(name)")
-        .eq("id", report.job_id)
+        .eq("id", reportJobId)
         .maybeSingle(),
       supabase
         .from("people")
@@ -111,7 +125,7 @@ export default async function ReportReviewPage({
       supabase
         .from("attachments")
         .select("id, kind, caption, storage_path, include_in_report, uploaded_at")
-        .eq("job_id", report.job_id)
+        .eq("job_id", reportJobId)
         .order("uploaded_at", { ascending: true }),
       loadActiveInvoiceReportMap(supabase),
       supabase
@@ -128,7 +142,7 @@ export default async function ReportReviewPage({
             )
           )
         `)
-        .eq("job_id", report.job_id)
+        .eq("job_id", reportJobId)
         .order("work_date", { ascending: true }),
       resolveFieldsForMethod(supabase, report.method),
     ]);
@@ -269,6 +283,33 @@ export default async function ReportReviewPage({
 
         <ErrorNote message={error} />
         {saved && <SavedNote />}
+
+        {!report.job_id && (
+          <Card>
+            <form action={linkReportToJob.bind(null, report.id)} className="space-y-3">
+              <Status tone="wait">This report is not linked to a job yet</Status>
+              <p className="text-[13px] text-ink-2">
+                You can keep filling it in. Link it to a job before sending it for review; approval,
+                sending and invoicing need the job.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <Field label="Job">
+                  <Select name="job_id" required defaultValue="">
+                    <option value="" disabled>
+                      Choose a job…
+                    </option>
+                    {linkableJobs.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.job_no} · {j.customers?.name ?? "Customer"}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Button type="submit">Link to this job</Button>
+              </div>
+            </form>
+          </Card>
+        )}
 
         {!readiness.ready && (
           <Card>

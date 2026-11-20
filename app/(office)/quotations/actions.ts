@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { Constants, type Enums } from "@/lib/db/types";
 import { friendlyError, text } from "@/lib/forms";
+import { resolveCustomerFromForm } from "@/lib/modules/customers/inline";
 import { parseAcceptQuotationInput } from "@/lib/modules/po/schema";
 import { acceptQuotationAndRecordPo } from "@/lib/modules/po/service";
 import { parseQuotationInput } from "@/lib/modules/quotations/schema";
@@ -70,6 +71,12 @@ export async function uploadQuotationFile(quotationId: string, fd: FormData) {
 
 export async function createQuotation(fd: FormData) {
   const { supabase } = await requireStaff();
+  const customer = await resolveCustomerFromForm(supabase, fd);
+  if (!customer.ok) {
+    redirect("/quotations/new?error=" + encodeURIComponent(customer.error));
+  }
+  fd.set("customer_id", customer.customerId);
+  if (customer.created) revalidatePath("/customers");
   const parsed = parseQuotationInput(fd);
   if (!parsed.ok) {
     redirect("/quotations/new?error=" + encodeURIComponent(parsed.error));

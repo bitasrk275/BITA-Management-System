@@ -53,7 +53,7 @@ export default async function ReportHistoryPage({
     report.id,
     ...(report.inspection_id ? [report.inspection_id] : []),
     report.job_id,
-  ];
+  ].filter((id): id is string => Boolean(id));
 
   const [auditRes, peopleRes] = await Promise.all([
     supabase
