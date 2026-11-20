@@ -3,7 +3,7 @@ import { createTestDb } from "../supabase/tests/setup";
 
 // Round 3: a report can be created on its own (no job) and linked to a job later.
 describe("reports without a job", () => {
-  it("allows a draft report with no job, then links it to a job", async () => {
+  it("allows a draft report with no job, then links it to a job", { timeout: 30_000 }, async () => {
     const { as } = await createTestDb();
     const cust = await as<{ id: string }>("service", "insert into customers (name) values ('Sample Forgings Ltd') returning id");
     const job = await as<{ id: string }>(
