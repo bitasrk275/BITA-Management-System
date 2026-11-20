@@ -12,11 +12,18 @@ import {
 import { authenticateDevice } from "../lib/field/auth";
 import {
   acknowledgeAssignment,
+  createAssignmentJobNote,
   createTechnicianMessage,
+  listAssignmentFiles,
+  listAssignmentJobNotes,
+  listTechnicianLeave,
+  sanitizeTechnicianScope,
   startAssignment,
   submitInspectionReport,
+  submitTechnicianLeaveRequest,
   uploadFieldAttachment,
 } from "../lib/field/assignments";
+import { approveLeaveRequest, rejectLeaveRequest } from "../lib/modules/employees/service";
 import { sha256 } from "../lib/field/crypto";
 import { createTestDb } from "../supabase/tests/setup";
 
@@ -670,5 +677,105 @@ describe("Field API tests on PGlite (T42)", () => {
       [TECH_A_PERSON],
     );
     expect(selectRes.rows.length).toBeGreaterThan(0);
+  });
+
+  it("7. Round 3 (R3-4): job site files (inspection_id null), scope-only sanitization, job notes, and leave request -> leave_days approval", async () => {
+    // 7a. Scope sanitization strips quotation numbers and rates
+    expect(
+      sanitizeTechnicianScope(
+        "Quotation for BITA/QTN/26-27/0042 Ultrasonic testing of 6 forged turbine shafts @ ₹2,500 per shaft + 18% GST",
+      ),
+    ).toBe("Ultrasonic testing of 6 forged turbine shafts");
+
+    // 7b. Upload a PDF document directly against the job (linkInspection: false -> inspection_id is null)
+    const pdfUpload = await uploadFieldAttachment(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
+      fileBuffer: Buffer.from("%PDF-1.4 fake gate pass"),
+      fileName: "site_gate_pass.pdf",
+      contentType: "application/pdf",
+      caption: "Customer gate pass & drawing",
+      linkInspection: false,
+    });
+    expect("ok" in pdfUpload && pdfUpload.ok).toBe(true);
+    if ("ok" in pdfUpload) {
+      expect(pdfUpload.kind).toBe("supporting_document");
+      const dbAtt = await db.query<{ inspection_id: string | null; kind: string; caption: string }>(
+        "select inspection_id, kind, caption from attachments where id = $1",
+        [pdfUpload.attachmentId],
+      );
+      expect(dbAtt.rows[0].inspection_id).toBeNull();
+      expect(dbAtt.rows[0].kind).toBe("supporting_document");
+      expect(dbAtt.rows[0].caption).toBe("Customer gate pass & drawing");
+    }
+
+    const filesList = await listAssignmentFiles(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON);
+    expect("ok" in filesList && filesList.ok).toBe(true);
+    if ("ok" in filesList) {
+      expect(filesList.files.some((f) => f.caption === "Customer gate pass & drawing")).toBe(true);
+    }
+
+    // 7c. Technician adds a note on the job, visible on the job
+    const noteRes = await createAssignmentJobNote(
+      adapter,
+      ASSIGNMENT_B_ID,
+      TECH_B_PERSON,
+      "Tested 4 of 6 shafts today; remaining 2 shafts awaiting surface grinding.",
+    );
+    expect("ok" in noteRes && noteRes.ok).toBe(true);
+
+    const notesList = await listAssignmentJobNotes(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON);
+    expect("ok" in notesList && notesList.ok).toBe(true);
+    if ("ok" in notesList) {
+      expect(
+        notesList.notes.some((n) =>
+          n.body.includes("Tested 4 of 6 shafts today"),
+        ),
+      ).toBe(true);
+    }
+
+    // 7d. Technician applies for 2-day leave; office approves -> leave_days rows created automatically
+    const leaveReq = await submitTechnicianLeaveRequest(adapter, TECH_B_PERSON, {
+      startDate: "2026-11-24",
+      endDate: "2026-11-25",
+      reason: "Family wedding in Mysuru",
+    });
+    expect("ok" in leaveReq && leaveReq.ok).toBe(true);
+    if ("ok" in leaveReq) {
+      expect(leaveReq.request.status).toBe("pending");
+
+      const approval = await approveLeaveRequest(adapter, leaveReq.request.id, {
+        reviewedByPersonId: OFFICE_PERSON,
+        reviewedByUserId: OFFICE_USER,
+      });
+      expect(approval.ok).toBe(true);
+      expect(approval.addedDates).toEqual(["2026-11-24", "2026-11-25"]);
+
+      const leaveState = await listTechnicianLeave(adapter, TECH_B_PERSON);
+      expect("ok" in leaveState && leaveState.ok).toBe(true);
+      if ("ok" in leaveState) {
+        const updatedReq = leaveState.requests.find((r) => r.id === leaveReq.request.id);
+        expect(updatedReq?.status).toBe("approved");
+        expect(leaveState.approvedDays.map((d) => d.leaveDate)).toEqual(
+          expect.arrayContaining(["2026-11-24", "2026-11-25"]),
+        );
+      }
+    }
+
+    // 7e. Rejecting a leave request marks it rejected without adding leave_days
+    const rejectReq = await submitTechnicianLeaveRequest(adapter, TECH_A_PERSON, {
+      startDate: "2026-11-28",
+      endDate: "2026-11-28",
+      reason: "Personal work",
+    });
+    expect("ok" in rejectReq && rejectReq.ok).toBe(true);
+    if ("ok" in rejectReq) {
+      await rejectLeaveRequest(adapter, rejectReq.request.id, {
+        reviewedByPersonId: OFFICE_PERSON,
+      });
+      const dbReq = await db.query<{ status: string }>(
+        "select status from leave_requests where id = $1",
+        [rejectReq.request.id],
+      );
+      expect(dbReq.rows[0].status).toBe("rejected");
+    }
   });
 });

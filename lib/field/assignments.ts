@@ -5,6 +5,33 @@ import { mapToCanonicalTestMethodEnum, resolveFieldsForMethod } from "../modules
 
 export const MAX_PHOTO_BYTES = 6 * 1024 * 1024; // 6 MB limit per contract
 
+export type TechnicianSiteFile = {
+  id: string;
+  kind: string;
+  caption: string | null;
+  storagePath: string;
+  fileName: string;
+  uploadedAt: string;
+};
+
+export type TechnicianJobNote = {
+  id: string;
+  kind: Enums<"technician_message_kind">;
+  body: string;
+  receivedAt: string;
+};
+
+export type TechnicianLeaveRequestItem = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected";
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
 export type TechnicianJobItem = {
   id: string;
   jobId: string;
@@ -12,6 +39,7 @@ export type TechnicianJobItem = {
   customerName: string;
   site: string | null;
   scope: string | null;
+  standard?: string | null;
   testMethods: Enums<"test_method">[];
   workDate: string;
   endDate: string | null;
@@ -36,7 +64,71 @@ export type TechnicianJobItem = {
     readings: Json;
     submittedAt: string | null;
   } | null;
+  attachments?: TechnicianSiteFile[];
+  jobNotes?: TechnicianJobNote[];
 };
+
+/**
+ * Strips quotation titles, reference numbers, and rates/currency amounts from scope text
+ * so technicians only see the scope of work (what to test), never quotation numbers or prices.
+ */
+export function sanitizeTechnicianScope(rawScope: string | null | undefined): string | null {
+  if (!rawScope) return null;
+  let s = rawScope.trim();
+  if (!s) return null;
+
+  // Strip leading "Quotation for " / "Quote for " / "Quotation: "
+  s = s.replace(/^(?:quotation|quote)\s*(?:for|:|-|–|—)\s*/i, "");
+  // Strip quotation reference numbers like BITA/QTN/26-27/0001 or QTN-0001
+  s = s.replace(/\b(?:BITA\/)?QTN[\/-][\w\/-]+/gi, "");
+  // Strip currency / rate clauses (e.g. "@ ₹1,500", "₹ 15,000", "Rs. 2500/-", "INR 5000", "minimum charge ...")
+  s = s.replace(/@?\s*(?:₹|Rs\.?|INR)\s*[\d,]+(?:\.\d+)?(?:\s*\/-)?(?:\s*per\s+[\w.]+)?/gi, "");
+  s = s.replace(/(?:rate|minimum\s+charge|total)[:\s]*(?:₹|Rs\.?|INR)?\s*[\d,]+(?:\.\d+)?(?:\s*\/-)?(?:\s*per\s+[\w.]+)?/gi, "");
+  s = s.replace(/\+\s*\d+%\s*GST/gi, "");
+  // Clean up dangling separators and symbols
+  s = s
+    .replace(/\(\s*\)/g, "")
+    .replace(/\s*[@·|—–-]\s*(?=[@·|—–-]|$)/g, "")
+    .replace(/^\s*[@·|—–:-]\s*/, "")
+    .replace(/\s*[@·|—–:-]\s*$/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return s || "NDT Inspection";
+}
+
+export function inferStandardForJob(
+  methods: Enums<"test_method">[],
+  scope: string | null | undefined,
+  readings?: Json | null,
+): string {
+  if (readings && typeof readings === "object" && !Array.isArray(readings)) {
+    const std = (readings as Record<string, unknown>).standard;
+    if (typeof std === "string" && std.trim()) {
+      return std.trim();
+    }
+  }
+  const text = scope || "";
+  const match = text.match(/\b((?:ASME|ASTM|IS|ISO|API|EN|BS)\s+[A-Z0-9.\-\s/]{2,25})/i);
+  if (match?.[1]) {
+    return match[1].trim();
+  }
+  const primary = methods[0] || "UT";
+  switch (primary) {
+    case "UT":
+      return "ASME Sec V Art 4 / IS 3664";
+    case "MPT":
+      return "ASME Sec V Art 7 / IS 3703";
+    case "DPT":
+      return "ASME Sec V Art 6 / IS 3658";
+    case "RT":
+      return "ASME Sec V Art 2";
+    case "VT":
+      return "ASME Sec V Art 9";
+    default:
+      return "As per applicable NDT specification";
+  }
+}
 
 /**
  * Returns assignments for the technician: upcoming plus the last 14 days.
@@ -208,6 +300,62 @@ export async function getTechnicianJobs(
     }
   }
 
+  // 4. Fetch site attachments and technician notes for these jobs (safe against partial test mocks)
+  const jobIds = Array.from(new Set(assignments.map((a) => a.job_id)));
+  const attachmentsByJob = new Map<string, TechnicianSiteFile[]>();
+  const notesByJob = new Map<string, TechnicianJobNote[]>();
+
+  try {
+    const attTable = supabase.from("attachments");
+    if (attTable && typeof attTable.select === "function" && jobIds.length > 0) {
+      const { data: attRows } = await attTable
+        .select("id, job_id, kind, caption, storage_path, uploaded_at")
+        .in("job_id", jobIds)
+        .order("uploaded_at", { ascending: false });
+      if (Array.isArray(attRows)) {
+        for (const r of attRows) {
+          const list = attachmentsByJob.get(r.job_id) || [];
+          list.push({
+            id: r.id,
+            kind: r.kind,
+            caption: r.caption,
+            storagePath: r.storage_path,
+            fileName: r.storage_path.split("/").pop() || r.storage_path,
+            uploadedAt: r.uploaded_at,
+          });
+          attachmentsByJob.set(r.job_id, list);
+        }
+      }
+    }
+  } catch {
+    // ignore on partial mocks
+  }
+
+  try {
+    const msgTable = supabase.from("technician_messages");
+    if (msgTable && typeof msgTable.select === "function" && jobIds.length > 0) {
+      const { data: msgRows } = await msgTable
+        .select("id, job_id, kind, body, received_at")
+        .in("job_id", jobIds)
+        .order("received_at", { ascending: false });
+      if (Array.isArray(msgRows)) {
+        for (const m of msgRows) {
+          if (!m.job_id || !m.body) continue;
+          const list = notesByJob.get(m.job_id) || [];
+          list.push({
+            id: m.id,
+            kind: m.kind,
+            body: m.body,
+            receivedAt: m.received_at,
+          });
+          notesByJob.set(m.job_id, list);
+        }
+      }
+    }
+  } catch {
+    // ignore on partial mocks
+  }
+
   // Combine results
   return assignments.map((a) => {
     // Supabase nested relation casting
@@ -219,6 +367,9 @@ export async function getTechnicianJobs(
       test_methods: Enums<"test_method">[];
       customers: { id: string; name: string };
     };
+    const methods = inferTestMethods(job.test_methods, job.scope);
+    const insp = inspectionByAssignment.get(a.id) || null;
+    const cleanScope = sanitizeTechnicianScope(job.scope);
 
     return {
       id: a.id,
@@ -226,8 +377,9 @@ export async function getTechnicianJobs(
       jobNo: job.job_no,
       customerName: job.customers?.name ?? "Customer",
       site: job.site,
-      scope: job.scope,
-      testMethods: inferTestMethods(job.test_methods, job.scope),
+      scope: cleanScope,
+      standard: inferStandardForJob(methods, cleanScope, insp?.readings),
+      testMethods: methods,
       workDate: a.work_date,
       endDate: a.end_date ?? null,
       notes: a.notes,
@@ -235,7 +387,9 @@ export async function getTechnicianJobs(
       startedAt: a.started_at,
       completedAt: a.completed_at,
       equipment: equipByAssignment.get(a.id) || [],
-      inspection: inspectionByAssignment.get(a.id) || null,
+      inspection: insp,
+      attachments: attachmentsByJob.get(a.job_id) || [],
+      jobNotes: notesByJob.get(a.job_id) || [],
     };
   });
 }
@@ -514,9 +668,47 @@ export async function submitInspectionReport(
   };
 }
 
+const VALID_ATTACHMENT_KINDS = new Set([
+  "site_photo",
+  "defect_photo",
+  "drawing",
+  "purchase_order",
+  "supporting_document",
+  "other",
+]);
+
+function resolveAttachmentKind(
+  explicitKind: string | undefined | null,
+  contentType: string,
+  fileName: string,
+): string {
+  if (explicitKind && VALID_ATTACHMENT_KINDS.has(explicitKind)) {
+    return explicitKind;
+  }
+  const lowerMime = (contentType || "").toLowerCase();
+  const lowerName = (fileName || "").toLowerCase();
+  if (
+    lowerMime.startsWith("image/") ||
+    /\.(jpg|jpeg|png|webp|heic|gif)$/i.test(lowerName)
+  ) {
+    return "site_photo";
+  }
+  if (/\.(dwg|dxf)$/i.test(lowerName)) {
+    return "drawing";
+  }
+  if (
+    lowerMime === "application/pdf" ||
+    /\.(pdf|doc|docx|xls|xlsx|txt|csv)$/i.test(lowerName)
+  ) {
+    return "supporting_document";
+  }
+  return "other";
+}
+
 /**
- * Uploads a photo/drawing attachment for an assignment.
+ * Uploads a photo/drawing/document attachment for an assignment.
  * Enforces 6 MB maximum and saves under documents/jobs/<job id>/<timestamp>-<name>.
+ * When linkInspection is false (default for job-level site file uploads), inspection_id is stored as null.
  */
 export async function uploadFieldAttachment(
   supabase: SupabaseClient<Database>,
@@ -527,10 +719,11 @@ export async function uploadFieldAttachment(
     fileName: string;
     contentType: string;
     caption?: string | null;
-    kind?: "site_photo" | "defect_photo" | "drawing" | string;
+    kind?: "site_photo" | "defect_photo" | "drawing" | "supporting_document" | "other" | string;
+    linkInspection?: boolean;
   },
 ): Promise<
-  | { ok: true; attachmentId: string; storagePath: string }
+  | { ok: true; attachmentId: string; storagePath: string; kind: string; fileName: string }
   | { error: string; status: number }
 > {
   const assignment = await verifyTechnicianAssignment(supabase, assignmentId, personId);
@@ -550,7 +743,7 @@ export async function uploadFieldAttachment(
   const { error: uploadError } = await supabase.storage
     .from("documents")
     .upload(storagePath, params.fileBuffer, {
-      contentType: params.contentType || "image/jpeg",
+      contentType: params.contentType || "application/octet-stream",
       upsert: false,
     });
 
@@ -558,21 +751,24 @@ export async function uploadFieldAttachment(
     return { error: `Storage upload failed: ${uploadError.message}`, status: 500 };
   }
 
-  // Look up existing inspection for this assignment if any
-  const { data: insp } = await supabase
-    .from("inspections")
-    .select("id")
-    .eq("assignment_id", assignmentId)
-    .maybeSingle();
+  let inspectionId: string | null = null;
+  if (params.linkInspection) {
+    const { data: insp } = await supabase
+      .from("inspections")
+      .select("id")
+      .eq("assignment_id", assignmentId)
+      .maybeSingle();
+    inspectionId = insp?.id ?? null;
+  }
 
-  const kind = params.kind || "site_photo";
+  const kind = resolveAttachmentKind(params.kind, params.contentType, cleanName);
 
-  // Record attachment in the database
+  // Record attachment in the database (inspection_id null for direct job site files)
   const { data: att, error: dbError } = await supabase
     .from("attachments")
     .insert({
       job_id: assignment.job_id,
-      inspection_id: insp?.id ?? null,
+      inspection_id: inspectionId,
       kind,
       caption: params.caption ?? null,
       storage_path: storagePath,
@@ -589,11 +785,48 @@ export async function uploadFieldAttachment(
     ok: true,
     attachmentId: att.id,
     storagePath,
+    kind,
+    fileName: cleanName,
   };
 }
 
 /**
- * Records a message from a technician (delay, leave, equipment problem, site issue).
+ * Lists files uploaded against the job for a technician's assignment.
+ */
+export async function listAssignmentFiles(
+  supabase: SupabaseClient<Database>,
+  assignmentId: string,
+  personId: string,
+): Promise<{ ok: true; files: TechnicianSiteFile[] } | { error: string; status: number }> {
+  const assignment = await verifyTechnicianAssignment(supabase, assignmentId, personId);
+  if (!assignment) {
+    return { error: "Assignment not found", status: 404 };
+  }
+
+  const { data, error } = await supabase
+    .from("attachments")
+    .select("id, kind, caption, storage_path, uploaded_at")
+    .eq("job_id", assignment.job_id)
+    .order("uploaded_at", { ascending: false });
+
+  if (error) {
+    return { error: `Failed to load files: ${error.message}`, status: 500 };
+  }
+
+  const files: TechnicianSiteFile[] = (data ?? []).map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    caption: r.caption,
+    storagePath: r.storage_path,
+    fileName: r.storage_path.split("/").pop() || r.storage_path,
+    uploadedAt: r.uploaded_at,
+  }));
+
+  return { ok: true, files };
+}
+
+/**
+ * Records a message from a technician (delay, leave, equipment problem, site issue, note).
  */
 export async function createTechnicianMessage(
   supabase: SupabaseClient<Database>,
@@ -602,6 +835,7 @@ export async function createTechnicianMessage(
     kind: Enums<"technician_message_kind">;
     body: string;
     jobId?: string | null;
+    assignmentId?: string | null;
   },
 ): Promise<{ ok: true; messageId: string } | { error: string; status: number }> {
   if (!params.body || !params.body.trim()) {
@@ -613,6 +847,7 @@ export async function createTechnicianMessage(
     "leave",
     "equipment_problem",
     "site_issue",
+    "note",
     "other",
   ];
 
@@ -623,20 +858,211 @@ export async function createTechnicianMessage(
     };
   }
 
-  const { data, error } = await supabase
+  const payload: Database["public"]["Tables"]["technician_messages"]["Insert"] = {
+    person_id: personId,
+    kind: params.kind,
+    body: params.body.trim(),
+    job_id: params.jobId || null,
+    ...(params.assignmentId ? { assignment_id: params.assignmentId } : {}),
+  };
+
+  let { data, error } = await supabase
     .from("technician_messages")
-    .insert({
-      person_id: personId,
-      kind: params.kind,
-      body: params.body.trim(),
-      job_id: params.jobId || null,
-    })
+    .insert(payload)
     .select("id")
     .single();
+
+  // Fallback if live database has not yet had 'note' added to technician_message_kind enum
+  if (error && params.kind === "note") {
+    const retry = await supabase
+      .from("technician_messages")
+      .insert({ ...payload, kind: "other" })
+      .select("id")
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     return { error: `Failed to record message: ${error?.message || "Unknown error"}`, status: 500 };
   }
 
   return { ok: true, messageId: data.id };
+}
+
+/**
+ * Adds a technician note/comment directly on an assigned job.
+ */
+export async function createAssignmentJobNote(
+  supabase: SupabaseClient<Database>,
+  assignmentId: string,
+  personId: string,
+  body: string,
+): Promise<{ ok: true; noteId: string; receivedAt: string } | { error: string; status: number }> {
+  const assignment = await verifyTechnicianAssignment(supabase, assignmentId, personId);
+  if (!assignment) {
+    return { error: "Assignment not found", status: 404 };
+  }
+
+  const res = await createTechnicianMessage(supabase, personId, {
+    kind: "note",
+    body,
+    jobId: assignment.job_id,
+    assignmentId: assignment.id,
+  });
+
+  if ("error" in res) {
+    return res;
+  }
+
+  return {
+    ok: true,
+    noteId: res.messageId,
+    receivedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Lists notes/messages for a technician's assigned job.
+ */
+export async function listAssignmentJobNotes(
+  supabase: SupabaseClient<Database>,
+  assignmentId: string,
+  personId: string,
+): Promise<{ ok: true; notes: TechnicianJobNote[] } | { error: string; status: number }> {
+  const assignment = await verifyTechnicianAssignment(supabase, assignmentId, personId);
+  if (!assignment) {
+    return { error: "Assignment not found", status: 404 };
+  }
+
+  const { data, error } = await supabase
+    .from("technician_messages")
+    .select("id, kind, body, received_at")
+    .eq("job_id", assignment.job_id)
+    .order("received_at", { ascending: false });
+
+  if (error) {
+    return { error: `Failed to load job notes: ${error.message}`, status: 500 };
+  }
+
+  const notes: TechnicianJobNote[] = (data ?? [])
+    .filter((r) => Boolean(r.body))
+    .map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      body: r.body || "",
+      receivedAt: r.received_at,
+    }));
+
+  return { ok: true, notes };
+}
+
+function toIsoDateStr(val: unknown): string {
+  if (val instanceof Date) return val.toISOString().slice(0, 10);
+  return String(val ?? "").slice(0, 10);
+}
+
+/**
+ * Submits a leave request from a technician (dates + reason).
+ * Office approves/rejects in the office app; approved leave creates leave_days rows.
+ */
+export async function submitTechnicianLeaveRequest(
+  supabase: SupabaseClient<Database>,
+  personId: string,
+  params: {
+    startDate: string;
+    endDate?: string | null;
+    reason?: string | null;
+  },
+): Promise<
+  | { ok: true; request: TechnicianLeaveRequestItem }
+  | { error: string; status: number }
+> {
+  const start = (params.startDate || "").trim();
+  const end = (params.endDate || params.startDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    return { error: "Please provide valid dates in YYYY-MM-DD format.", status: 400 };
+  }
+  if (end < start) {
+    return { error: "End date cannot be earlier than start date.", status: 400 };
+  }
+
+  const cleanReason = params.reason?.trim() || null;
+
+  const { data, error } = await supabase
+    .from("leave_requests")
+    .insert({
+      person_id: personId,
+      start_date: start,
+      end_date: end,
+      reason: cleanReason,
+      status: "pending",
+    })
+    .select("id, start_date, end_date, reason, status, review_note, reviewed_at, created_at")
+    .single();
+
+  if (error || !data) {
+    return { error: `Failed to submit leave request: ${error?.message || "Unknown error"}`, status: 500 };
+  }
+
+  return {
+    ok: true,
+    request: {
+      id: data.id,
+      startDate: toIsoDateStr(data.start_date),
+      endDate: toIsoDateStr(data.end_date),
+      reason: data.reason,
+      status: (data.status as "pending" | "approved" | "rejected") || "pending",
+      reviewNote: data.review_note,
+      reviewedAt: data.reviewed_at,
+      createdAt: String(data.created_at),
+    },
+  };
+}
+
+/**
+ * Lists leave requests and approved leave days for a technician.
+ */
+export async function listTechnicianLeave(
+  supabase: SupabaseClient<Database>,
+  personId: string,
+): Promise<
+  | {
+      ok: true;
+      requests: TechnicianLeaveRequestItem[];
+      approvedDays: Array<{ id: string; leaveDate: string; reason: string | null }>;
+    }
+  | { error: string; status: number }
+> {
+  const [reqRes, daysRes] = await Promise.all([
+    supabase
+      .from("leave_requests")
+      .select("id, start_date, end_date, reason, status, review_note, reviewed_at, created_at")
+      .eq("person_id", personId)
+      .order("start_date", { ascending: false }),
+    supabase
+      .from("leave_days")
+      .select("id, leave_date, reason")
+      .eq("person_id", personId)
+      .order("leave_date", { ascending: false }),
+  ]);
+
+  const requests: TechnicianLeaveRequestItem[] = (reqRes.data ?? []).map((r) => ({
+    id: r.id,
+    startDate: toIsoDateStr(r.start_date),
+    endDate: toIsoDateStr(r.end_date),
+    reason: r.reason,
+    status: (r.status as "pending" | "approved" | "rejected") || "pending",
+    reviewNote: r.review_note,
+    reviewedAt: r.reviewed_at,
+    createdAt: String(r.created_at),
+  }));
+
+  const approvedDays = (daysRes.data ?? []).map((d) => ({
+    id: d.id,
+    leaveDate: toIsoDateStr(d.leave_date),
+    reason: d.reason,
+  }));
+
+  return { ok: true, requests, approvedDays };
 }
