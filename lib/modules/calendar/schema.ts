@@ -110,6 +110,8 @@ export type MoveAssignmentInput = {
   newWorkDate: string;
   newEndDate?: string | null;
   newTechnicianId?: string;
+  // When given, replaces the equipment booked on this assignment.
+  newEquipmentIds?: string[];
   force?: boolean;
 };
 

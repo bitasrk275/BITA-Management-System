@@ -83,6 +83,10 @@ export async function submitMoveAssignmentModalAction(formData: FormData): Promi
       newWorkDate,
       newEndDate: newEndDate || null,
       newTechnicianId: newTechnicianId || undefined,
+      newEquipmentIds:
+        formData.get("equipment_edit") === "1"
+          ? formData.getAll("equipment_ids").map((v) => String(v).trim()).filter(Boolean)
+          : undefined,
       force,
     });
   } catch (err: unknown) {
