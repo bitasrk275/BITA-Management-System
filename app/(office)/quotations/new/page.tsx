@@ -1,5 +1,16 @@
 import Link from "next/link";
-import { Card, EmptyRow, ErrorNote, List, ListRow, Mono, PageHeader, SectionTitle } from "@/components/ui";
+import {
+  Card,
+  EmptyRow,
+  ErrorNote,
+  Input,
+  List,
+  ListRow,
+  Mono,
+  PageHeader,
+  SecondaryButton,
+  SectionTitle,
+} from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { resolveEnquiryAttention } from "../../jobs/closure";
 import { formatINR } from "../../jobs/labels";
@@ -14,9 +25,9 @@ export const metadata = { title: "New quotation – BITA" };
 export default async function NewQuotationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; enquiry?: string; customer?: string }>;
+  searchParams: Promise<{ error?: string; enquiry?: string; customer?: string; rate?: string }>;
 }) {
-  const { error, enquiry: enquiryId, customer: customerIdParam } = await searchParams;
+  const { error, enquiry: enquiryId, customer: customerIdParam, rate } = await searchParams;
   const { supabase } = await requireStaff();
   const options = await quotationFormOptions(supabase);
 
@@ -58,19 +69,27 @@ export default async function NewQuotationPage({
   }
 
   const targetCustomerId = defaults?.customer_id;
-  const { data: pastItems } = await supabase
+  // Past quoted rates: newest quotations first, this customer's rates on top, searchable by item text.
+  const rateTerm = rate?.replace(/[,()%*]/g, " ").trim();
+  let pastQuery = supabase
     .from("quotation_items")
     .select(
       "id, description, basis, rate, minimum_charge, quotations!inner(id, ref_no, quote_date, status, customer_id, customers(name))",
     )
-    .order("position", { ascending: true })
-    .limit(15);
+    .limit(200);
+  if (rateTerm) {
+    pastQuery = pastQuery.or(`description.ilike.%${rateTerm}%,basis.ilike.%${rateTerm}%,notes.ilike.%${rateTerm}%`);
+  }
+  const { data: pastItems } = await pastQuery;
 
-  const sortedPastItems = (pastItems ?? []).sort((a, b) => {
-    const aMatch = targetCustomerId && a.quotations.customer_id === targetCustomerId ? 0 : 1;
-    const bMatch = targetCustomerId && b.quotations.customer_id === targetCustomerId ? 0 : 1;
-    return aMatch - bMatch;
-  });
+  const sortedPastItems = (pastItems ?? [])
+    .sort((a, b) => {
+      const aMatch = targetCustomerId && a.quotations.customer_id === targetCustomerId ? 0 : 1;
+      const bMatch = targetCustomerId && b.quotations.customer_id === targetCustomerId ? 0 : 1;
+      if (aMatch !== bMatch) return aMatch - bMatch;
+      return (b.quotations.quote_date ?? "").localeCompare(a.quotations.quote_date ?? "");
+    })
+    .slice(0, 25);
 
   return (
     <>
@@ -93,6 +112,12 @@ export default async function NewQuotationPage({
 
         <div>
           <SectionTitle>Past quoted rates</SectionTitle>
+          <form className="mb-3 flex gap-2">
+            {enquiryId && <input type="hidden" name="enquiry" value={enquiryId} />}
+            {customerIdParam && <input type="hidden" name="customer" value={customerIdParam} />}
+            <Input name="rate" placeholder="Item, method or basis…" defaultValue={rate} />
+            <SecondaryButton type="submit">Search</SecondaryButton>
+          </form>
           <List>
             {sortedPastItems.length > 0 ? (
               sortedPastItems.map((it) => (
@@ -122,7 +147,9 @@ export default async function NewQuotationPage({
                 />
               ))
             ) : (
-              <EmptyRow>No past quotation items recorded yet.</EmptyRow>
+              <EmptyRow>
+                {rateTerm ? "No past quoted items matched this search." : "No past quotation items recorded yet."}
+              </EmptyRow>
             )}
           </List>
         </div>

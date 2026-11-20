@@ -65,17 +65,19 @@ export default async function QuotationsPage({
     .select(
       "id, description, basis, rate, minimum_charge, notes, quotations!inner(id, ref_no, quote_date, status, customers(name))",
     )
-    .order("position", { ascending: true })
-    .limit(40);
+    .limit(200);
   if (rateTerm) {
     itemQuery = itemQuery.or(`description.ilike.%${rateTerm}%,basis.ilike.%${rateTerm}%,notes.ilike.%${rateTerm}%`);
   }
 
-  const [{ data: quotations, error }, { data: pastItems }, canDelete] = await Promise.all([
+  const [{ data: quotations, error }, { data: pastItemRows }, canDelete] = await Promise.all([
     query,
     itemQuery,
     hasPermissionForRoles(supabase, person?.roles, "delete"),
   ]);
+  const pastItems = (pastItemRows ?? [])
+    .sort((a, b) => (b.quotations.quote_date ?? "").localeCompare(a.quotations.quote_date ?? ""))
+    .slice(0, 40);
 
   return (
     <>
@@ -101,7 +103,7 @@ export default async function QuotationsPage({
 
       <ErrorNote message={error?.message} />
 
-      {(rateTerm || (pastItems && pastItems.length > 0)) && (
+      {pastItems && (
         <div className="mb-6">
           <SectionTitle>
             {rateTerm ? `Past rates matching "${rateTerm}"` : "Recent quoted rates"}
