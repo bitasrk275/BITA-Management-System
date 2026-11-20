@@ -888,6 +888,19 @@ export async function confirmDirectUpload(
     };
   }
 
+  const remainder = storagePath.slice(expectedPrefix.length);
+  if (
+    !remainder ||
+    remainder.includes("..") ||
+    remainder.includes("\\") ||
+    remainder.includes("/")
+  ) {
+    return {
+      error: "Invalid storage path: file path contains invalid characters or traversal segments.",
+      status: 403,
+    };
+  }
+
   let inspectionId: string | null = null;
   if (params.linkInspection) {
     const { data: insp } = await supabase

@@ -813,6 +813,34 @@ describe("Field API tests on PGlite (T42)", () => {
         expect(badConfirm.status).toBe(403);
       }
 
+      // 8b-2. confirmDirectUpload refuses path traversal (..), backslash, or nested slash
+      const traversalConfirm = await confirmDirectUpload(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
+        storagePath: `jobs/${JOB_ID}/../other-job/file.pdf`,
+        caption: "Traversal attempt",
+      });
+      expect("error" in traversalConfirm).toBe(true);
+      if ("error" in traversalConfirm) {
+        expect(traversalConfirm.status).toBe(403);
+      }
+
+      const backslashConfirm = await confirmDirectUpload(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
+        storagePath: `jobs/${JOB_ID}/sub\\file.pdf`,
+        caption: "Backslash attempt",
+      });
+      expect("error" in backslashConfirm).toBe(true);
+      if ("error" in backslashConfirm) {
+        expect(backslashConfirm.status).toBe(403);
+      }
+
+      const nestedSlashConfirm = await confirmDirectUpload(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
+        storagePath: `jobs/${JOB_ID}/nested/file.pdf`,
+        caption: "Nested slash attempt",
+      });
+      expect("error" in nestedSlashConfirm).toBe(true);
+      if ("error" in nestedSlashConfirm) {
+        expect(nestedSlashConfirm.status).toBe(403);
+      }
+
       // 8c. confirmDirectUpload creates attachment row under job with null inspection_id
       const goodConfirm = await confirmDirectUpload(adapter, ASSIGNMENT_B_ID, TECH_B_PERSON, {
         storagePath: urlRes.storagePath,
