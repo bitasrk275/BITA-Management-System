@@ -26,6 +26,7 @@ import {
 } from "@/lib/modules/invoices/service";
 import { recordMultiJobPaymentReceipt } from "@/lib/modules/invoices/payments-received";
 import { loadBookedJobEquipmentForReport } from "@/lib/modules/reports/service";
+import { buildJobReportPrefill, loadReportLookups, mergePrefill } from "@/lib/modules/reports/prefill";
 import {
   parseCreateCreditNoteInput,
   parseRecordPaymentInput,
@@ -436,7 +437,17 @@ export async function generateReportFromJob(jobId: string, formData?: FormData) 
         inspection_date: reportDate,
       };
 
-  const prefilledReadings = prefillReadingsFromBookedEquipment(baseReadings, bookedEquipment);
+  // Same autofill as every other way of creating a report: technicians with certificates,
+  // equipment with serial and calibration, and the customer's last settings. Blanks only.
+  const [jobPrefill, lookups] = await Promise.all([
+    buildJobReportPrefill(supabase, job.id, method),
+    loadReportLookups(supabase, method),
+  ]);
+  const prefilledReadings = mergePrefill(
+    prefillReadingsFromBookedEquipment(baseReadings, bookedEquipment),
+    jobPrefill,
+    lookups.technicians,
+  );
   const content = buildReportContent(
     prefilledReadings,
     readyInspection?.observations ?? job.scope ?? null,
