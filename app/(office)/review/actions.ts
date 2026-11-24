@@ -15,6 +15,7 @@ import {
 } from "@/lib/modules/reports/service";
 import { missingFields } from "@/lib/reports/fields";
 import { resolveFieldsForMethod } from "@/lib/modules/settings/templates";
+import { buildJobReportPrefill, loadReportLookups, mergePrefill } from "@/lib/modules/reports/prefill";
 import {
   buildReportContent,
   checkReportReadiness,
@@ -92,9 +93,14 @@ export async function prepareReport(fd: FormData) {
     loadBookedJobEquipment(supabase, inspection.job_id),
     resolveFieldsForMethod(supabase, inspection.method),
   ]);
-  const readings = prefillReadingsFromBookedEquipment(
-    extractReadings(inspection.readings),
-    bookedEquipment
+  const [jobPrefill, lookups] = await Promise.all([
+    buildJobReportPrefill(supabase, inspection.job_id, inspection.method),
+    loadReportLookups(supabase, inspection.method),
+  ]);
+  const readings = mergePrefill(
+    prefillReadingsFromBookedEquipment(extractReadings(inspection.readings), bookedEquipment),
+    jobPrefill,
+    lookups.technicians,
   );
   const readiness = checkReportReadiness(inspection.method, inspection, readings, methodFields);
   if (!readiness.ready) {
@@ -419,6 +425,9 @@ export async function createBlankReport(fd: FormData) {
   if (jobId && !validUuid(jobId)) redirectError(back, "Choose a valid job.");
   if (signatoryId && !validUuid(signatoryId)) redirectError(back, "Choose a valid signatory.");
 
+  const startReadings = jobId
+    ? mergePrefill({}, await buildJobReportPrefill(supabase, jobId, method as Enums<"test_method">))
+    : {};
   const { data: created, error } = await supabase
     .from("reports")
     .insert({
@@ -427,7 +436,7 @@ export async function createBlankReport(fd: FormData) {
       method: method as Enums<"test_method">,
       report_no: reportNo,
       report_date: reportDate,
-      content: buildReportContent({}, null, null),
+      content: buildReportContent(startReadings, null, null),
       status: "draft",
       prepared_by: person.id,
       signatory_id: signatoryId || null,
@@ -450,7 +459,7 @@ export async function linkReportToJob(reportId: string, fd: FormData) {
 
   const { data: report } = await supabase
     .from("reports")
-    .select("id, status, job_id")
+    .select("id, status, job_id, method, content")
     .eq("id", reportId)
     .maybeSingle();
   if (!report) redirect("/review");
@@ -458,10 +467,46 @@ export async function linkReportToJob(reportId: string, fd: FormData) {
     redirectError(path, "An approved report cannot be moved to another job.");
   }
 
-  const { error } = await supabase.from("reports").update({ job_id: jobId }).eq("id", reportId);
+  const [prefill, lookups] = await Promise.all([
+    buildJobReportPrefill(supabase, jobId, report.method),
+    loadReportLookups(supabase, report.method),
+  ]);
+  const content = buildReportContent(
+    mergePrefill(extractReadings(report.content), prefill, lookups.technicians),
+  );
+  const { error } = await supabase.from("reports").update({ job_id: jobId, content }).eq("id", reportId);
   if (error) redirectError(path, error.message);
 
   revalidateReportPaths(reportId, jobId);
   if (report.job_id) revalidatePath(`/jobs/${report.job_id}`);
   redirect(`${path}?saved=linked`);
+}
+
+// "Fill from job": fills the blank fields of a draft report from its job (client, site, date,
+// technicians with qualifications, booked equipment with serial and calibration). Typed values stay.
+export async function fillReportFromJob(reportId: string) {
+  if (!validUuid(reportId)) redirect("/review");
+  const { supabase } = await requireStaff();
+  const path = `/review/${reportId}`;
+  const { data: report } = await supabase
+    .from("reports")
+    .select("id, status, job_id, method, content")
+    .eq("id", reportId)
+    .maybeSingle();
+  if (!report) redirect("/review");
+  if (!report.job_id) redirectError(path, "Link this report to a job first.");
+  if (report.status === "approved" || report.status === "sent") {
+    redirectError(path, "An approved report cannot be changed.");
+  }
+  const [prefill, lookups] = await Promise.all([
+    buildJobReportPrefill(supabase, report.job_id, report.method),
+    loadReportLookups(supabase, report.method),
+  ]);
+  const content = buildReportContent(
+    mergePrefill(extractReadings(report.content), prefill, lookups.technicians),
+  );
+  const { error } = await supabase.from("reports").update({ content }).eq("id", reportId);
+  if (error) redirectError(path, error.message);
+  revalidateReportPaths(reportId, report.job_id);
+  redirect(`${path}?saved=filled`);
 }

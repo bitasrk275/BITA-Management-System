@@ -92,7 +92,7 @@ export default async function InvoiceDetailPage({
     await Promise.all([
       invoicesTable(supabase)
         .select(
-          "*, jobs(id, job_no, po_number, po_date, po_value, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports(id, report_no, method, status), invoice_reports(report_id, reports(id, report_no, method, status, job_id, jobs(id, job_no, po_number))), quotations(id, ref_no, status)",
+          "*, jobs(id, job_no, po_number, po_date, po_value, scope, status, customer_id, quotation_id, customers(id, name, code, gstin, billing_address, payment_terms_days)), reports!invoices_report_id_fkey(id, report_no, method, status), invoice_reports(report_id, reports(id, report_no, method, status, job_id, jobs(id, job_no, po_number))), quotations(id, ref_no, status)",
         )
         .eq("id", id)
         .maybeSingle() as Promise<{ data: InvoiceWithRelations | null }>,

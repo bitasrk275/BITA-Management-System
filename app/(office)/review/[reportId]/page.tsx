@@ -25,6 +25,7 @@ import {
   type TechnicianReadings,
 } from "@/lib/reports/fields";
 import { resolveFieldsForMethod } from "@/lib/modules/settings/templates";
+import { loadReportLookups } from "@/lib/modules/reports/prefill";
 import { loadReportApprovalAssets } from "@/lib/reports/branding.server";
 import {
   type BookedJobEquipmentItem,
@@ -45,6 +46,7 @@ import type { ReportDocument } from "@/templates/reports/types";
 import { METHOD_LABEL } from "../../jobs/labels";
 import {
   approveReport,
+  fillReportFromJob,
   linkReportToJob,
   markReportSent,
   refreshReportFromInspection,
@@ -103,7 +105,7 @@ export default async function ReportReviewPage({
   // Not linked to a job yet: job lookups match nothing.
   const reportJobId = report.job_id ?? "00000000-0000-0000-0000-000000000000";
 
-  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes, activeInvoiceMap, bookedAssignmentsRes, methodFields] =
+  const [inspectionRes, jobRes, signatoriesRes, approverRes, attachmentsRes, activeInvoiceMap, bookedAssignmentsRes, methodFields, reportLookups] =
     await Promise.all([
       report.inspection_id
         ? supabase.from("inspections").select("*").eq("id", report.inspection_id).maybeSingle()
@@ -145,6 +147,7 @@ export default async function ReportReviewPage({
         .eq("job_id", reportJobId)
         .order("work_date", { ascending: true }),
       resolveFieldsForMethod(supabase, report.method),
+      loadReportLookups(supabase, report.method),
     ]);
 
   const inspection = inspectionRes.data;
@@ -568,15 +571,27 @@ export default async function ReportReviewPage({
         </div>
 
         {supportedMethod(report.method) && (
-          <ReportEditor
-            method={report.method}
-            reportDate={report.report_date}
-            readings={readings}
-            isApproved={isApproved}
-            defaultOpen={edit === "1"}
-            action={updateReportContent.bind(null, report.id)}
-            fields={methodFields}
-          />
+          <>
+            {report.job_id && !isApproved && (
+              <form action={fillReportFromJob.bind(null, report.id)} className="flex flex-wrap items-center gap-2">
+                <SecondaryButton type="submit">Fill from job</SecondaryButton>
+                <span className="text-[12.5px] text-ink-3">
+                  Fills empty fields with the client, site, date, technicians with their certificates, and the booked
+                  equipment with serial number and calibration. Anything already typed is kept.
+                </span>
+              </form>
+            )}
+            <ReportEditor
+              method={report.method}
+              reportDate={report.report_date}
+              readings={readings}
+              isApproved={isApproved}
+              defaultOpen={edit === "1" || !isApproved}
+              action={updateReportContent.bind(null, report.id)}
+              fields={methodFields}
+              lookups={reportLookups}
+            />
+          </>
         )}
 
         {/* Photos & Attachments Selection */}

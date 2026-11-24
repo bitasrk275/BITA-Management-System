@@ -60,6 +60,19 @@ export async function GET(
           }
           dropdownOptions[opt.list_key] = list;
         }
+
+        // Equipment used = BITA's real equipment register (not the sample list), so the
+        // serial number and calibration can follow from the chosen instrument.
+        const { data: register } = await supabase
+          .from("equipment")
+          .select("make, model")
+          .is("deleted_at", null)
+          .eq("active", true)
+          .order("make");
+        const registerLabels = [
+          ...new Set((register ?? []).map((e) => [e.make, e.model].filter(Boolean).join(" ").trim()).filter(Boolean)),
+        ];
+        if (registerLabels.length > 0) dropdownOptions.ut_equipment = registerLabels;
       } catch {
         // Fall back to seed templates
       }

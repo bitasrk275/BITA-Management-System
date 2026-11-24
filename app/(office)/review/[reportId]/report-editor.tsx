@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -22,6 +22,7 @@ import {
   type ReportReadings,
   type TechnicianReadings,
 } from "@/lib/reports/fields";
+import type { ReportLookups } from "@/lib/modules/reports/prefill";
 
 type ExtendedFieldDefinition = FieldDefinition & {
   options?: readonly string[];
@@ -33,12 +34,16 @@ function ScalarFieldControl({
   definition,
   initialValue,
   disabled,
+  optionsOverride,
+  onPick,
 }: {
   definition: ExtendedFieldDefinition;
   initialValue: string;
   disabled: boolean;
+  optionsOverride?: readonly string[];
+  onPick?: (key: string, value: string) => void;
 }) {
-  const options = definition.options;
+  const options = optionsOverride && optionsOverride.length > 0 ? optionsOverride : definition.options;
   const isFixed = Boolean(definition.readOnly || definition.fixed);
   const initialInOptions =
     options && initialValue !== "" ? options.includes(initialValue) : true;
@@ -61,7 +66,10 @@ function ScalarFieldControl({
           <Select
             name={`reading_${definition.key}`}
             value={selectedOption}
-            onChange={(e) => setSelectedOption(e.target.value)}
+            onChange={(e) => {
+              setSelectedOption(e.target.value);
+              if (e.target.value !== "__OTHER__") onPick?.(definition.key, e.target.value);
+            }}
             disabled={disabled || isFixed}
           >
             <option value="">Select {definition.label.toLowerCase()}…</option>
@@ -121,6 +129,7 @@ export function ReportEditor({
   defaultOpen = false,
   action,
   fields,
+  lookups,
 }: {
   method: ReportMethod;
   reportDate: string;
@@ -129,8 +138,34 @@ export function ReportEditor({
   defaultOpen?: boolean;
   action: (fd: FormData) => Promise<void>;
   fields?: readonly FieldDefinition[];
+  lookups?: ReportLookups;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const formRef = useRef<HTMLFormElement>(null);
+  const equipmentOptions = (lookups?.equipment ?? []).map((e) => e.label);
+
+  // Autofill inside the form: set a field's value by its input name.
+  function setValue(name: string, value: string) {
+    const el = formRef.current?.elements.namedItem(name);
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) el.value = value;
+  }
+  // Picking equipment fills its serial number and calibration from the equipment register.
+  function handlePick(key: string, value: string) {
+    if (key !== "equipment") return;
+    const eq = lookups?.equipment.find((e) => e.label === value);
+    if (!eq) return;
+    setValue("reading_equipment_serial", eq.serial);
+    setValue("reading_equipment_calibration", eq.calibration);
+  }
+  // Typing or choosing a technician's name fills their qualification and certificate.
+  function handleTechnicianName(idx: number, name: string) {
+    const t = lookups?.technicians.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+    if (!t) return;
+    setValue(`technicians.${idx}.qualification`, t.qualification);
+    setValue(`technicians.${idx}.certificate_no`, t.certificate_no);
+    setValue(`technicians.${idx}.issued_on`, t.issued_on);
+    setValue(`technicians.${idx}.valid_until`, t.valid_until);
+  }
   const scalarDefinitions = (fields ?? fieldsForMethod(method)) as readonly ExtendedFieldDefinition[];
   const techGroup = REPEATING_GROUPS[0];
   const itemGroup = REPEATING_GROUPS[1];
@@ -171,7 +206,14 @@ export function ReportEditor({
       )}
 
       {open && (
-        <form action={action} className="space-y-6 border-t border-line pt-4">
+        <form ref={formRef} action={action} className="space-y-6 border-t border-line pt-4">
+          {lookups && lookups.technicians.length > 0 && (
+            <datalist id="report-technician-names">
+              {lookups.technicians.map((t) => (
+                <option key={t.name} value={t.name} />
+              ))}
+            </datalist>
+          )}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Report date *">
               <Input
@@ -192,6 +234,8 @@ export function ReportEditor({
                   definition={def}
                   initialValue={strVal}
                   disabled={isApproved}
+                  optionsOverride={def.key === "equipment" ? equipmentOptions : undefined}
+                  onPick={handlePick}
                 />
               );
             })}
@@ -246,6 +290,13 @@ export function ReportEditor({
                           type={f.input === "date" ? "date" : "text"}
                           defaultValue={val === null || val === undefined ? "" : String(val)}
                           disabled={isApproved}
+                          {...(f.key === "name"
+                            ? {
+                                list: "report-technician-names",
+                                onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                                  handleTechnicianName(idx, e.target.value),
+                              }
+                            : {})}
                         />
                       </Field>
                     );
@@ -292,7 +343,7 @@ export function ReportEditor({
                   )}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-[1fr_7rem_7rem]">
-                  <Field label="Component description (#22) *">
+                  <Field label="Component description *">
                     <Input
                       name={`items.${idx}.description`}
                       list={`item_desc_list_${idx}`}
@@ -313,7 +364,7 @@ export function ReportEditor({
                       <option value="Plate" />
                     </datalist>
                   </Field>
-                  <Field label="Qty. (#25) *">
+                  <Field label="Qty. *">
                     <Input
                       name={`items.${idx}.quantity`}
                       type="number"
@@ -343,7 +394,7 @@ export function ReportEditor({
                   </Field>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Identification numbers (#23 — SR No. / H No. / Mat Code)">
+                  <Field label="Identification numbers (SR No. / H No. / Mat Code)">
                     <Textarea
                       name={`items.${idx}.identification_no`}
                       defaultValue={
@@ -356,7 +407,7 @@ export function ReportEditor({
                     />
                   </Field>
                   <div className="space-y-3">
-                    <Field label="Size (#24 — Ø / thickness × length mm)">
+                    <Field label="Size (Ø / thickness × length mm)">
                       <Input
                         name={`items.${idx}.size`}
                         defaultValue={
@@ -368,7 +419,7 @@ export function ReportEditor({
                         disabled={isApproved}
                       />
                     </Field>
-                    <Field label="Result (#27)">
+                    <Field label="Result">
                       <Select
                         name={`items.${idx}.result`}
                         defaultValue={
@@ -386,7 +437,7 @@ export function ReportEditor({
                     </Field>
                   </div>
                 </div>
-                <Field label="Observations / remarks (#26) *">
+                <Field label="Observations / remarks *">
                   <Textarea
                     name={`items.${idx}.observations`}
                     defaultValue={
