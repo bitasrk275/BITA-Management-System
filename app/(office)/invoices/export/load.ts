@@ -40,7 +40,9 @@ interface RawCreditNoteForExport {
   credit_note_no: string;
   issued_on: string;
   amount: number;
-  gst_amount: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
   total: number;
   reason: string | null;
   invoices?: {
@@ -83,12 +85,12 @@ export async function loadGstExportData(
     supabase
       .from("credit_notes")
       .select(
-        "id, credit_note_no, issued_on, amount, gst_amount, total, reason, invoices(invoice_no, number, invoice_date, place_of_supply, jobs(customers(name, gstin)))",
+        "id, credit_note_no, issued_on:credit_date, amount:taxable_value, cgst, sgst, igst, total, reason, invoices(invoice_no, number, invoice_date, place_of_supply, jobs(customers(name, gstin)))",
       )
-      .is("deleted_at", null)
-      .gte("issued_on", fromDate)
-      .lte("issued_on", toDate)
-      .order("issued_on", { ascending: true }) as unknown as Promise<{
+      .eq("status", "issued")
+      .gte("credit_date", fromDate)
+      .lte("credit_date", toDate)
+      .order("credit_date", { ascending: true }) as unknown as Promise<{
       data: RawCreditNoteForExport[] | null;
     }>,
   ]);
@@ -131,7 +133,7 @@ export async function loadGstExportData(
     customer_gstin: cn.invoices?.jobs?.customers?.gstin ?? null,
     reason: cn.reason,
     amount: cn.amount,
-    gst_amount: cn.gst_amount,
+    gst_amount: (Number(cn.cgst) || 0) + (Number(cn.sgst) || 0) + (Number(cn.igst) || 0),
     total: cn.total,
   }));
 
