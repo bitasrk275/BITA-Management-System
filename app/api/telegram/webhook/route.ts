@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireApiStaff } from "@/lib/api/v1";
 import { getSupabaseAdmin } from "@/lib/field/service";
 import {
   answerTelegramExecutiveQuery,
@@ -157,6 +158,15 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
+
+  // Setup actions change the bot and message linked chats: management only.
+  if (url.searchParams.get("register") === "1" || url.searchParams.get("send_welcome") === "1") {
+    const auth = await requireApiStaff();
+    if (!auth.ok) return auth.response;
+    if (!auth.person.roles.includes("management")) {
+      return NextResponse.json({ ok: false, error: "Management access required." }, { status: 403 });
+    }
+  }
   const hasBotTokenEnv = Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim());
   const hasWebhookSecretEnv = Boolean(process.env.TELEGRAM_WEBHOOK_SECRET?.trim());
 

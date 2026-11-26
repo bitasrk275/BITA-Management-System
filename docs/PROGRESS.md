@@ -82,6 +82,19 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-26 18:30 – Naveen – Claude Code (Orion)
+Task: Round 4 – BITA's 24 Nov complaints (slow, report autofill, invoices, app) and production readiness
+Done:
+- Invoice pages and downloads fixed (ambiguous reports join), CA GST export fixed, `npm run check:queries` checks every query against the live schema (PR 46).
+- Report autofill on every path: Reports page, Fill from job, and job-page Generate report (PRs 46, 47); verified live.
+- Speed: keep-warm via pg_cron every 3 min, 6:30–21:30 IST (migration applied); pages 0.3–0.9 s. The delay was Vercel cold starts, not Supabase (queries average about 6 ms).
+- Live end-to-end test as the client: job → report → approve → invoice → payment → quotation → calendar → phone API, all passing.
+- PR 48: test and placeholder wording removed from reports and invoices (no fake seal or signature); Telegram setup links need a management login.
+- Technician APK v1.1.1 signed with the permanent release key (kept outside the repo, in Naveen's user folder).
+Files changed: app/(office)/invoices/*, lib/modules/reports/prefill.ts, app/(office)/review/*, lib/reports/*, lib/invoices/template.ts, templates/reports/preview-data.ts, app/api/telegram/webhook/route.ts, supabase/migrations/20261124000000_keep_site_warm.sql
+Next: merge PR 48. BITA is buying a Hostinger KVM 1 VPS (India): move the website off Vercel, keep Supabase, add nightly database backups, rebuild the APK with the new address, turn off keep-warm. BITA fills Settings → company profile. Clear TEST data and set the real next invoice number before the first real invoice.
+Blockers / questions: BITA's real next invoice number; their domain for the app.
+
 ### 2026-11-20 15:30 – Naveen – Claude Code (Orion)
 Task: Round 3 – BITA's change list after their first review (8 areas), released the same day
 Done:

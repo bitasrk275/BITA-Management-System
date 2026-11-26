@@ -252,8 +252,8 @@ describe("lib/invoices PDF and Word (.docx) template builder", () => {
     expect(spec.defaultSac).toBe("998393");
     expect(spec.poBoxDisplay).toBe("TTIL/PO/2026/104\ndtd. 29.10.2026");
     expect(spec.amountInWords).toBe("Rupees Forty-Seven Thousand Two Hundred only");
-    expect(spec.seller.bankDetailsPlaceholder).toContain("BANK DETAILS PLACEHOLDER");
-    expect(spec.seller.termsPlaceholder).toContain("TERMS & CONDITIONS PLACEHOLDER");
+    expect(spec.seller.bankDetailsPlaceholder).toBe("");
+    expect(spec.seller.termsPlaceholder).not.toMatch(/PLACEHOLDER|\[/);
 
     const withoutPo = buildInvoiceDocumentSpec({
       ...sampleInput,

@@ -1,10 +1,6 @@
 import type { requireStaff } from "@/lib/auth";
 import type { ReportApproval, ReportLetterhead } from "@/templates/reports/types";
-import {
-  DEFAULT_DEV_LETTERHEAD,
-  fakeSealSvgDataUrl,
-  fakeSignatureSvgDataUrl,
-} from "./review";
+import { DEFAULT_DEV_LETTERHEAD } from "./review";
 
 type SupabaseClientType = Awaited<ReturnType<typeof requireStaff>>["supabase"];
 
@@ -241,8 +237,8 @@ export async function loadReportApprovalAssets(
       approvedAt: params.approvedAt,
       signatoryName,
       ...(signatoryQualification ? { signatoryQualification } : {}),
-      signatureUrl: realSigUrl ?? fakeSignatureSvgDataUrl(signatoryName),
-      sealUrl: realSealUrl ?? fakeSealSvgDataUrl(),
+      ...(realSigUrl ? { signatureUrl: realSigUrl } : {}),
+      ...(realSealUrl ? { sealUrl: realSealUrl } : {}),
     },
   };
 }

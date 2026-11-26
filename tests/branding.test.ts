@@ -316,7 +316,7 @@ describe("G7: Real branding on reports and invoices", () => {
       }
     });
 
-    it("falls back to SVG placeholder when neither has a signature", async () => {
+    it("prints no signature or seal image when none is uploaded", async () => {
       const mockSupabase = {
         from: vi.fn((table: string) => {
           if (table === "settings") {
@@ -370,8 +370,8 @@ describe("G7: Real branding on reports and invoices", () => {
 
       expect(result.approval.approved).toBe(true);
       if (result.approval.approved) {
-        expect(result.approval.signatureUrl).toMatch(/^data:image\/svg\+xml/);
-        expect(result.approval.sealUrl).toMatch(/^data:image\/svg\+xml/);
+        expect(result.approval.signatureUrl).toBeUndefined();
+        expect(result.approval.sealUrl).toBeUndefined();
       }
     });
   });

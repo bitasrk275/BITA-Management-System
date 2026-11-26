@@ -64,9 +64,9 @@ export default async function ReportPreview({
     doc.approval = {
       approved: true,
       approvedAt: "2026-11-06T08:00:00Z",
-      signatoryName: "FAKE TEST Reviewer (Level III)",
-      signatoryQualification: "ASNT NDT Level III · UT / MT / PT (Fake Preview)",
-      signatureUrl: fakeSignatureSvgDataUrl("FAKE TEST Reviewer"),
+      signatoryName: "Sample Reviewer (Level III)",
+      signatoryQualification: "ASNT NDT Level III · UT / MT / PT",
+      signatureUrl: fakeSignatureSvgDataUrl("Sample Reviewer"),
       sealUrl: fakeSealSvgDataUrl(),
     };
   }
@@ -117,7 +117,7 @@ export default async function ReportPreview({
           <div className="flex flex-wrap items-center gap-3">
             <Status tone={showApproved ? "ok" : "wait"}>
               {showApproved
-                ? "Approved preview (fake signature & seal)"
+                ? "Approved preview (sample signature & seal)"
                 : "Draft preview (signature & seal withheld)"}
             </Status>
             <ButtonLink

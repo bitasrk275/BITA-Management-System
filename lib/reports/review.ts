@@ -15,13 +15,9 @@ export type InspectionRow = Tables<"inspections">;
 export type ReportRow = Tables<"reports">;
 
 export const DEFAULT_DEV_LETTERHEAD: ReportLetterhead = {
-  name: "EXAMPLE INSPECTION & TESTING AGENCY (DEV PREVIEW)",
-  addressLines: [
-    "Plot 00, Fake Industrial Area, Peenya Stage II, Bengaluru – 560 058",
-  ],
-  contactLines: [
-    "Tel: +91 80 0000 0000 · Email: reports@example-inspection.test",
-  ],
+  name: "BANGALORE INSPECTION & TESTING AGENCY",
+  addressLines: ["Bengaluru, Karnataka"],
+  contactLines: [],
 };
 
 export function supportedMethod(method: string): method is ReportMethod {
@@ -216,7 +212,7 @@ export function fakeSignatureSvgDataUrl(name: string): string {
 }
 
 export function fakeSealSvgDataUrl(): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="42" fill="none" stroke="#111111" stroke-width="2"/><circle cx="48" cy="48" r="36" fill="none" stroke="#111111" stroke-width="1" stroke-dasharray="2,2"/><text x="48" y="42" text-anchor="middle" font-family="serif" font-size="9" font-weight="bold" fill="#111111">FAKE DEV SEAL</text><text x="48" y="54" text-anchor="middle" font-family="serif" font-size="8" fill="#111111">APPROVED</text><text x="48" y="65" text-anchor="middle" font-family="monospace" font-size="7" fill="#555555">NDT DIVISION</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="42" fill="none" stroke="#111111" stroke-width="2"/><circle cx="48" cy="48" r="36" fill="none" stroke="#111111" stroke-width="1" stroke-dasharray="2,2"/><text x="48" y="42" text-anchor="middle" font-family="serif" font-size="9" font-weight="bold" fill="#111111">SAMPLE SEAL</text><text x="48" y="54" text-anchor="middle" font-family="serif" font-size="8" fill="#111111">APPROVED</text><text x="48" y="65" text-anchor="middle" font-family="monospace" font-size="7" fill="#555555">NDT DIVISION</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
