@@ -65,18 +65,16 @@ export interface BitaInvoiceProfile {
 export const DEFAULT_BITA_INVOICE_PROFILE: BitaInvoiceProfile = {
   name: "BANGALORE INSPECTION & TESTING AGENCY",
   subtitle: "Non-Destructive Testing & Inspection Engineers (Estd. 1987)",
-  address: "Bengaluru, Karnataka, India — [Office address configured in Settings]",
-  phone: "[Office Phone / Cell configured in Settings]",
-  email: "[Office Email configured in Settings]",
-  pan: "[PAN configured in Settings]",
-  gstin: "[BITA GSTIN placeholder · State Code 29 (Karnataka)]",
+  address: "Bengaluru, Karnataka, India",
+  phone: "",
+  email: "",
+  pan: "",
+  gstin: "",
   stateCode: BITA_STATE_CODE,
   stateName: BITA_STATE_NAME,
   defaultSac: DEFAULT_SAC_CODE,
-  bankDetailsPlaceholder:
-    "[BANK DETAILS PLACEHOLDER — Bank Name, Branch, Account Number & IFSC configured in Settings]",
-  termsPlaceholder:
-    "[TERMS & CONDITIONS PLACEHOLDER — This is a digitally signed original document. No physical signature is required..]",
+  bankDetailsPlaceholder: "",
+  termsPlaceholder: "This is a digitally signed original document. No physical signature is required.",
 };
 
 export interface InvoiceTemplateLine {

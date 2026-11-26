@@ -21,7 +21,7 @@ describe("staff-only fake report previews", () => {
   it.each(["UT", "MT", "MPT", "DPT"])("renders the %s draft only after the staff check", async (method) => {
     const html = renderToStaticMarkup(await ReportPreview({ params: Promise.resolve({ method }) }));
     expect(mocks.requireStaff).toHaveBeenCalledTimes(1);
-    expect(html).toContain("FAKE TEST Customer");
+    expect(html).toContain("Sample Customer");
     expect(html).toContain("NOT APPROVED FOR ISSUE");
     expect(html).not.toContain("report-signoff");
     if (process.env.T8A_RENDER_DIR) {

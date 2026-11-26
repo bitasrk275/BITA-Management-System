@@ -19,7 +19,7 @@ describe("paper report layouts", () => {
     expect(html).toContain(REPORT_LAYOUTS[method].title);
     expect(html.match(/<col style/g)?.length).toBe(REPORT_LAYOUTS[method].columns.length);
     for (const label of ["CLIENT", "PROJECT", "INSPECTION SITE/DATE", "Cert. No.", "Observations/Remarks"]) expect(html).toContain(label);
-    expect(html).toContain("FAKE DATA");
+    expect(html).toContain("FORMAT PREVIEW ONLY");
     if (process.env.T8A_RENDER_DIR) {
       mkdirSync(process.env.T8A_RENDER_DIR, { recursive: true });
       writeFileSync(join(process.env.T8A_RENDER_DIR, `${method}.html`), `<!doctype html><html><head><meta charset="utf-8" /></head><body>${html}</body></html>`);
