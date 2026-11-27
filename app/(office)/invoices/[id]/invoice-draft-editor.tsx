@@ -327,7 +327,7 @@ export function InvoiceDraftEditor({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <SectionTitle>Invoice lines (from Price list)</SectionTitle>
-            <p className="text-[12px] text-ink-3">
+            <p className="text-[13px] text-ink-3">
               Select services and charges from the price list dropdown or click <strong>+ Add new item</strong>. Rates can be adjusted per invoice without changing past invoices.
             </p>
           </div>
@@ -351,13 +351,13 @@ export function InvoiceDraftEditor({
         {showAddPriceItem && (
           <div className="rounded-lg border border-line bg-surface-2 p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-ink">
+              <span className="text-[13px] font-semibold text-ink">
                 Add new service / charge to Price list
               </span>
               <button
                 type="button"
                 onClick={() => setShowAddPriceItem(false)}
-                className="text-xs text-ink-3 underline"
+                className="text-[13px] text-ink-3 underline"
               >
                 Cancel
               </button>
@@ -424,23 +424,23 @@ export function InvoiceDraftEditor({
                 className="rounded-lg border border-line bg-surface-2/40 p-3.5 space-y-3"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[12px] font-medium text-ink-2">
+                  <span className="text-[13px] font-medium text-ink-2">
                     Line #{index + 1}
                     {calc.minimum_charge_applied && (
-                      <span className="ml-2 rounded bg-ink/10 px-2 py-0.5 text-[11px] font-semibold text-ink">
+                      <span className="ml-2 rounded bg-ink/10 px-2 py-0.5 text-[13px] font-semibold text-ink">
                         Minimum charge {formatINR(calc.minimum_charge)} applied
                       </span>
                     )}
                   </span>
                   <div className="flex items-center gap-3">
-                    <span className="text-[13px] font-semibold text-ink tabular-nums">
+                    <span className="text-[14px] font-semibold text-ink tabular-nums">
                       Amount: {formatINR(calc.amount)}
                     </span>
                     {lines.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeLine(index)}
-                        className="text-[12px] font-medium text-bad hover:underline"
+                        className="text-[13px] font-medium text-bad hover:underline"
                       >
                         Remove
                       </button>
@@ -546,7 +546,7 @@ export function InvoiceDraftEditor({
       </div>
 
       {/* Live GST & Round-Off Preview */}
-      <div className="rounded-lg border border-line bg-surface-2/50 p-4 space-y-2 text-[13px]">
+      <div className="rounded-lg border border-line bg-surface-2/50 p-4 space-y-2 text-[14px]">
         <div className="flex justify-between text-ink-2">
           <span>Taxable value</span>
           <span className="font-medium text-ink tabular-nums">{formatINR(gst.taxable_value)}</span>
@@ -579,7 +579,7 @@ export function InvoiceDraftEditor({
           <span>Total invoice amount (INR)</span>
           <span className="tabular-nums">{formatINR(gst.total)}</span>
         </div>
-        <div className="text-[12px] text-ink-3">
+        <div className="text-[13px] text-ink-3">
           Amount in words: <strong className="font-medium text-ink">{amountInWordsINR(gst.total)}</strong>
         </div>
       </div>

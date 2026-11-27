@@ -108,7 +108,7 @@ export default async function SettingsUsersPage({
                             )}
                             <Status tone={loginTone}>{loginText}</Status>
                           </div>
-                          <div className="mt-0.5 text-[12.5px] text-ink-3">
+                          <div className="mt-0.5 text-[14px] text-ink-3">
                             {[
                               p.position,
                               p.roles.length > 0 ? roleLabel(p.roles) : "No roles assigned",
@@ -117,7 +117,7 @@ export default async function SettingsUsersPage({
                               .filter(Boolean)
                               .join(" · ")}
                           </div>
-                          <div className="mt-0.5 text-[12.5px] text-ink-3">
+                          <div className="mt-0.5 text-[14px] text-ink-3">
                             {[p.email, p.mobile].filter(Boolean).join(" · ") || "No email or mobile set"}
                           </div>
                         </div>
@@ -126,7 +126,7 @@ export default async function SettingsUsersPage({
 
                     {isManagement && (
                       <details className="mt-3">
-                        <summary className="cursor-pointer text-[13px] font-medium text-ink-2 hover:text-ink">
+                        <summary className="cursor-pointer text-[14px] font-medium text-ink-2 hover:text-ink">
                           Edit roles, details or login
                         </summary>
                         <form
@@ -152,7 +152,7 @@ export default async function SettingsUsersPage({
                           </div>
 
                           <div>
-                            <span className="text-[13px] font-medium text-ink-2">Roles</span>
+                            <span className="text-[14px] font-medium text-ink-2">Roles</span>
                             <div className="mt-1.5 space-y-1.5">
                               {Constants.public.Enums.app_role.map((role) => (
                                 <Checkbox
@@ -263,7 +263,7 @@ export default async function SettingsUsersPage({
                 </Field>
 
                 <div>
-                  <span className="text-[13px] font-medium text-ink-2">Roles</span>
+                  <span className="text-[14px] font-medium text-ink-2">Roles</span>
                   <div className="mt-1.5 space-y-1.5">
                     {Constants.public.Enums.app_role.map((role) => (
                       <Checkbox

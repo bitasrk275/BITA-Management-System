@@ -17,7 +17,7 @@ export function RegisterForm({ register, record, people, action, canEdit }: {
         {register === "people" ? <PersonFields person={record as Person | undefined} />
           : register === "qualifications" ? <QualificationFields qualification={record as Qualification | undefined} people={people} />
             : <EquipmentFields equipment={record as Equipment | undefined} />}
-        {register !== "people" && !record && canEdit && <p className="text-sm text-ink-2">Save the record, then attach its certificate copy.</p>}
+        {register !== "people" && !record && canEdit && <p className="text-[15px] text-ink-2">Save the record, then attach its certificate copy.</p>}
         {canEdit && <Button type="submit">{record ? "Save changes" : "Add record"}</Button>}
       </fieldset>
     </form>
@@ -34,9 +34,9 @@ function PersonFields({ person }: { person?: Person }) {
       <Field label="Email"><Input name="email" type="email" defaultValue={person?.email ?? ""} /></Field>
     </div>
     <fieldset className="space-y-2 rounded-md border border-line p-3">
-      <legend className="px-1 text-sm font-medium">Roles</legend>
+      <legend className="px-1 text-[15px] font-medium">Roles</legend>
       {ROLES.map((role) => <Checkbox key={role} name="roles" value={role} label={role.charAt(0).toUpperCase() + role.slice(1)} defaultChecked={person?.roles.includes(role)} />)}
-      <p className="text-xs text-ink-3">Roles control access for linked logins. Adding a person does not create or link a login.</p>
+      <p className="text-[13px] text-ink-3">Roles control access for linked logins. Adding a person does not create or link a login.</p>
     </fieldset>
     <Checkbox name="active" label="Active person" defaultChecked={person?.active ?? true} />
   </>;

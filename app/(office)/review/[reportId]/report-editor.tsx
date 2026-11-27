@@ -185,8 +185,8 @@ export function ReportEditor({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <SectionTitle>Edit report readings, observations &amp; items</SectionTitle>
-          <p className="text-[13px] text-ink-2">
-            Every saved change updates <span className="font-mono text-xs">reports.content</span> and is recorded in the
+          <p className="text-[14px] text-ink-2">
+            Every saved change updates <span className="font-mono text-[13px]">reports.content</span> and is recorded in the
             correction history log automatically.
           </p>
         </div>
@@ -262,7 +262,7 @@ export function ReportEditor({
                 className="space-y-3 rounded-md border border-line-2 bg-surface-2 p-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-ink-2">
+                  <span className="text-[13px] font-medium text-ink-2">
                     Technician #{idx + 1}
                   </span>
                   {!isApproved && techRows.length > 1 && (
@@ -271,7 +271,7 @@ export function ReportEditor({
                       onClick={() =>
                         setTechRows((prev) => prev.filter((_, i) => i !== idx))
                       }
-                      className="text-xs text-ink-3 underline hover:text-ink"
+                      className="text-[13px] text-ink-3 underline hover:text-ink"
                     >
                       Remove
                     </button>
@@ -327,7 +327,7 @@ export function ReportEditor({
                 className="space-y-3 rounded-md border border-line-2 bg-surface-2 p-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-ink-2">
+                  <span className="text-[13px] font-medium text-ink-2">
                     Inspected item #{idx + 1}
                   </span>
                   {!isApproved && itemRows.length > 1 && (
@@ -336,7 +336,7 @@ export function ReportEditor({
                       onClick={() =>
                         setItemRows((prev) => prev.filter((_, i) => i !== idx))
                       }
-                      className="text-xs text-ink-3 underline hover:text-ink"
+                      className="text-[13px] text-ink-3 underline hover:text-ink"
                     >
                       Remove
                     </button>

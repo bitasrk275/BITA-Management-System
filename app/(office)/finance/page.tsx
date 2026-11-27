@@ -57,8 +57,8 @@ export default async function FinanceReportsPage({
           subtitle="Receivables ageing, customer revenue, monthly income vs expenses, TDS payments, and unconverted proformas"
         />
         <Card>
-          <h2 className="text-sm font-semibold text-ink">Access restricted</h2>
-          <p className="mt-1.5 text-[13.5px] text-ink-2">
+          <h2 className="text-[15px] font-semibold text-ink">Access restricted</h2>
+          <p className="mt-1.5 text-[15px] text-ink-2">
             You do not have permission (<Mono>view_finance</Mono>) to view financial reports. Contact management to grant access in Settings.
           </p>
         </Card>
@@ -123,7 +123,7 @@ export default async function FinanceReportsPage({
           <Button type="submit">Apply filters</Button>
           <Link
             href="/finance"
-            className="inline-flex h-8 items-center rounded-md border border-line bg-white px-3 text-[13px] font-medium text-ink hover:bg-surface"
+            className="inline-flex h-8 items-center rounded-md border border-line bg-white px-3 text-[14px] font-medium text-ink hover:bg-surface"
           >
             Reset
           </Link>
@@ -162,9 +162,9 @@ export default async function FinanceReportsPage({
           1. Receivables ageing (issued tax invoices)
         </SectionTitle>
         <div className="overflow-x-auto rounded-lg border border-line bg-white">
-          <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
+          <table className="w-full min-w-[720px] border-collapse text-left text-[14px]">
             <thead>
-              <tr className="border-b border-line bg-surface text-[11.5px] font-medium text-ink-3">
+              <tr className="border-b border-line bg-surface text-[13px] font-medium text-ink-3">
                 <th className="px-3.5 py-2.5">Customer</th>
                 <th className="px-3 py-2.5 text-right">Invoices</th>
                 <th className="px-3 py-2.5 text-right">Not due</th>
@@ -178,7 +178,7 @@ export default async function FinanceReportsPage({
             <tbody className="divide-y divide-line">
               {ageing.customers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-[13px] text-ink-3">
+                  <td colSpan={8} className="px-4 py-8 text-center text-[14px] text-ink-3">
                     No outstanding tax invoice receivables as of {shortDate(ageing.as_of_date)}.
                   </td>
                 </tr>
@@ -192,7 +192,7 @@ export default async function FinanceReportsPage({
                         </Link>
                       </div>
                       {c.customer_gstin && (
-                        <div className="font-mono text-[11.5px] text-ink-3">
+                        <div className="font-mono text-[13px] text-ink-3">
                           {c.customer_gstin}
                         </div>
                       )}
@@ -251,9 +251,9 @@ export default async function FinanceReportsPage({
           2. Customer-wise revenue & outstanding (FY {custRev.fy})
         </SectionTitle>
         <div className="overflow-x-auto rounded-lg border border-line bg-white">
-          <table className="w-full min-w-[780px] border-collapse text-left text-[13px]">
+          <table className="w-full min-w-[780px] border-collapse text-left text-[14px]">
             <thead>
-              <tr className="border-b border-line bg-surface text-[11.5px] font-medium text-ink-3">
+              <tr className="border-b border-line bg-surface text-[13px] font-medium text-ink-3">
                 <th className="px-3.5 py-2.5">Customer</th>
                 <th className="px-3 py-2.5 text-right">Invoices</th>
                 <th className="px-3 py-2.5 text-right">Taxable value</th>
@@ -267,7 +267,7 @@ export default async function FinanceReportsPage({
             <tbody className="divide-y divide-line">
               {custRev.customers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-[13px] text-ink-3">
+                  <td colSpan={8} className="px-4 py-8 text-center text-[14px] text-ink-3">
                     No issued tax invoices recorded in FY {custRev.fy} ({shortDate(custRev.start_date)} to {shortDate(custRev.end_date)}).
                   </td>
                 </tr>
@@ -281,7 +281,7 @@ export default async function FinanceReportsPage({
                         </Link>
                       </div>
                       {c.customer_gstin && (
-                        <div className="font-mono text-[11.5px] text-ink-3">
+                        <div className="font-mono text-[13px] text-ink-3">
                           {c.customer_gstin}
                         </div>
                       )}
@@ -304,7 +304,7 @@ export default async function FinanceReportsPage({
                     <td className="px-3 py-2.5 text-right font-mono text-ink-2">
                       {formatINR(c.paid_amount + c.tds_amount)}
                       {c.tds_amount > 0 && (
-                        <div className="text-[11px] text-ink-3">
+                        <div className="text-[13px] text-ink-3">
                           incl. TDS {formatINR(c.tds_amount)}
                         </div>
                       )}
@@ -347,9 +347,9 @@ export default async function FinanceReportsPage({
           3. Monthly income vs job expenses (FY {monthly.fy})
         </SectionTitle>
         <div className="overflow-x-auto rounded-lg border border-line bg-white">
-          <table className="w-full min-w-[760px] border-collapse text-left text-[13px]">
+          <table className="w-full min-w-[760px] border-collapse text-left text-[14px]">
             <thead>
-              <tr className="border-b border-line bg-surface text-[11.5px] font-medium text-ink-3">
+              <tr className="border-b border-line bg-surface text-[13px] font-medium text-ink-3">
                 <th className="px-3.5 py-2.5">Month</th>
                 <th className="px-3 py-2.5 text-right">Tax invoices</th>
                 <th className="px-3 py-2.5 text-right">Taxable value</th>
@@ -409,9 +409,9 @@ export default async function FinanceReportsPage({
           4. Payments received & TDS ({formatMonthLabel(payments.month)})
         </SectionTitle>
         <div className="overflow-x-auto rounded-lg border border-line bg-white">
-          <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
+          <table className="w-full min-w-[720px] border-collapse text-left text-[14px]">
             <thead>
-              <tr className="border-b border-line bg-surface text-[11.5px] font-medium text-ink-3">
+              <tr className="border-b border-line bg-surface text-[13px] font-medium text-ink-3">
                 <th className="px-3.5 py-2.5">Paid on</th>
                 <th className="px-3 py-2.5">Invoice / Job</th>
                 <th className="px-3 py-2.5">Customer</th>
@@ -424,31 +424,31 @@ export default async function FinanceReportsPage({
             <tbody className="divide-y divide-line">
               {payments.payments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-[13px] text-ink-3">
+                  <td colSpan={7} className="px-4 py-8 text-center text-[14px] text-ink-3">
                     No payments recorded in {formatMonthLabel(payments.month)}.
                   </td>
                 </tr>
               ) : (
                 payments.payments.map((p) => (
                   <tr key={p.payment_id} className="hover:bg-surface/60">
-                    <td className="px-3.5 py-2.5 font-mono text-[12.5px] text-ink-2">
+                    <td className="px-3.5 py-2.5 font-mono text-[14px] text-ink-2">
                       {shortDate(p.paid_on)}
                     </td>
                     <td className="px-3 py-2.5">
                       <Link
                         href={`/invoices/${p.invoice_id}`}
-                        className="font-mono text-[12.5px] font-medium text-ink hover:underline"
+                        className="font-mono text-[14px] font-medium text-ink hover:underline"
                       >
                         {p.invoice_no}
                       </Link>
-                      <div className="font-mono text-[11px] text-ink-3">
+                      <div className="font-mono text-[13px] text-ink-3">
                         {p.job_no}
                       </div>
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="font-medium text-ink">{p.customer_name}</div>
                       {p.customer_gstin && (
-                        <div className="font-mono text-[11px] text-ink-3">
+                        <div className="font-mono text-[13px] text-ink-3">
                           {p.customer_gstin}
                         </div>
                       )}
@@ -456,7 +456,7 @@ export default async function FinanceReportsPage({
                     <td className="px-3 py-2.5 text-ink-2">
                       <div>{p.mode ?? "—"}</div>
                       {p.reference && (
-                        <div className="font-mono text-[11px] text-ink-3">
+                        <div className="font-mono text-[13px] text-ink-3">
                           {p.reference}
                         </div>
                       )}
@@ -507,9 +507,9 @@ export default async function FinanceReportsPage({
           5. Proforma invoices not yet converted to tax invoices
         </SectionTitle>
         <div className="overflow-x-auto rounded-lg border border-line bg-white">
-          <table className="w-full min-w-[700px] border-collapse text-left text-[13px]">
+          <table className="w-full min-w-[700px] border-collapse text-left text-[14px]">
             <thead>
-              <tr className="border-b border-line bg-surface text-[11.5px] font-medium text-ink-3">
+              <tr className="border-b border-line bg-surface text-[13px] font-medium text-ink-3">
                 <th className="px-3.5 py-2.5">Proforma no.</th>
                 <th className="px-3 py-2.5">Date / Age</th>
                 <th className="px-3 py-2.5">Customer & Job</th>
@@ -522,7 +522,7 @@ export default async function FinanceReportsPage({
             <tbody className="divide-y divide-line">
               {proformas.proformas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-[13px] text-ink-3">
+                  <td colSpan={7} className="px-4 py-8 text-center text-[14px] text-ink-3">
                     All active proforma invoices have been converted to tax invoices.
                   </td>
                 </tr>
@@ -532,25 +532,25 @@ export default async function FinanceReportsPage({
                     <td className="px-3.5 py-2.5">
                       <Link
                         href={`/invoices/${pf.invoice_id}`}
-                        className="font-mono text-[12.5px] font-medium text-ink hover:underline"
+                        className="font-mono text-[14px] font-medium text-ink hover:underline"
                       >
                         {pf.invoice_no}
                       </Link>
                       {pf.customer_po_number && (
-                        <div className="font-mono text-[11px] text-ink-3">
+                        <div className="font-mono text-[13px] text-ink-3">
                           PO: {pf.customer_po_number}
                         </div>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="font-mono text-[12.5px] text-ink-2">
+                      <div className="font-mono text-[14px] text-ink-2">
                         {shortDate(pf.invoice_date)}
                       </div>
                       <Badge>{pf.age_days}d old</Badge>
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="font-medium text-ink">{pf.customer_name}</div>
-                      <div className="font-mono text-[11.5px] text-ink-3">
+                      <div className="font-mono text-[13px] text-ink-3">
                         <Link href={`/jobs/${pf.job_id}`} className="hover:underline">
                           {pf.job_no}
                         </Link>

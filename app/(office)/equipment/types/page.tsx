@@ -62,7 +62,7 @@ export default async function EquipmentTypesPage(props: {
       <ErrorNote message={searchParams.error} />
       {searchParams.saved && <SavedNote />}
       {searchParams.deleted && (
-        <Card className="border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+        <Card className="border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
           Equipment type moved to{" "}
           <Link href="/recycle-bin" className="underline font-medium">
             Recycle bin
@@ -89,19 +89,19 @@ export default async function EquipmentTypesPage(props: {
                   }
                   detail={
                     t.description ? (
-                      <span className="text-xs text-neutral-500">{t.description}</span>
+                      <span className="text-[13px] text-neutral-500">{t.description}</span>
                     ) : null
                   }
                   action={
                     canDelete ? (
                       <details className="text-right">
-                        <summary className="cursor-pointer list-none rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-600 hover:text-red-700 hover:bg-red-50 inline-block">
+                        <summary className="cursor-pointer list-none rounded border border-neutral-200 px-2 py-1 text-[13px] text-neutral-600 hover:text-red-700 hover:bg-red-50 inline-block">
                           Delete
                         </summary>
                         <form action={deleteEquipmentTypeAction.bind(null, t.id)} className="mt-1.5">
                           <button
                             type="submit"
-                            className="rounded bg-red-700 px-2 py-1 text-xs text-white hover:bg-red-800"
+                            className="rounded bg-red-700 px-2 py-1 text-[13px] text-white hover:bg-red-800"
                           >
                             Confirm delete
                           </button>

@@ -94,10 +94,10 @@ export default async function OfficeHome() {
             {(week.data ?? []).map((a) => (
               <ListRow
                 key={a.id}
-                lead={<span className="w-9 font-mono text-[12.5px] text-ink-3">{weekday(a.work_date)}</span>}
+                lead={<span className="w-9 font-mono text-[14px] text-ink-3">{weekday(a.work_date)}</span>}
                 title={`${a.people?.full_name ?? "?"} · ${a.jobs?.customers?.name ?? ""}`}
                 detail={[a.jobs?.test_methods.join(", "), a.jobs?.job_no].filter(Boolean).join(" · ")}
-                action={a.work_date === today ? <span className="text-xs text-ink-2">Today</span> : undefined}
+                action={a.work_date === today ? <span className="text-[13px] text-ink-2">Today</span> : undefined}
               />
             ))}
             {needTechnician.map((j) => (

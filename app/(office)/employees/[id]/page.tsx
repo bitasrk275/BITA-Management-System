@@ -119,13 +119,13 @@ export default async function EmployeeDetailPage({
 
       {query.pairingCode && (
         <Card className="border-ok/30 bg-ok/5 p-5">
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-3">
+          <div className="text-[13px] font-semibold uppercase tracking-wider text-ink-3">
             New Phone Pairing Code
           </div>
           <div className="my-2 font-mono text-3xl font-bold tracking-widest text-ink">
             {query.pairingCode}
           </div>
-          <p className="text-xs text-ink-2">
+          <p className="text-[13px] text-ink-2">
             Valid for 15 minutes
             {query.expiresAt
               ? ` (until ${new Date(query.expiresAt).toLocaleTimeString("en-IN", {
@@ -189,7 +189,7 @@ export default async function EmployeeDetailPage({
               Employee details {isManagement ? "& compensation" : ""}
             </SectionTitle>
             {!isManagement && (
-              <p className="text-xs text-ink-3">
+              <p className="text-[13px] text-ink-3">
                 Only management can edit employee roles or view/edit salary & per-job
                 allowance.
               </p>
@@ -246,7 +246,7 @@ export default async function EmployeeDetailPage({
               </Field>
 
               <Field label="Roles">
-                <div className="flex flex-wrap gap-3 pt-1 text-xs">
+                <div className="flex flex-wrap gap-3 pt-1 text-[13px]">
                   {APP_ROLES.map((r) => (
                     <label key={r} className="inline-flex items-center gap-1.5">
                       <input
@@ -301,7 +301,7 @@ export default async function EmployeeDetailPage({
                 </div>
               )}
 
-              <label className="flex items-center gap-2 pt-1 text-xs font-medium text-ink">
+              <label className="flex items-center gap-2 pt-1 text-[13px] font-medium text-ink">
                 <input
                   type="checkbox"
                   name="active"
@@ -319,14 +319,14 @@ export default async function EmployeeDetailPage({
             </form>
 
             {canDelete && (
-              <div className="flex items-center justify-between border-t border-line pt-3 text-xs text-ink-2">
+              <div className="flex items-center justify-between border-t border-line pt-3 text-[13px] text-ink-2">
                 <span>Move employee to recycle bin</span>
                 <details className="relative">
-                  <summary className="cursor-pointer list-none rounded border border-line px-2.5 py-1 text-xs text-bad hover:bg-bad/5">
+                  <summary className="cursor-pointer list-none rounded border border-line px-2.5 py-1 text-[13px] text-bad hover:bg-bad/5">
                     Delete employee
                   </summary>
                   <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-line bg-white p-3 shadow-md">
-                    <p className="mb-2 text-xs text-ink-2">
+                    <p className="mb-2 text-[13px] text-ink-2">
                       Move {employee.full_name} to the recycle bin?
                     </p>
                     <form action={deleteEmployeeAction.bind(null, employee.id)}>
@@ -346,7 +346,7 @@ export default async function EmployeeDetailPage({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <SectionTitle>Linked phones (Android app)</SectionTitle>
-                  <p className="text-xs text-ink-3">
+                  <p className="text-[13px] text-ink-3">
                     Link a technician phone with a one-time 6-digit code, or unlink a
                     lost phone immediately.
                   </p>
@@ -386,11 +386,11 @@ export default async function EmployeeDetailPage({
                       action={
                         canEditStaff && !dev.revoked_at ? (
                           <details className="relative">
-                            <summary className="cursor-pointer list-none rounded border border-line px-2.5 py-1 text-xs text-bad hover:bg-bad/5">
+                            <summary className="cursor-pointer list-none rounded border border-line px-2.5 py-1 text-[13px] text-bad hover:bg-bad/5">
                               Unlink phone
                             </summary>
                             <div className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-line bg-white p-2.5 shadow-md">
-                              <p className="mb-2 text-xs text-ink-2">
+                              <p className="mb-2 text-[13px] text-ink-2">
                                 Unlink {dev.device_name || "this phone"}? It will lose
                                 access immediately.
                               </p>
@@ -424,7 +424,7 @@ export default async function EmployeeDetailPage({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <SectionTitle>Digital signature</SectionTitle>
-                <p className="text-xs text-ink-3">
+                <p className="text-[13px] text-ink-3">
                   Applied to approved inspection reports when {employee.full_name} is the technical reviewer.
                 </p>
               </div>
@@ -438,13 +438,13 @@ export default async function EmployeeDetailPage({
             {employee.signature_path && (
               <div className="flex items-center justify-between rounded border border-line bg-side/40 p-3">
                 <div className="flex items-center gap-2 truncate">
-                  <span className="text-xs font-mono text-ink">
+                  <span className="text-[13px] font-mono text-ink">
                     {employee.signature_path.split("/").pop()}
                   </span>
                 </div>
                 {isManagement && (
                   <form action={removeEmployeeSignatureAction.bind(null, employee.id)}>
-                    <SecondaryButton type="submit" className="text-xs text-bad">
+                    <SecondaryButton type="submit" className="text-[13px] text-bad">
                       Remove signature
                     </SecondaryButton>
                   </form>
@@ -470,7 +470,7 @@ export default async function EmployeeDetailPage({
                     name="signature_file"
                     accept="image/png,image/jpeg,image/jpg"
                     required
-                    className="w-full text-xs text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-xs file:text-ink"
+                    className="w-full text-[13px] text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-[13px] file:text-ink"
                   />
                 </Field>
                 <Button type="submit">
@@ -515,7 +515,7 @@ export default async function EmployeeDetailPage({
                       </div>
                     }
                     detail={
-                      <div className="text-xs text-ink-2">
+                      <div className="text-[13px] text-ink-2">
                         <div>
                           {[q.scheme, q.certifying_body]
                             .filter(Boolean)
@@ -534,18 +534,18 @@ export default async function EmployeeDetailPage({
                             href={`/registers/qualifications/${q.id}/certificate`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs font-medium text-ink underline"
+                            className="text-[13px] font-medium text-ink underline"
                           >
                             Certificate ↗
                           </a>
                         )}
                         {canDelete && (
                           <details className="relative">
-                            <summary className="cursor-pointer list-none rounded border border-line px-2 py-1 text-xs text-bad hover:bg-bad/5">
+                            <summary className="cursor-pointer list-none rounded border border-line px-2 py-1 text-[13px] text-bad hover:bg-bad/5">
                               Remove
                             </summary>
                             <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-line bg-white p-2.5 shadow-md">
-                              <p className="mb-2 text-xs text-ink-2">
+                              <p className="mb-2 text-[13px] text-ink-2">
                                 Delete {q.method} {q.level} qualification?
                               </p>
                               <form
@@ -634,7 +634,7 @@ export default async function EmployeeDetailPage({
                     type="file"
                     name="certificate_file"
                     accept=".pdf,image/*"
-                    className="w-full text-xs text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-xs file:text-ink"
+                    className="w-full text-[13px] text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-[13px] file:text-ink"
                   />
                 </Field>
 

@@ -103,13 +103,13 @@ export default async function PriceListPage({
                         <span className="font-medium text-ink">{item.name}</span>
                         {!item.active && <Badge>Inactive</Badge>}
                         {item.sac && (
-                          <span className="text-xs text-ink-3">
+                          <span className="text-[13px] text-ink-3">
                             SAC <Mono>{item.sac}</Mono>
                           </span>
                         )}
                       </div>
                       {item.description && (
-                        <div className="mt-0.5 text-xs text-ink-2 break-words">
+                        <div className="mt-0.5 text-[13px] text-ink-2 break-words">
                           {item.description}
                         </div>
                       )}
@@ -118,14 +118,14 @@ export default async function PriceListPage({
                       <div className="font-semibold text-ink tabular-nums">
                         <Mono>{formatINR(Number(item.default_rate) || 0)}</Mono>
                       </div>
-                      <div className="text-xs text-ink-3">per {item.unit}</div>
+                      <div className="text-[13px] text-ink-3">per {item.unit}</div>
                     </div>
                   </div>
 
                   {canWrite && (
                     <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-line-2/60 pt-2.5">
                       <details className="w-full">
-                        <summary className="cursor-pointer text-xs font-medium text-ink-2 underline">
+                        <summary className="cursor-pointer text-[13px] font-medium text-ink-2 underline">
                           Edit price item
                         </summary>
                         <form
@@ -162,7 +162,7 @@ export default async function PriceListPage({
                               placeholder="Detailed service description copied onto invoice lines"
                             />
                           </Field>
-                          <label className="flex items-center gap-2 text-xs text-ink-2">
+                          <label className="flex items-center gap-2 text-[13px] text-ink-2">
                             <input
                               type="checkbox"
                               name="active"
@@ -179,14 +179,14 @@ export default async function PriceListPage({
 
                       {canDelete && (
                         <details>
-                          <summary className="cursor-pointer text-xs font-medium text-bad underline">
+                          <summary className="cursor-pointer text-[13px] font-medium text-bad underline">
                             Delete item…
                           </summary>
                           <form
                             action={deletePriceItemAction.bind(null, item.id)}
                             className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 p-2.5"
                           >
-                            <span className="text-xs text-ink-2">
+                            <span className="text-[13px] text-ink-2">
                               Move <strong>{item.name}</strong> to the recycle bin? Past invoices are unaffected.
                             </span>
                             <SecondaryButton type="submit">Confirm delete</SecondaryButton>
@@ -204,7 +204,7 @@ export default async function PriceListPage({
         {canWrite && (
           <Card className="h-fit space-y-4">
             <SectionTitle>Add new price item</SectionTitle>
-            <p className="text-xs text-ink-2">
+            <p className="text-[13px] text-ink-2">
               Items added here appear in the invoice line dropdown immediately. Rates can still be changed on each individual invoice.
             </p>
             <form action={createPriceItemAction} className="space-y-3">

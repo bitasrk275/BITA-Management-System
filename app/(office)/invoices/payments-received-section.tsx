@@ -95,7 +95,7 @@ export function PaymentsReceivedSection({
                   setCustomerId(e.target.value);
                   setSelectedJobIds([]);
                 }}
-                className="w-64"
+                className="w-full sm:w-64"
               >
                 <option value="">All customers ({jobs.length} jobs)</option>
                 {customers.map((c) => (
@@ -117,7 +117,7 @@ export function PaymentsReceivedSection({
                   key={tab.key}
                   type="button"
                   onClick={() => setViewFilter(tab.key)}
-                  className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition ${
+                  className={`rounded-lg px-3 py-1.5 text-[14px] font-medium transition ${
                     viewFilter === tab.key
                       ? "bg-ink text-white"
                       : "border border-line bg-white text-ink-2 hover:bg-surface-2 hover:text-ink"
@@ -138,7 +138,7 @@ export function PaymentsReceivedSection({
                 <button
                   type="button"
                   onClick={clearSelection}
-                  className="text-xs text-ink-3 underline hover:text-ink"
+                  className="text-[13px] text-ink-3 underline hover:text-ink"
                 >
                   Clear ({selectedJobIds.length})
                 </button>
@@ -147,9 +147,8 @@ export function PaymentsReceivedSection({
           )}
         </div>
 
-        <p className="text-[12.5px] text-ink-2">
-          Tick the <strong className="text-ink">Paid</strong> checkbox next to one or several Job IDs (for example when a customer pays for 10 jobs at once) and click{" "}
-          <strong className="text-ink">Mark ticked jobs as Paid</strong>. You can also attach the customer&apos;s payment advice or bank statement below.
+        <p className="text-[15px] text-ink-2">
+          Tick every job the customer has paid for, then press <strong className="text-ink">Mark ticked jobs as Paid</strong>.
         </p>
 
         <form action={recordMultiJobPaymentAction} className="space-y-4">
@@ -162,7 +161,7 @@ export function PaymentsReceivedSection({
               return (
                 <div
                   key={j.job_id}
-                  className={`flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-sm ${
+                  className={`flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-[15px] ${
                     j.is_paid ? "bg-surface-2/40" : "hover:bg-surface-2"
                   }`}
                 >
@@ -185,12 +184,12 @@ export function PaymentsReceivedSection({
                           className="h-4 w-4 rounded border-line"
                         />
                       )}
-                      <span className="text-xs font-semibold text-ink">Paid</span>
+                      <span className="text-[13px] font-semibold text-ink">Paid</span>
                     </label>
 
                     <Link
                       href={`/jobs/${j.job_id}`}
-                      className="font-mono text-sm font-semibold text-ink underline"
+                      className="font-mono text-[15px] font-semibold text-ink underline"
                     >
                       {j.job_no}
                     </Link>
@@ -205,7 +204,7 @@ export function PaymentsReceivedSection({
 
                     {j.po_number && <Badge>PO {j.po_number}</Badge>}
                     {j.invoices.map((inv) => (
-                      <span key={inv.id} className="inline-flex items-center gap-1 text-xs text-ink-2">
+                      <span key={inv.id} className="inline-flex items-center gap-1 text-[13px] text-ink-2">
                         <Link href={`/invoices/${inv.id}`} className="font-mono underline">
                           {inv.invoice_no}
                         </Link>
@@ -218,7 +217,7 @@ export function PaymentsReceivedSection({
 
                   <div className="flex flex-wrap items-center gap-3 text-right">
                     {j.total_billed > 0 ? (
-                      <div className="text-xs tabular-nums">
+                      <div className="text-[13px] tabular-nums">
                         <span className="text-ink-3">Billed {formatINR(j.total_billed)}</span>
                         {j.outstanding_balance > 0 && (
                           <span className="ml-2 font-semibold text-ink">
@@ -227,11 +226,11 @@ export function PaymentsReceivedSection({
                         )}
                       </div>
                     ) : j.po_value ? (
-                      <span className="text-xs text-ink-3 tabular-nums">
+                      <span className="text-[13px] text-ink-3 tabular-nums">
                         PO {formatINR(j.po_value)}
                       </span>
                     ) : (
-                      <span className="text-xs text-ink-3">No issued invoice yet</span>
+                      <span className="text-[13px] text-ink-3">No issued invoice yet</span>
                     )}
 
                     {j.is_paid && j.paid_receipt_id && j.advice_path && (
@@ -239,7 +238,7 @@ export function PaymentsReceivedSection({
                         href={`/invoices/receipt-advice/${j.paid_receipt_id}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs font-medium text-ink underline"
+                        className="text-[13px] font-medium text-ink underline"
                       >
                         Payment advice
                       </a>
@@ -250,7 +249,7 @@ export function PaymentsReceivedSection({
             })}
 
             {filteredJobs.length === 0 && (
-              <div className="px-4 py-6 text-center text-sm text-ink-3">
+              <div className="px-4 py-6 text-center text-[15px] text-ink-3">
                 No jobs match this filter.
               </div>
             )}
@@ -258,7 +257,7 @@ export function PaymentsReceivedSection({
 
           <div className="rounded-lg border border-line bg-surface-2/60 p-3.5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs text-ink-2">
+              <div className="text-[13px] text-ink-2">
                 Selected:{" "}
                 <strong className="text-ink">
                   {selectedJobIds.length} job{selectedJobIds.length === 1 ? "" : "s"}
@@ -277,7 +276,7 @@ export function PaymentsReceivedSection({
             </div>
 
             <details className="border-t border-line pt-2.5">
-              <summary className="cursor-pointer text-xs font-medium text-ink underline">
+              <summary className="cursor-pointer text-[13px] font-medium text-ink underline">
                 Optional: Enter payment receipt details or upload customer payment advice / bank statement
               </summary>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -339,10 +338,10 @@ export function PaymentsReceivedSection({
 
         {receipts.length > 0 && (
           <div className="border-t border-line pt-3 space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-ink-3">
+            <div className="text-[13px] font-semibold uppercase tracking-wider text-ink-3">
               Recent multi-job payment receipts ({receipts.length})
             </div>
-            <ul className="divide-y divide-line rounded-lg border border-line bg-white text-xs">
+            <ul className="divide-y divide-line rounded-lg border border-line bg-white text-[13px]">
               {receipts.slice(0, 10).map((r) => (
                 <li
                   key={r.id}

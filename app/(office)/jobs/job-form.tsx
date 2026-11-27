@@ -94,10 +94,10 @@ export function JobForm({
         />
       </Field>
       <fieldset>
-        <legend className="text-sm font-medium text-ink-2">Test methods</legend>
+        <legend className="text-[15px] font-medium text-ink-2">Test methods</legend>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {methodsList.map((m) => (
-            <label key={m.code} className="flex items-center gap-2 text-sm">
+            <label key={m.code} className="flex items-center gap-2 text-[15px]">
               <input
                 type="checkbox"
                 name="test_methods"
@@ -119,16 +119,16 @@ export function JobForm({
       </Field>
       {!job && schedule && (
         <fieldset className="space-y-3 rounded-lg border border-line p-3">
-          <legend className="px-1 text-sm font-medium text-ink-2">Schedule (shows on the calendar)</legend>
+          <legend className="px-1 text-[15px] font-medium text-ink-2">Schedule (shows on the calendar)</legend>
           {schedule.returnTo && <input type="hidden" name="return_to" value={schedule.returnTo} />}
           <div>
-            <p className="text-sm text-ink-2">Technicians</p>
+            <p className="text-[15px] text-ink-2">Technicians</p>
             {schedule.technicians.length === 0 ? (
-              <p className="mt-1 text-[12.5px] text-ink-3">No active technicians yet. Add them under Employees.</p>
+              <p className="mt-1 text-[14px] text-ink-3">No active technicians yet. Add them under Employees.</p>
             ) : (
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {schedule.technicians.map((t) => (
-                  <label key={t.id} className="flex items-center gap-2 text-sm">
+                  <label key={t.id} className="flex items-center gap-2 text-[15px]">
                     <input
                       type="checkbox"
                       name="technician_ids"
@@ -152,10 +152,10 @@ export function JobForm({
           </div>
           {schedule.equipment.length > 0 && (
             <div>
-              <p className="text-sm text-ink-2">Equipment</p>
+              <p className="text-[15px] text-ink-2">Equipment</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {schedule.equipment.map((e) => (
-                  <label key={e.id} className="flex items-center gap-2 text-sm">
+                  <label key={e.id} className="flex items-center gap-2 text-[15px]">
                     <input type="checkbox" name="equipment_ids" value={e.id} className="h-4 w-4" />
                     {e.label}
                   </label>
@@ -163,7 +163,7 @@ export function JobForm({
               </div>
             </div>
           )}
-          <p className="text-[12.5px] text-ink-3">
+          <p className="text-[14px] text-ink-3">
             Optional. Leave it empty to schedule later from the Calendar.
           </p>
         </fieldset>

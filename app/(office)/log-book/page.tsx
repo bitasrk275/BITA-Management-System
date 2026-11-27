@@ -240,7 +240,7 @@ export default async function LogBookPage({
                       </div>
                     }
                     detail={
-                      <div className="mt-1 space-y-1 text-xs text-ink-2">
+                      <div className="mt-1 space-y-1 text-[13px] text-ink-2">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           <span>
                             <strong className="text-ink">Date:</strong> {dateLabel}
@@ -259,7 +259,7 @@ export default async function LogBookPage({
                           <div className="text-ink-3">Note: {entry.notes}</div>
                         )}
                         {entry.entry_expenses.length > 0 && (
-                          <div className="pt-1 text-[11.5px] text-ink-2">
+                          <div className="pt-1 text-[13px] text-ink-2">
                             Expenses:{" "}
                             {entry.entry_expenses
                               .map(
@@ -276,7 +276,7 @@ export default async function LogBookPage({
                     action={
                       canWrite ? (
                         <details className="relative">
-                          <summary className="cursor-pointer list-none rounded-lg border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink hover:bg-side">
+                          <summary className="cursor-pointer list-none rounded-lg border border-line bg-white px-2.5 py-1 text-[13px] font-medium text-ink hover:bg-side">
                             Update
                           </summary>
                           <div className="absolute right-0 z-20 mt-1.5 w-64 rounded-xl border border-line bg-white p-3 shadow-lg">
@@ -420,7 +420,7 @@ export default async function LogBookPage({
                           {matchedJob && (
                             <Link
                               href={`/jobs/${exp.job_id}`}
-                              className="text-xs hover:underline"
+                              className="text-[13px] hover:underline"
                             >
                               <Mono>{matchedJob.job_no}</Mono>
                             </Link>
@@ -428,7 +428,7 @@ export default async function LogBookPage({
                         </div>
                       }
                       detail={
-                        <div className="text-xs text-ink-2">
+                        <div className="text-[13px] text-ink-2">
                           {[
                             shortDate(exp.expense_date),
                             exp.person_name,
@@ -441,11 +441,11 @@ export default async function LogBookPage({
                       action={
                         canDelete ? (
                           <details className="relative">
-                            <summary className="cursor-pointer list-none rounded border border-line px-2 py-1 text-xs text-bad hover:bg-bad/5">
+                            <summary className="cursor-pointer list-none rounded border border-line px-2 py-1 text-[13px] text-bad hover:bg-bad/5">
                               Delete
                             </summary>
                             <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-line bg-white p-2.5 shadow-md">
-                              <p className="mb-2 text-xs text-ink-2">
+                              <p className="mb-2 text-[13px] text-ink-2">
                                 Delete this {formatINR(exp.amount)} expense?
                               </p>
                               <form action={deleteJobExpenseAction.bind(null, exp.id)}>

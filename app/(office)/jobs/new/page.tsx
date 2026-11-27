@@ -67,7 +67,7 @@ export default async function NewJobPage({
     <>
       <PageHeader title="New job" />
       <ErrorNote message={error} />
-      <p className="mb-4 text-sm text-ink-2">
+      <p className="mb-4 text-[15px] text-ink-2">
         The Job ID is given automatically when you save. Pick the technician, dates and equipment below and the job goes straight onto the calendar.
       </p>
       <JobForm

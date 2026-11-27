@@ -116,7 +116,7 @@ export default async function EquipmentDetailPage(props: {
         subtitle={
           <div className="flex flex-wrap items-center gap-2 mt-1">
             {equipment.serial_no && (
-              <span className="text-xs">
+              <span className="text-[13px]">
                 <Mono>{equipment.serial_no}</Mono>
               </span>
             )}
@@ -150,14 +150,14 @@ export default async function EquipmentDetailPage(props: {
       <ErrorNote message={searchParams.error} />
       {searchParams.saved && <SavedNote />}
       {searchParams.moved && (
-        <Card className="border-green-200 bg-green-50 p-4 text-xs text-green-900">
+        <Card className="border-green-200 bg-green-50 p-4 text-[13px] text-green-900">
           Equipment movement recorded and current location updated.
         </Card>
       )}
 
       {/* Calibration Alert Banner */}
       {equipment.calibration.status === "expired" && (
-        <div className="rounded border border-red-300 bg-red-50 p-4 text-xs text-red-900 flex items-center justify-between">
+        <div className="rounded border border-red-300 bg-red-50 p-4 text-[13px] text-red-900 flex items-center justify-between">
           <div>
             <strong>Calibration expired!</strong> This instrument expired {Math.abs(equipment.calibration.daysRemaining || 0)} days ago ({equipment.calibration_due}). Please calibrate before deploying to customer sites.
           </div>
@@ -165,7 +165,7 @@ export default async function EquipmentDetailPage(props: {
       )}
 
       {equipment.calibration.status === "due_soon" && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 flex items-center justify-between">
+        <div className="rounded border border-amber-300 bg-amber-50 p-4 text-[13px] text-amber-900 flex items-center justify-between">
           <div>
             <strong>Calibration due soon!</strong> Calibration is due in {equipment.calibration.daysRemaining} days ({equipment.calibration_due}).
           </div>
@@ -219,19 +219,19 @@ export default async function EquipmentDetailPage(props: {
                       href={certSignedUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-neutral-900 underline font-medium hover:text-neutral-700"
+                      className="text-[13px] text-neutral-900 underline font-medium hover:text-neutral-700"
                     >
                       View certificate document ↗
                     </a>
                   </div>
                 ) : (
-                  <span className="text-xs text-neutral-400 block mb-1">No certificate attached</span>
+                  <span className="text-[13px] text-neutral-400 block mb-1">No certificate attached</span>
                 )}
                 <input
                   type="file"
                   name="certificate_file"
                   accept=".pdf,image/*"
-                  className="w-full text-xs text-neutral-600 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border file:border-neutral-300 file:text-xs file:bg-neutral-50 file:text-neutral-800"
+                  className="w-full text-[13px] text-neutral-600 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border file:border-neutral-300 file:text-[13px] file:bg-neutral-50 file:text-neutral-800"
                 />
               </Field>
 
@@ -263,17 +263,17 @@ export default async function EquipmentDetailPage(props: {
             <Card className="p-4 border-red-100 bg-red-50/30 space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-medium text-red-900">Delete this equipment</div>
-                  <div className="text-[11px] text-red-700">Moves item to the recycle bin; can be restored later.</div>
+                  <div className="text-[13px] font-medium text-red-900">Delete this equipment</div>
+                  <div className="text-[13px] text-red-700">Moves item to the recycle bin; can be restored later.</div>
                 </div>
                 <details className="text-right">
-                  <summary className="cursor-pointer list-none rounded border border-red-300 bg-white px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 font-medium inline-block">
+                  <summary className="cursor-pointer list-none rounded border border-red-300 bg-white px-2.5 py-1 text-[13px] text-red-700 hover:bg-red-50 font-medium inline-block">
                     Delete
                   </summary>
                   <form action={deleteEquipmentAction.bind(null, equipment.id)} className="mt-2">
                     <button
                       type="submit"
-                      className="rounded bg-red-700 px-2.5 py-1 text-xs text-white hover:bg-red-800 font-medium"
+                      className="rounded bg-red-700 px-2.5 py-1 text-[13px] text-white hover:bg-red-800 font-medium"
                     >
                       Confirm move to recycle bin
                     </button>
@@ -331,7 +331,7 @@ export default async function EquipmentDetailPage(props: {
                     type="file"
                     name="challan_file"
                     accept=".pdf,image/*"
-                    className="w-full text-xs text-neutral-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border file:border-neutral-300 file:text-xs file:bg-neutral-50 file:text-neutral-800"
+                    className="w-full text-[13px] text-neutral-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border file:border-neutral-300 file:text-[13px] file:bg-neutral-50 file:text-neutral-800"
                   />
                 </Field>
               </div>
@@ -353,7 +353,7 @@ export default async function EquipmentDetailPage(props: {
             <SectionTitle>Movement history ({movementsWithUrls.length})</SectionTitle>
             <List>
               {movementsWithUrls.length === 0 ? (
-                <div className="p-4 text-center text-xs text-neutral-400">
+                <div className="p-4 text-center text-[13px] text-neutral-400">
                   No movements recorded yet.
                 </div>
               ) : (
@@ -368,14 +368,14 @@ export default async function EquipmentDetailPage(props: {
                           {m.from_location || "Office"} → <strong>{m.to_location}</strong>
                         </span>
                         {m.delivery_challan_no && (
-                          <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-800">
+                          <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[13px] font-mono text-neutral-800">
                             DC: {m.delivery_challan_no}
                           </span>
                         )}
                       </div>
                     }
                     detail={
-                      <div className="flex flex-wrap items-center gap-x-3 text-xs text-neutral-600 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-x-3 text-[13px] text-neutral-600 mt-0.5">
                         <Status tone={m.status === "at_site" ? "info" : m.status === "out_for_calibration" ? "wait" : "ok"}>
                           {m.status === "at_site" ? "At site" : m.status === "out_for_calibration" ? "Calibration" : "In office"}
                         </Status>
@@ -399,7 +399,7 @@ export default async function EquipmentDetailPage(props: {
                           href={m.challanUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded border border-neutral-300 px-2 py-1 text-xs text-neutral-800 hover:bg-neutral-50"
+                          className="rounded border border-neutral-300 px-2 py-1 text-[13px] text-neutral-800 hover:bg-neutral-50"
                         >
                           View Challan ↗
                         </a>

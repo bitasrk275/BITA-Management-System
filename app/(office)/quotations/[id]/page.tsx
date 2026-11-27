@@ -144,7 +144,7 @@ export default async function QuotationPage({
 
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Badge>{statusInfo.label}</Badge>
-        <span className="text-xs text-ink-3">
+        <span className="text-[13px] text-ink-3">
           Date: {formatDateIN(quotation.quote_date)} · Quoted total: <Mono>{formatINR(totalAmount)}</Mono>
         </span>
         {approver?.data && quotation.approved_at && (
@@ -171,10 +171,10 @@ export default async function QuotationPage({
           <Card className="space-y-4">
             <SectionTitle>Uploaded quotation file &amp; acceptance flow</SectionTitle>
 
-            <div className="rounded-md border border-line-2 bg-surface-2 p-3 text-sm">
+            <div className="rounded-md border border-line-2 bg-surface-2 p-3 text-[15px]">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="text-xs font-medium text-ink-3">Quotation document (PDF / Word)</div>
+                  <div className="text-[13px] font-medium text-ink-3">Quotation document (PDF / Word)</div>
                   {uploadedFileName ? (
                     <div className="mt-0.5 font-medium text-ink">
                       <a href={`/quotations/${id}/file`} className="underline">
@@ -204,7 +204,7 @@ export default async function QuotationPage({
             </div>
 
             <div className="space-y-3 border-t border-line-2 pt-3">
-              <div className="text-xs text-ink-2">
+              <div className="text-[13px] text-ink-2">
                 Workflow: <strong>Draft</strong> → <strong>Sent to customer</strong> (records send after BITA emails it)
                 → <strong>Accepted by customer</strong> or <strong>Rejected</strong> → <strong>Create job</strong>.
               </div>
@@ -223,7 +223,7 @@ export default async function QuotationPage({
                   </div>
                   {isManagement && (
                     <details className="border-t border-line-2 pt-2">
-                      <summary className="cursor-pointer text-xs font-medium text-ink underline">
+                      <summary className="cursor-pointer text-[13px] font-medium text-ink underline">
                         {linkedJobs.data && linkedJobs.data.length > 0
                           ? "Record or update Customer PO on linked job"
                           : "Record Customer PO & create job in one click"}
@@ -317,7 +317,7 @@ export default async function QuotationPage({
                       action={acceptQuotation.bind(null, id)}
                       className="space-y-3 rounded-md border border-line-2 bg-surface-2/60 p-3"
                     >
-                      <div className="text-xs font-semibold text-ink">
+                      <div className="text-[13px] font-semibold text-ink">
                         Customer Acceptance &amp; PO (optional — work can start before PO arrives)
                       </div>
                       <div className="grid gap-3 sm:grid-cols-3">
@@ -340,7 +340,7 @@ export default async function QuotationPage({
                       <Field label="PO file (PDF or image)">
                         <Input name="po_file" type="file" accept=".pdf,image/*" />
                       </Field>
-                      <label className="flex items-center gap-2 text-xs text-ink-2">
+                      <label className="flex items-center gap-2 text-[13px] text-ink-2">
                         <input
                           type="checkbox"
                           name="create_job"
@@ -390,17 +390,17 @@ export default async function QuotationPage({
           {canDelete && (
             <Card>
               <details>
-                <summary className="cursor-pointer text-sm font-medium text-bad">
+                <summary className="cursor-pointer text-[15px] font-medium text-bad">
                   Delete quotation
                 </summary>
                 {linkedJobs.data && linkedJobs.data.length > 0 ? (
-                  <p className="mt-2 text-xs text-bad">
+                  <p className="mt-2 text-[13px] text-bad">
                     Cannot delete this quotation: active job{" "}
                     <strong>{linkedJobs.data.map((j) => j.job_no).join(", ")}</strong> is linked to it.
                   </p>
                 ) : (
                   <>
-                    <p className="mt-2 text-xs text-ink-3">
+                    <p className="mt-2 text-[13px] text-ink-3">
                       Deleting moves this quotation to the{" "}
                       <Link href="/recycle-bin" className="underline">
                         recycle bin
@@ -419,14 +419,14 @@ export default async function QuotationPage({
           <Card className="space-y-2">
             <SectionTitle>Customer &amp; enquiry</SectionTitle>
             {customer.data && (
-              <div className="text-sm">
+              <div className="text-[15px]">
                 <Link href={`/customers/${customer.data.id}`} className="font-medium underline">
                   {customer.data.name}
                 </Link>
                 {customer.data.billing_address && (
-                  <p className="mt-1 whitespace-pre-wrap text-xs text-ink-2 break-words">{customer.data.billing_address}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-[13px] text-ink-2 break-words">{customer.data.billing_address}</p>
                 )}
-                <p className="mt-1 text-xs text-ink-3">
+                <p className="mt-1 text-[13px] text-ink-3">
                   {[
                     customer.data.gstin ? `GSTIN ${customer.data.gstin}` : null,
                     quotation.attention ? `Attn: ${quotation.attention}` : null,
@@ -436,14 +436,14 @@ export default async function QuotationPage({
                 </p>
               </div>
             )}
-            <div className="pt-2 text-sm">
+            <div className="pt-2 text-[15px]">
               <span className="text-ink-3">Enquiry: </span>
               {enquiry?.data ? (
                 <>
                   <Link href={`/enquiries/${enquiry.data.id}`} className="underline">
                     {enquiry.data.subject ?? "(no subject)"}
                   </Link>
-                  <span className="ml-2 text-xs text-ink-3">({enquiry.data.status})</span>
+                  <span className="ml-2 text-[13px] text-ink-3">({enquiry.data.status})</span>
                 </>
               ) : (
                 "None"
@@ -454,7 +454,7 @@ export default async function QuotationPage({
           <Card className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <SectionTitle>Priced items, rates &amp; total</SectionTitle>
-              <div className="text-xs text-ink-2">
+              <div className="text-[13px] text-ink-2">
                 Total: <strong className="text-ink"><Mono>{formatINR(totalAmount)}</Mono></strong>
               </div>
             </div>
@@ -463,8 +463,8 @@ export default async function QuotationPage({
                 <li key={it.id} className="border-b border-line-2 pb-4 last:border-0">
                   <details>
                     <summary className="cursor-pointer">
-                      <Mono>#{it.position}</Mono> <span className="text-sm font-medium">{it.description}</span>
-                      <div className="mt-0.5 text-xs text-ink-2">
+                      <Mono>#{it.position}</Mono> <span className="text-[15px] font-medium">{it.description}</span>
+                      <div className="mt-0.5 text-[13px] text-ink-2">
                         <Mono>{formatINR(it.rate)}</Mono> {it.basis ? <span>({it.basis})</span> : null}
                         {it.minimum_charge ? ` · Minimum charge: ${formatINR(it.minimum_charge)}` : ""}
                         {it.notes ? ` · ${it.notes}` : ""}
@@ -483,19 +483,19 @@ export default async function QuotationPage({
                 </li>
               ))}
               {items.data?.length === 0 && (
-                <li className="text-sm text-ink-3">
+                <li className="text-[15px] text-ink-3">
                   No items added yet. Add the component and inspection rates below.
                 </li>
               )}
             </ul>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2 px-3 py-2 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-surface-2 px-3 py-2 text-[15px]">
               <span className="font-medium text-ink-2">Quoted total (before GST)</span>
               <strong className="text-ink"><Mono>{formatINR(totalAmount)}</Mono></strong>
             </div>
 
             <details className="pt-2" open={(items.data?.length ?? 0) === 0}>
-              <summary className="cursor-pointer text-sm font-semibold underline">Add a priced item</summary>
+              <summary className="cursor-pointer text-[15px] font-semibold underline">Add a priced item</summary>
               <form action={addQuotationItem.bind(null, id)} className="mt-3 space-y-3">
                 <QuotationItemFields defaultPosition={nextPosition} priceItems={priceItems.data} />
                 <Button type="submit">Add item</Button>
@@ -557,9 +557,9 @@ export default async function QuotationPage({
                   action={
                     <div className="text-right">
                       <Mono>{formatINR(it.rate)}</Mono>
-                      {it.basis ? <span className="ml-1 text-xs text-ink-3">{it.basis}</span> : null}
+                      {it.basis ? <span className="ml-1 text-[13px] text-ink-3">{it.basis}</span> : null}
                       {it.minimum_charge ? (
-                        <div className="text-xs text-ink-3">Min {formatINR(it.minimum_charge)}</div>
+                        <div className="text-[13px] text-ink-3">Min {formatINR(it.minimum_charge)}</div>
                       ) : null}
                     </div>
                   }

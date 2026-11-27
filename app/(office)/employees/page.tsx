@@ -101,7 +101,7 @@ export default async function EmployeesPage({
             </ButtonLink>
             {isManagement && (
               <details className="relative">
-                <summary className="cursor-pointer list-none rounded-lg bg-ink px-3.5 py-2 text-[13.5px] font-medium text-white hover:bg-ink/90">
+                <summary className="cursor-pointer list-none rounded-lg bg-ink px-3.5 py-2 text-[15px] font-medium text-white hover:bg-ink/90">
                   + Add employee
                 </summary>
                 <div className="absolute right-0 z-30 mt-2 w-80 sm:w-96 rounded-xl border border-line bg-white p-4 shadow-xl">
@@ -129,7 +129,7 @@ export default async function EmployeesPage({
                       <Input type="email" name="email" placeholder="ramesh@bita.test" />
                     </Field>
                     <Field label="Roles">
-                      <div className="flex flex-wrap gap-3 pt-1 text-xs">
+                      <div className="flex flex-wrap gap-3 pt-1 text-[13px]">
                         {APP_ROLES.map((r) => (
                           <label key={r} className="inline-flex items-center gap-1.5">
                             <input
@@ -176,7 +176,7 @@ export default async function EmployeesPage({
       <ErrorNote message={params.error} />
       {params.saved && <SavedNote />}
       {params.deleted && (
-        <Card className="border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+        <Card className="border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
           Employee moved to{" "}
           <Link href="/recycle-bin" className="underline font-medium">
             Recycle bin
@@ -337,7 +337,7 @@ export default async function EmployeesPage({
                     </div>
                   }
                   detail={
-                    <div className="mt-1 space-y-1 text-xs text-ink-2">
+                    <div className="mt-1 space-y-1 text-[13px] text-ink-2">
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                         <span>
                           {[emp.position, emp.mobile, emp.email]
@@ -363,7 +363,7 @@ export default async function EmployeesPage({
                           {emp.qualifications.map((q) => (
                             <span
                               key={q.id}
-                              className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                              className={`rounded px-1.5 py-0.5 text-[13px] font-medium ${
                                 q.is_expired
                                   ? "bg-bad/10 text-bad"
                                   : "bg-side text-ink-2"
@@ -379,7 +379,7 @@ export default async function EmployeesPage({
                       {isManagement &&
                         (emp.monthly_salary !== null ||
                           emp.per_job_allowance !== null) && (
-                          <div className="pt-0.5 text-[11.5px] text-ink-2">
+                          <div className="pt-0.5 text-[13px] text-ink-2">
                             <strong className="text-ink">Compensation (Management only):</strong>{" "}
                             Salary{" "}
                             {emp.monthly_salary !== null

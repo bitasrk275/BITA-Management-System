@@ -140,20 +140,7 @@ export default async function InvoicesListPage({
     <>
       <PageHeader
         title="Invoices & Payments"
-        subtitle="Generate GST invoices from one or several approved reports of the same customer GSTIN, issue BITA/YY-YY/INV-xxxx numbers, download PDF & Word, and record payments."
-        action={
-          <>
-            <ButtonLink href="/price-list" variant="secondary" size="sm">
-              Price list
-            </ButtonLink>
-            <ButtonLink href="/invoices/export" variant="secondary" size="sm">
-              CA GST export (GSTR-1)
-            </ButtonLink>
-            <ButtonLink href="/jobs" variant="secondary" size="sm">
-              Generate from a job
-            </ButtonLink>
-          </>
-        }
+        subtitle="Make invoices for finished jobs and mark them paid when the money arrives."
       />
 
       <ErrorNote message={actionError} />
@@ -194,17 +181,15 @@ export default async function InvoicesListPage({
 
       {/* Generate invoice directly for a job */}
       <section className="mb-7">
-        <SectionTitle>Generate invoice for a job</SectionTitle>
+        <SectionTitle>Make an invoice</SectionTitle>
         <Card className="space-y-3">
-          <p className="text-[13px] text-ink-2">
-            Pick a Job ID and choose Tax invoice or Proforma invoice to generate (or open) the invoice linked to that job.
-          </p>
+          <p className="text-[15px] text-ink-2">Choose the job and the kind of invoice. If the job already has one, it opens.</p>
           <form
             action={generateInvoiceForSelectedJob}
             className="flex flex-wrap items-center gap-3"
           >
             <input type="hidden" name="return_to" value="/invoices" />
-            <Select name="job_id" required className="min-w-[260px] flex-1">
+            <Select name="job_id" required className="min-w-0 flex-1 basis-64">
               <option value="">Choose a job…</option>
               {paymentsData.jobs.map((j) => (
                 <option key={j.job_id} value={j.job_id}>
@@ -213,9 +198,9 @@ export default async function InvoicesListPage({
                 </option>
               ))}
             </Select>
-            <Select name="kind" defaultValue="tax_invoice" className="w-56">
-              <option value="tax_invoice">Tax invoice (BITA/YY-YY/INV-xxxx)</option>
-              <option value="proforma">Proforma invoice (BITA/YY-YY/PI-xxxx)</option>
+            <Select name="kind" defaultValue="tax_invoice" className="min-w-0 flex-1 basis-48 sm:max-w-64">
+              <option value="tax_invoice">Tax invoice</option>
+              <option value="proforma">Proforma invoice</option>
             </Select>
             <Button type="submit">Generate invoice</Button>
           </form>
@@ -233,15 +218,14 @@ export default async function InvoicesListPage({
       {/* Prepare invoice from one or several Invoice pending reports */}
       <section className="mb-7">
         <SectionTitle>
-          Prepare invoice from Invoice pending reports ({pendingReports.length})
+          One invoice for several reports ({pendingReports.length} waiting)
         </SectionTitle>
         <Card className="space-y-4">
-          <p className="text-[13px] text-ink-2">
-            Approved reports stay <strong className="text-ink">Invoice pending</strong> until linked to a draft or issued invoice. Select one or several reports belonging to the{" "}
-            <strong className="text-ink">same customer GSTIN</strong> to combine them onto one invoice. If the reports come from different POs, all PO numbers are combined on the invoice.
+          <p className="text-[15px] text-ink-2">
+            Tick approved reports of the <strong className="text-ink">same customer</strong> to bill them together on one invoice.
           </p>
           {pendingReports.length === 0 ? (
-            <p className="text-sm text-ink-3">
+            <p className="text-[15px] text-ink-3">
               No approved reports are currently awaiting an invoice.
             </p>
           ) : (
@@ -251,7 +235,7 @@ export default async function InvoicesListPage({
                 {pendingReports.map((r) => (
                   <label
                     key={r.id}
-                    className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-sm hover:bg-surface-2"
+                    className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-[15px] hover:bg-surface-2"
                   >
                     <div className="flex flex-wrap items-center gap-2.5">
                       <input
@@ -262,7 +246,7 @@ export default async function InvoicesListPage({
                       />
                       <Mono>{r.report_no}</Mono>
                       <Status tone="wait">Invoice pending</Status>
-                      <span className="text-xs text-ink-2">
+                      <span className="text-[13px] text-ink-2">
                         {METHOD_LABEL[r.method as keyof typeof METHOD_LABEL] ?? r.method} · Job {r.job_no} ·{" "}
                         <strong className="text-ink">{r.customer_name}</strong>
                       </span>
@@ -270,7 +254,7 @@ export default async function InvoicesListPage({
                       {r.customer_po_number && <Badge>PO {r.customer_po_number}</Badge>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-ink-3">{shortDate(r.report_date)}</span>
+                      <span className="text-[13px] text-ink-3">{shortDate(r.report_date)}</span>
                       <ButtonLink href={`/review/${r.id}`} variant="secondary" size="sm">
                         Report
                       </ButtonLink>
@@ -279,7 +263,7 @@ export default async function InvoicesListPage({
                 ))}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <span className="text-xs text-ink-3">
+                <span className="text-[13px] text-ink-3">
                   Tick one or more reports with the same customer GSTIN, choose Tax invoice or Proforma, and click Prepare invoice.
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
@@ -302,7 +286,7 @@ export default async function InvoicesListPage({
             <Link
               key={f.key}
               href={f.key === "all" ? "/invoices" : `/invoices?status=${f.key}`}
-              className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition ${
+              className={`rounded-lg px-3 py-1.5 text-[14px] font-medium transition ${
                 active
                   ? "bg-ink text-white"
                   : "border border-line bg-white text-ink-2 hover:bg-surface-2 hover:text-ink"
@@ -368,11 +352,11 @@ export default async function InvoicesListPage({
                 action={
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <div className="text-[13px] font-semibold text-ink tabular-nums">
+                      <div className="text-[14px] font-semibold text-ink tabular-nums">
                         {formatINR(Number(inv.total) || 0)}
                       </div>
                       {inv.status !== "draft" && inv.status !== "cancelled" && (
-                        <div className="text-[11.5px] text-ink-3 tabular-nums">
+                        <div className="text-[13px] text-ink-3 tabular-nums">
                           Bal: {formatINR(Number(inv.balance) || 0)}
                         </div>
                       )}

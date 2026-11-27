@@ -193,7 +193,7 @@ export function NewEnquiryForm({
             ))}
           </Select>
         </Field>
-        <p className="text-xs text-ink-3">
+        <p className="text-[13px] text-ink-3">
           New customer?{" "}
           <Link href="/customers/new" className="text-ink underline">
             Add the customer first

@@ -135,7 +135,7 @@ export function QuotationForm({
       >
         <Input name="pdf_file" type="file" accept={QUOTATION_FILE_ACCEPT} />
         {quotation && existingFileName && (
-          <div className="mt-1 text-xs text-ink-2">
+          <div className="mt-1 text-[13px] text-ink-2">
             Current file:{" "}
             <a href={`/quotations/${quotation.id}/file`} className="font-medium underline">
               {existingFileName}
@@ -156,19 +156,19 @@ export function QuotationForm({
               + Add item
             </SecondaryButton>
           </div>
-          <p className="text-xs text-ink-2">
+          <p className="text-[13px] text-ink-2">
             Enter the quoted items and rates so the GST invoice can be filled from them after the report is approved.
           </p>
 
           {rows.map((row, idx) => (
             <div key={row.key} className="space-y-3 rounded-md border border-line-2 bg-surface-2 p-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-ink-2">Item #{idx + 1}</span>
+                <span className="text-[13px] font-medium text-ink-2">Item #{idx + 1}</span>
                 {rows.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeRow(idx)}
-                    className="text-xs text-ink-3 underline hover:text-ink"
+                    className="text-[13px] text-ink-3 underline hover:text-ink"
                   >
                     Remove
                   </button>
@@ -249,7 +249,7 @@ export function QuotationForm({
             </div>
           ))}
 
-          <div className="flex items-center justify-between rounded-md border border-line bg-surface-2 px-3 py-2 text-sm">
+          <div className="flex items-center justify-between rounded-md border border-line bg-surface-2 px-3 py-2 text-[15px]">
             <span className="font-medium text-ink-2">Quoted total (before GST)</span>
             <strong className="text-ink"><Mono>{formatINR(draftTotal)}</Mono></strong>
           </div>

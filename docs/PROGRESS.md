@@ -82,6 +82,19 @@ Next: <the next concrete step>
 Blockers / questions: <or "none">
 ```
 
+### 2026-11-27 – Naveen – Claude Code (Orion)
+Task: Office dashboard redesign: BITA found the UI hard to use ("can't find things", "too much on each page", "steps are confusing"); must work on any screen size
+Done:
+- New look "Plant Safety Signboard" (DESIGN.md rewritten): blue = act, yellow = waiting, green = done, red = overdue, each with its sign shape; Barlow lettering; bigger text and 44px touch targets.
+- Navigation cut from 19 menu items to five places (Today, Jobs, Reports, Money, Records); every page is still listed under its place. Phone: bottom bar plus page tabs.
+- Today is a board of signs, one per thing to do, most urgent first.
+- Job page: route Enquiry → Paid plus one "Next step" box; edit form and duplicate money section folded away.
+- Shorter help text on Invoices; export form on Jobs folded below the list; small text raised across 48 screens.
+- Checked every office page at 375px: no sideways scrolling. No route, server action or API changed. 454 tests, lint and types pass.
+Files changed: app/globals.css, app/layout.tsx, components/ui.tsx, components/app-shell.tsx, app/(office)/dashboard, jobs, invoices, calendar and text sizes across app/(office)
+Next: BITA reviews the new dashboard; then the technician phone app in the same style.
+Blockers / questions: none
+
 ### 2026-11-26 18:30 – Naveen – Claude Code (Orion)
 Task: Round 4 – BITA's 24 Nov complaints (slow, report autofill, invoices, app) and production readiness
 Done:

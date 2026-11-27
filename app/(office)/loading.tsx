@@ -6,7 +6,7 @@ export default function OfficeLoading() {
           <div className="h-7 w-48 rounded-lg bg-line" />
           <div className="h-4 w-72 rounded bg-line-2" />
         </div>
-        <div className="flex items-center gap-2 text-xs font-medium text-ink-3">
+        <div className="flex items-center gap-2 text-[13px] font-medium text-ink-3">
           <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-ink-3 border-t-ink" />
           Loading…
         </div>

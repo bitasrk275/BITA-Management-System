@@ -31,11 +31,11 @@ export async function SiteNotes({ jobId }: { jobId: string }) {
         <Badge>{list.length}</Badge>
       </div>
       {list.length === 0 ? (
-        <p className="text-sm text-ink-3">
+        <p className="text-[15px] text-ink-3">
           No notes or comments from the technician for this job yet.
         </p>
       ) : (
-        <ul className="divide-y divide-line-2 text-sm">
+        <ul className="divide-y divide-line-2 text-[15px]">
           {list.map((n) => {
             const personRow = n.people as unknown as { full_name?: string } | null;
             return (
@@ -48,7 +48,7 @@ export async function SiteNotes({ jobId }: { jobId: string }) {
                     {n.kind !== "note" && n.kind !== "other" && (
                       <Badge>{MESSAGE_KIND_LABEL[n.kind] ?? n.kind}</Badge>
                     )}
-                    <span className="text-xs text-ink-3">{formatIST(n.received_at)}</span>
+                    <span className="text-[13px] text-ink-3">{formatIST(n.received_at)}</span>
                   </div>
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-ink-2">{n.body}</p>

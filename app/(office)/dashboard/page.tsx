@@ -9,6 +9,8 @@ import {
   Mono,
   PageHeader,
   SectionTitle,
+  Sign,
+  SignBoard,
   Stats,
   Status,
   type Tone,
@@ -144,7 +146,7 @@ export default async function ManagementHome() {
   const attention: Item[] = [
     ...(reviewReports.data ?? []).map((r) => ({
       key: "r" + r.id,
-      tone: "bad" as const,
+      tone: "info" as const,
       title: `Approve ${r.method} report ${r.report_no}`,
       detail: [r.jobs?.customers?.name, r.inspections?.missing_fields.length ? `missing ${r.inspections.missing_fields.join(", ")}` : "all readings in"]
         .filter(Boolean)
@@ -179,7 +181,7 @@ export default async function ManagementHome() {
     })),
     ...(draftQuotes.data ?? []).map((q) => ({
       key: "q" + q.id,
-      tone: "wait" as const,
+      tone: "info" as const,
       title: `Approve quotation ${q.ref_no ?? "(draft)"}`,
       detail: [q.customers?.name, q.subject].filter(Boolean).join(" · "),
       href: `/quotations/${q.id}`,
@@ -187,7 +189,7 @@ export default async function ManagementHome() {
     })),
     ...unassigned.map((j) => ({
       key: "j" + j.id,
-      tone: "wait" as const,
+      tone: "info" as const,
       title: `Assign a technician to ${j.job_no}`,
       detail: [j.customers?.name, j.scope].filter(Boolean).join(" · "),
       href: `/jobs/${j.id}`,
@@ -195,7 +197,7 @@ export default async function ManagementHome() {
     })),
     ...readyToCloseJobs.map((j) => ({
       key: "close" + j.id,
-      tone: "wait" as const,
+      tone: "ok" as const,
       title: `Close completed job ${j.job_no}`,
       detail: [j.customers?.name, "report sent · no balance outstanding"].filter(Boolean).join(" · "),
       href: `/jobs/${j.id}`,
@@ -228,7 +230,7 @@ export default async function ManagementHome() {
     }),
     ...pendingLeaveRequests.map((lr) => ({
       key: "leave_req_" + lr.id,
-      tone: "wait" as const,
+      tone: "info" as const,
       title: `Leave request from ${lr.person_name}`,
       detail: [
         lr.start_date === lr.end_date ? lr.start_date : `${lr.start_date} to ${lr.end_date}`,
@@ -240,6 +242,9 @@ export default async function ManagementHome() {
       label: "Review",
     })),
   ];
+
+  const urgency: Record<Tone, number> = { bad: 0, info: 1, wait: 2, ok: 3, none: 4 };
+  attention.sort((a, b) => urgency[a.tone] - urgency[b.tone]);
 
   return (
     <>
@@ -277,66 +282,24 @@ export default async function ManagementHome() {
         ]}
       />
 
-      <div className="grid gap-7 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-7">
-          <section>
-            <SectionTitle>Needs your attention</SectionTitle>
-            <List>
-              {attention.map((a) => (
-                <ListRow
-                  key={a.key}
-                  tone={a.tone}
-                  title={a.title}
-                  detail={a.detail}
-                  action={
-                    <ButtonLink href={a.href} variant={a.primary ? "primary" : "secondary"} size="sm">
-                      {a.label}
-                    </ButtonLink>
-                  }
-                />
-              ))}
-              {attention.length === 0 && <EmptyRow>All clear: no reports, payments, quotations or jobs waiting for you.</EmptyRow>}
-            </List>
-          </section>
-
-          {recentEdits.data && recentEdits.data.length > 0 && (
-            <section>
-              <SectionTitle>Report edits (technician updated after submit)</SectionTitle>
+          <section aria-labelledby="todo-title">
+            <SectionTitle>
+              <span id="todo-title">To do</span>
+            </SectionTitle>
+            {attention.length === 0 ? (
               <List>
-                {recentEdits.data.map((edit) => {
-                  const diffObj = (edit.diff ?? {}) as Record<string, { old: unknown; new: unknown }>;
-                  const fieldNames = Object.keys(diffObj);
-                  const changesDetail = fieldNames.map((f) => (
-                    <span key={f} className="block text-xs text-ink-2">
-                      <strong>{f}</strong>: {String(diffObj[f]?.old ?? "—")} →{" "}
-                      <span className="text-ink">{String(diffObj[f]?.new ?? "—")}</span>
-                    </span>
-                  ));
-
-                  return (
-                    <ListRow
-                      key={edit.id}
-                      tone="wait"
-                      title={
-                        <span>
-                          <Mono>{edit.jobs?.job_no}</Mono>
-                          <span className="ml-2 font-normal text-ink-2">
-                            {edit.people?.full_name} ({edit.jobs?.customers?.name})
-                          </span>
-                        </span>
-                      }
-                      detail={<div className="space-y-0.5">{changesDetail}</div>}
-                      action={
-                        <ButtonLink href={`/jobs/${edit.job_id}`} variant="secondary" size="sm">
-                          Job details
-                        </ButtonLink>
-                      }
-                    />
-                  );
-                })}
+                <EmptyRow>All clear: no reports, payments, quotations or jobs are waiting for you.</EmptyRow>
               </List>
-            </section>
-          )}
+            ) : (
+              <SignBoard>
+                {attention.map((a) => (
+                  <Sign key={a.key} tone={a.tone} title={a.title} detail={a.detail} href={a.href} action={a.label} />
+                ))}
+              </SignBoard>
+            )}
+          </section>
 
           <section>
             <SectionTitle link={{ href: "/jobs", label: "View all" }}>Open jobs</SectionTitle>
@@ -352,10 +315,10 @@ export default async function ManagementHome() {
                   <ListRow
                     key={j.id}
                     title={
-                      <a href={`/jobs/${j.id}`} className="hover:underline">
+                      <Link href={`/jobs/${j.id}`} className="hover:underline">
                         <Mono>{j.job_no}</Mono>
                         <span className="ml-3 font-normal text-ink-2">{j.customers?.name}</span>
-                      </a>
+                      </Link>
                     }
                     action={<Status tone={s.tone}>{s.label}</Status>}
                   />
@@ -369,32 +332,32 @@ export default async function ManagementHome() {
         <div className="min-w-0 space-y-7">
           <section>
             <SectionTitle>Money</SectionTitle>
-            <div className="rounded-xl border border-line p-4">
-              <div className="text-[13px] text-ink-2">Outstanding</div>
-              <div className="text-2xl font-semibold tracking-[-0.03em] tabular-nums">{formatINR(outstanding)}</div>
+            <div className="rounded-lg border border-line bg-white p-4 sm:p-5">
+              <div className="text-[14px] font-medium text-ink-2">Outstanding</div>
+              <div className="font-sign text-[34px] font-bold leading-tight tabular-nums">{formatINR(outstanding)}</div>
               {outstanding > 0 && (
                 <div className="my-3.5 flex h-2 gap-0.5 overflow-hidden rounded">
-                  <i className="bg-ink" style={{ flex: sum(notYetDue) }} />
-                  <i className="bg-[#a3a3a3]" style={{ flex: sum(dueThisWeek) }} />
+                  <i className="bg-ok" style={{ flex: sum(notYetDue) }} />
+                  <i className="bg-caution" style={{ flex: sum(dueThisWeek) }} />
                   <i className="bg-bad" style={{ flex: sum(overdue) }} />
                 </div>
               )}
-              <ul className="text-[13px]">
+              <ul className="text-[15px]">
                 {[
-                  { label: "Not yet due", amount: sum(notYetDue), cls: "bg-ink" },
-                  { label: "Due this week", amount: sum(dueThisWeek), cls: "bg-[#a3a3a3]" },
+                  { label: "Not yet due", amount: sum(notYetDue), cls: "bg-ok" },
+                  { label: "Due this week", amount: sum(dueThisWeek), cls: "bg-caution" },
                   { label: "Overdue", amount: sum(overdue), cls: "bg-bad" },
                 ].map((b) => (
-                  <li key={b.label} className="flex justify-between border-t border-line-2 py-1.5">
+                  <li key={b.label} className="flex justify-between gap-3 border-t border-line-2 py-2">
                     <span className="flex items-center gap-2 text-ink-2">
-                      <i className={`inline-block h-2 w-2 rounded-sm ${b.cls}`} />
+                      <i className={`inline-block h-3 w-3 rounded-sm ${b.cls}`} />
                       {b.label}
                     </span>
-                    <b className="font-medium tabular-nums">{formatINR(b.amount)}</b>
+                    <b className="font-semibold tabular-nums">{formatINR(b.amount)}</b>
                   </li>
                 ))}
               </ul>
-              <p className="mt-2.5 text-xs text-ink-3">From issued tax invoices.</p>
+              <p className="mt-2.5 text-[14px] text-ink-3">From issued tax invoices.</p>
             </div>
           </section>
 
@@ -427,13 +390,13 @@ function jobStage(status: Enums<"job_status">, assignments: { work_date: string;
   switch (status) {
     case "enquiry_received":
     case "awaiting_approval":
-      return next ? { label: `On site ${shortDate(next.work_date)}`, tone: "info" } : { label: "Needs technician", tone: "wait" };
+      return next ? { label: `On site ${shortDate(next.work_date)}`, tone: "info" } : { label: "Needs technician", tone: "info" };
     case "scheduled":
-      return next ? { label: `On site ${shortDate(next.work_date)} · ${next.people?.full_name.split(" ").pop() ?? ""}`, tone: "info" } : { label: "Needs technician", tone: "wait" };
+      return next ? { label: `On site ${shortDate(next.work_date)} · ${next.people?.full_name.split(" ").pop() ?? ""}`, tone: "info" } : { label: "Needs technician", tone: "info" };
     case "inspection_done":
       return { label: "Field data in", tone: "info" };
     case "report_in_review":
-      return { label: "Report to approve", tone: "bad" };
+      return { label: "Report to approve", tone: "info" };
     case "report_sent":
       return { label: "Report sent", tone: "ok" };
     case "invoiced":

@@ -143,9 +143,9 @@ export default async function NewQuotationPage({
                   action={
                     <div className="text-right">
                       <Mono>{formatINR(it.rate)}</Mono>
-                      {it.basis ? <span className="ml-1 text-xs text-ink-3">{it.basis}</span> : null}
+                      {it.basis ? <span className="ml-1 text-[13px] text-ink-3">{it.basis}</span> : null}
                       {it.minimum_charge ? (
-                        <div className="text-xs text-ink-3">min {formatINR(it.minimum_charge)}</div>
+                        <div className="text-[13px] text-ink-3">min {formatINR(it.minimum_charge)}</div>
                       ) : null}
                     </div>
                   }

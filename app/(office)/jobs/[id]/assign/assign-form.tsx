@@ -72,9 +72,9 @@ export function AssignForm({
 
       {selectedPersonId && (
         <div className="space-y-2">
-          <p className="text-sm font-medium">Qualification check for job test methods</p>
+          <p className="text-[15px] font-medium">Qualification check for job test methods</p>
           {jobMethods.length === 0 ? (
-            <p className="text-xs">No test methods set on this job yet.</p>
+            <p className="text-[13px]">No test methods set on this job yet.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {evaluation.checks.map((c) => (
@@ -88,7 +88,7 @@ export function AssignForm({
           ))}
 
           {personQualifications.length > 0 && (
-            <p className="text-xs">
+            <p className="text-[13px]">
               All certificates on file:{" "}
               {personQualifications
                 .map(
@@ -108,9 +108,9 @@ export function AssignForm({
       </Field>
 
       <div>
-        <span className="text-sm font-medium">Equipment</span>
+        <span className="text-[15px] font-medium">Equipment</span>
         {equipmentList.length === 0 ? (
-          <p className="mt-1 text-xs">No active equipment in register.</p>
+          <p className="mt-1 text-[13px]">No active equipment in register.</p>
         ) : (
           <div className="mt-2 space-y-2">
             {equipmentList.map((eq) => {

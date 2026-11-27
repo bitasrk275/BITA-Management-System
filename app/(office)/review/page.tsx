@@ -153,7 +153,7 @@ export default async function ReviewQueue({
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <Link
           href={methodFilter ? `/review?method=${encodeURIComponent(methodFilter)}` : "/review"}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+          className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition ${
             !filterInvoicePending
               ? "bg-ink text-white"
               : "border border-line bg-surface text-ink-2 hover:text-ink"
@@ -167,7 +167,7 @@ export default async function ReviewQueue({
               ? `/review?filter=invoice_pending&method=${encodeURIComponent(methodFilter)}`
               : "/review?filter=invoice_pending"
           }
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+          className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition ${
             filterInvoicePending
               ? "bg-ink text-white"
               : "border border-line bg-surface text-ink-2 hover:text-ink"
@@ -178,10 +178,10 @@ export default async function ReviewQueue({
 
         {activeMethods.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l border-line">
-            <span className="text-xs text-ink-3">Method:</span>
+            <span className="text-[13px] text-ink-3">Method:</span>
             <Link
               href={filterInvoicePending ? "/review?filter=invoice_pending" : "/review"}
-              className={`rounded-md px-2.5 py-1 text-xs transition ${
+              className={`rounded-md px-2.5 py-1 text-[13px] transition ${
                 !methodFilter
                   ? "bg-ink-2 text-white font-medium"
                   : "border border-line text-ink-2 hover:text-ink"
@@ -193,7 +193,7 @@ export default async function ReviewQueue({
               <Link
                 key={m.code}
                 href={`/review?${filterInvoicePending ? "filter=invoice_pending&" : ""}method=${encodeURIComponent(m.code)}`}
-                className={`rounded-md px-2.5 py-1 text-xs transition ${
+                className={`rounded-md px-2.5 py-1 text-[13px] transition ${
                   methodFilter === m.code
                     ? "bg-ink-2 text-white font-medium"
                     : "border border-line text-ink-2 hover:text-ink"
@@ -213,12 +213,12 @@ export default async function ReviewQueue({
             Invoice pending — approved reports awaiting billing ({invoicePendingReports.length})
           </SectionTitle>
           <Card className="space-y-4">
-            <p className="text-[13px] text-ink-2">
+            <p className="text-[14px] text-ink-2">
               Approved reports stay <strong className="text-ink">Invoice pending</strong> until added to a draft or issued invoice. Tick one or several reports belonging to the{" "}
               <strong className="text-ink">same customer GSTIN</strong> to combine them on a single invoice (distinct customer POs are combined automatically).
             </p>
             {invoicePendingReports.length === 0 ? (
-              <p className="text-sm text-ink-3">
+              <p className="text-[15px] text-ink-3">
                 All approved reports have been added to an invoice.
               </p>
             ) : (
@@ -235,7 +235,7 @@ export default async function ReviewQueue({
                     return (
                       <label
                         key={r.id}
-                        className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-sm hover:bg-surface-2"
+                        className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-[15px] hover:bg-surface-2"
                       >
                         <div className="flex flex-wrap items-center gap-2.5">
                           {canBill && (
@@ -251,7 +251,7 @@ export default async function ReviewQueue({
                           <Status tone="ok">
                             {r.status === "sent" ? "Sent" : "Approved"}
                           </Status>
-                          <span className="text-xs text-ink-2">
+                          <span className="text-[13px] text-ink-2">
                             {getMethodLabel(r.method)} · Job {r.jobs?.job_no ?? "—"} ·{" "}
                             <strong className="text-ink">
                               {r.jobs?.customers?.name ?? "Customer"}
@@ -262,7 +262,7 @@ export default async function ReviewQueue({
                         </div>
                         <div className="flex items-center gap-2">
                           {r.approved_at && (
-                            <span className="text-xs text-ink-3">
+                            <span className="text-[13px] text-ink-3">
                               {shortDate(r.approved_at.slice(0, 10))}
                             </span>
                           )}
@@ -276,7 +276,7 @@ export default async function ReviewQueue({
                 </div>
                 {canBill && (
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                    <span className="text-xs text-ink-3">
+                    <span className="text-[13px] text-ink-3">
                       Select one or more reports of the same customer (same GSTIN), choose Tax invoice or Proforma, and click Prepare invoice.
                     </span>
                     <div className="flex flex-wrap items-center gap-2">
@@ -390,7 +390,7 @@ export default async function ReviewQueue({
               })}
               {waiting.length === 0 && <EmptyRow>No reports waiting for approval.</EmptyRow>}
             </List>
-            <p className="mt-3 text-xs text-ink-3">
+            <p className="mt-3 text-[13px] text-ink-3">
               Signatures and the company seal are added only after a reviewer approves.
             </p>
           </section>

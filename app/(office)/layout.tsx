@@ -8,7 +8,7 @@ export default async function OfficeLayout({ children }: { children: ReactNode }
   if (!person) {
     return (
       <main className="mx-auto max-w-md px-4 py-16">
-        <p className="rounded-lg border border-wait/30 bg-wait/5 px-3.5 py-2.5 text-[13.5px] text-ink">
+        <p className="rounded-lg border border-wait/30 bg-wait/5 px-3.5 py-2.5 text-[15px] text-ink">
           Your login works, but it isn&apos;t set up as BITA staff yet. Ask Naveen to add you.
         </p>
       </main>

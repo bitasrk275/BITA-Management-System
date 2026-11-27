@@ -99,7 +99,7 @@ export default async function GstExportPage({
           </form>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-[12.5px] text-ink-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-[14px] text-ink-2">
           <span>
             Showing <strong className="text-ink">{report.grand_totals.count}</strong> invoice(s) ({report.b2b.length} B2B, {report.b2c.length} B2C
             {report.grand_totals.cancelled_count > 0 ? `, ${report.grand_totals.cancelled_count} cancelled` : ""})
@@ -153,7 +153,7 @@ export default async function GstExportPage({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <SectionTitle>1. B2B Invoices — Registered Customers ({report.b2b.length})</SectionTitle>
-            <p className="text-[12px] text-ink-3">
+            <p className="text-[13px] text-ink-3">
               Customers with a GSTIN on record. Columns defined in <Mono>lib/invoices/gst-export.ts</Mono>.
             </p>
           </div>
@@ -163,9 +163,9 @@ export default async function GstExportPage({
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full border-collapse text-left text-[12.5px]">
+          <table className="w-full border-collapse text-left text-[14px]">
             <thead>
-              <tr className="border-b border-line bg-surface-2 text-[11.5px] font-medium text-ink-2">
+              <tr className="border-b border-line bg-surface-2 text-[13px] font-medium text-ink-2">
                 {B2B_GST_COLUMNS.map((col) => (
                   <th
                     key={col.key}
@@ -238,7 +238,7 @@ export default async function GstExportPage({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <SectionTitle>2. B2C Invoices — Unregistered Customers ({report.b2c.length})</SectionTitle>
-            <p className="text-[12px] text-ink-3">
+            <p className="text-[13px] text-ink-3">
               Customers without a GSTIN. Same columns as B2B without the GSTIN column.
             </p>
           </div>
@@ -248,9 +248,9 @@ export default async function GstExportPage({
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full border-collapse text-left text-[12.5px]">
+          <table className="w-full border-collapse text-left text-[14px]">
             <thead>
-              <tr className="border-b border-line bg-surface-2 text-[11.5px] font-medium text-ink-2">
+              <tr className="border-b border-line bg-surface-2 text-[13px] font-medium text-ink-2">
                 {B2C_GST_COLUMNS.map((col) => (
                   <th
                     key={col.key}
@@ -320,7 +320,7 @@ export default async function GstExportPage({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <SectionTitle>3. Credit Notes — CDNR / CDNUR ({report.credit_notes.length})</SectionTitle>
-            <p className="text-[12px] text-ink-3">
+            <p className="text-[13px] text-ink-3">
               Credit notes issued against tax invoices in this period, plus total TDS deducted by customers: <strong className="text-ink">{formatINR(report.tds_totals.total_tds)}</strong> (B2B {formatINR(report.tds_totals.b2b_tds)} · B2C {formatINR(report.tds_totals.b2c_tds)}).
             </p>
           </div>
@@ -330,9 +330,9 @@ export default async function GstExportPage({
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full border-collapse text-left text-[12.5px]">
+          <table className="w-full border-collapse text-left text-[14px]">
             <thead>
-              <tr className="border-b border-line bg-surface-2 text-[11.5px] font-medium text-ink-2">
+              <tr className="border-b border-line bg-surface-2 text-[13px] font-medium text-ink-2">
                 {CREDIT_NOTE_GST_COLUMNS.map((col) => (
                   <th
                     key={col.key}

@@ -81,7 +81,7 @@ export default async function EquipmentPage(props: {
 
       {searchParams.saved && <SavedNote />}
       {searchParams.deleted && (
-        <Card className="border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+        <Card className="border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
           Equipment item moved to{" "}
           <Link href="/recycle-bin" className="underline font-medium">
             Recycle bin
@@ -125,7 +125,7 @@ export default async function EquipmentPage(props: {
       {/* Filter Tabs & Search */}
       <Card className="p-4 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-1.5 text-xs font-medium">
+          <div className="flex flex-wrap gap-1.5 text-[13px] font-medium">
             <Link
               href={`/equipment?${new URLSearchParams({
                 ...(typeId ? { type_id: typeId } : {}),
@@ -202,7 +202,7 @@ export default async function EquipmentPage(props: {
             <select
               name="type_id"
               defaultValue={typeId || ""}
-              className="rounded border border-neutral-300 px-2 py-1.5 text-xs text-neutral-800 bg-white"
+              className="rounded border border-neutral-300 px-2 py-1.5 text-[13px] text-neutral-800 bg-white"
             >
               <option value="">All categories</option>
               {types.map((t) => (
@@ -216,18 +216,18 @@ export default async function EquipmentPage(props: {
               name="q"
               defaultValue={searchTerm}
               placeholder="Search serial, make, model..."
-              className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none w-48 sm:w-64"
+              className="rounded border border-neutral-300 px-3 py-1.5 text-[13px] text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none w-48 sm:w-64"
             />
             <button
               type="submit"
-              className="rounded border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50"
+              className="rounded border border-neutral-300 bg-white px-2.5 py-1.5 text-[13px] font-medium text-neutral-800 hover:bg-neutral-50"
             >
               Filter
             </button>
             {(searchTerm || typeId) && (
               <Link
                 href={`/equipment?status=${currentStatus}`}
-                className="text-xs text-neutral-500 hover:text-neutral-800 underline"
+                className="text-[13px] text-neutral-500 hover:text-neutral-800 underline"
               >
                 Clear
               </Link>
@@ -288,7 +288,7 @@ export default async function EquipmentPage(props: {
                         {titleText}
                       </Link>
                       {item.serial_no && (
-                        <span className="text-xs">
+                        <span className="text-[13px]">
                           <Mono>{item.serial_no}</Mono>
                         </span>
                       )}
@@ -298,7 +298,7 @@ export default async function EquipmentPage(props: {
                     </div>
                   }
                   detail={
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-600 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-neutral-600 mt-0.5">
                       <Status tone={statusTone}>{statusLabel}</Status>
                       <span>
                         <span className="text-neutral-400">Location:</span>{" "}
