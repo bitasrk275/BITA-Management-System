@@ -24,9 +24,9 @@ export default async function CustomersPage({
     <>
       <PageHeader title="Customers" action={<ButtonLink href="/customers/new">New customer</ButtonLink>} />
       {deleted && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5 text-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5 text-[15px]">
           <Status tone="info">Customer moved to the recycle bin.</Status>
-          <Link href="/recycle-bin" className="text-xs font-medium text-ink underline">
+          <Link href="/recycle-bin" className="text-[13px] font-medium text-ink underline">
             Open recycle bin
           </Link>
         </div>
@@ -34,7 +34,7 @@ export default async function CustomersPage({
       <form className="mb-4">
         <Input name="q" placeholder="Search name, code or GSTIN" defaultValue={q} />
       </form>
-      {error && <p className="text-sm text-ink">{error}</p>}
+      {error && <p className="text-[15px] text-ink">{error}</p>}
       <ul className="divide-y divide-line rounded-xl border border-line bg-white">
         {customers.map((c) => (
           <li key={c.id} className="flex flex-col justify-between sm:flex-row sm:items-center px-4 py-3 hover:bg-side">
@@ -44,20 +44,20 @@ export default async function CustomersPage({
                 {c.code && <Badge>{c.code}</Badge>}
                 {c.uses_proforma && <Badge>Proforma</Badge>}
               </div>
-              <div className="mt-1 text-xs text-ink-3">
+              <div className="mt-1 text-[13px] text-ink-3">
                 {c.gstin ?? "GSTIN not given"} · {c.contact_count} contacts
               </div>
             </Link>
             {canDelete && (
-              <details className="mt-2 sm:mt-0 text-xs">
+              <details className="mt-2 sm:mt-0 text-[13px]">
                 <summary className="cursor-pointer font-medium text-bad hover:underline">
                   Delete…
                 </summary>
                 <form action={deleteCustomer.bind(null, c.id)} className="mt-1.5 flex items-center gap-2 rounded border border-line bg-surface-2 p-2">
-                  <span className="text-xs text-ink-2">Recycle bin?</span>
+                  <span className="text-[13px] text-ink-2">Recycle bin?</span>
                   <button
                     type="submit"
-                    className="rounded border border-bad bg-bad/10 px-2 py-0.5 text-xs font-semibold text-bad hover:bg-bad/20"
+                    className="rounded border border-bad bg-bad/10 px-2 py-0.5 text-[13px] font-semibold text-bad hover:bg-bad/20"
                   >
                     Confirm delete
                   </button>
@@ -66,7 +66,7 @@ export default async function CustomersPage({
             )}
           </li>
         ))}
-        {customers.length === 0 && <li className="px-4 py-6 text-sm text-ink-3">No customers found.</li>}
+        {customers.length === 0 && <li className="px-4 py-6 text-[15px] text-ink-3">No customers found.</li>}
       </ul>
     </>
   );

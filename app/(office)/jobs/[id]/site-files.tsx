@@ -51,11 +51,11 @@ export async function SiteFiles({ jobId }: { jobId: string }) {
         <Badge>{withUrls.length}</Badge>
       </div>
       {withUrls.length === 0 ? (
-        <p className="text-sm text-ink-3">
+        <p className="text-[15px] text-ink-3">
           No photos or files uploaded from site yet. Technicians can upload photos, PDFs and documents directly from the phone app.
         </p>
       ) : (
-        <ul className="divide-y divide-line-2 text-sm">
+        <ul className="divide-y divide-line-2 text-[15px]">
           {withUrls.map((f) => (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
               <div className="min-w-0 flex-1">
@@ -65,7 +65,7 @@ export async function SiteFiles({ jobId }: { jobId: string }) {
                   </span>
                   <Badge>{KIND_LABEL[f.kind] ?? f.kind}</Badge>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-ink-3">
+                <p className="mt-0.5 truncate text-[13px] text-ink-3">
                   {[
                     f.caption ? f.fileName : null,
                     f.uploaderName ? `by ${f.uploaderName}` : null,
@@ -75,7 +75,7 @@ export async function SiteFiles({ jobId }: { jobId: string }) {
                     .join(" · ")}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-3 text-xs font-medium">
+              <div className="flex shrink-0 items-center gap-3 text-[13px] font-medium">
                 {f.openUrl ? (
                   <a
                     href={f.openUrl}

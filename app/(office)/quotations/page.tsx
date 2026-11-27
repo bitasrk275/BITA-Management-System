@@ -136,9 +136,9 @@ export default async function QuotationsPage({
                   action={
                     <div className="text-right">
                       <Mono>{formatINR(it.rate)}</Mono>
-                      {it.basis ? <span className="ml-1 text-xs text-ink-3">{it.basis}</span> : null}
+                      {it.basis ? <span className="ml-1 text-[13px] text-ink-3">{it.basis}</span> : null}
                       {it.minimum_charge ? (
-                        <div className="text-xs text-ink-3">Min. {formatINR(it.minimum_charge)}</div>
+                        <div className="text-[13px] text-ink-3">Min. {formatINR(it.minimum_charge)}</div>
                       ) : null}
                     </div>
                   }
@@ -169,7 +169,7 @@ export default async function QuotationsPage({
                   <span>{qt.customers?.name}</span>
                   <Badge>{statusInfo.label}</Badge>
                   {total > 0 && (
-                    <span className="text-xs text-ink-2">
+                    <span className="text-[13px] text-ink-2">
                       Total: <Mono>{formatINR(total)}</Mono>
                     </span>
                   )}
@@ -220,7 +220,7 @@ export default async function QuotationsPage({
                     Open
                   </ButtonLink>
                   {canDelete && (
-                    <details className="text-right text-xs">
+                    <details className="text-right text-[13px]">
                       <summary className="cursor-pointer font-medium text-bad hover:underline">
                         Delete…
                       </summary>
@@ -228,10 +228,10 @@ export default async function QuotationsPage({
                         action={deleteQuotation.bind(null, qt.id)}
                         className="mt-1 flex items-center justify-end gap-2 rounded border border-line bg-surface-2 p-1.5"
                       >
-                        <span className="text-xs text-ink-2">Recycle bin?</span>
+                        <span className="text-[13px] text-ink-2">Recycle bin?</span>
                         <button
                           type="submit"
-                          className="rounded border border-bad bg-bad/10 px-2 py-0.5 text-xs font-semibold text-bad hover:bg-bad/20"
+                          className="rounded border border-bad bg-bad/10 px-2 py-0.5 text-[13px] font-semibold text-bad hover:bg-bad/20"
                         >
                           Confirm
                         </button>

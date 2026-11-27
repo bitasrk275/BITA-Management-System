@@ -59,23 +59,23 @@ export default async function EnquiryPage({
       <div className="mb-4 flex flex-wrap gap-2">
         <Badge>{SOURCE_LABEL[enquiry.source]}</Badge>
         <Badge>{STATUS_LABEL[enquiry.status]}</Badge>
-        <span className="text-xs text-ink-3">{formatIST(enquiry.received_at)}</span>
+        <span className="text-[13px] text-ink-3">{formatIST(enquiry.received_at)}</span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="mb-2 font-semibold">Message</h2>
-          <p className="text-sm text-ink-2 break-words">
+          <p className="text-[15px] text-ink-2 break-words">
             From: {[enquiry.from_name, enquiry.from_address].filter(Boolean).join(" · ") || "not given"}
           </p>
-          <p className="mt-3 whitespace-pre-wrap text-sm break-words">{enquiry.body || "No details."}</p>
+          <p className="mt-3 whitespace-pre-wrap text-[15px] break-words">{enquiry.body || "No details."}</p>
         </Card>
 
         <div className="space-y-6">
           <Card>
             <h2 className="mb-3 font-semibold">Customer</h2>
             {enquiry.customers && (
-              <p className="mb-3 text-sm">
+              <p className="mb-3 text-[15px]">
                 Linked to{" "}
                 <Link href={`/customers/${enquiry.customers.id}`} className="font-medium text-ink underline">
                   {enquiry.customers.name}
@@ -83,7 +83,7 @@ export default async function EnquiryPage({
               </p>
             )}
             {suggested && (
-              <form action={linkCustomer.bind(null, id)} className="mb-3 rounded-lg border border-wait/30 bg-wait/5 p-3 text-[13.5px]">
+              <form action={linkCustomer.bind(null, id)} className="mb-3 rounded-lg border border-wait/30 bg-wait/5 p-3 text-[15px]">
                 <input type="hidden" name="customer_id" value={suggested.id} />
                 Sender matches a contact of <strong>{suggested.name}</strong>.{" "}
                 <button className="font-semibold text-ink underline">Link to this customer</button>
@@ -114,10 +114,10 @@ export default async function EnquiryPage({
           {canDelete && (
             <Card>
               <details>
-                <summary className="cursor-pointer text-sm font-medium text-bad">
+                <summary className="cursor-pointer text-[15px] font-medium text-bad">
                   Delete enquiry
                 </summary>
-                <p className="mt-2 text-xs text-ink-3">
+                <p className="mt-2 text-[13px] text-ink-3">
                   Deleting moves this enquiry to the{" "}
                   <Link href="/recycle-bin" className="underline">
                     recycle bin

@@ -291,7 +291,7 @@ export default async function ReportReviewPage({
           <Card>
             <form action={linkReportToJob.bind(null, report.id)} className="space-y-3">
               <Status tone="wait">This report is not linked to a job yet</Status>
-              <p className="text-[13px] text-ink-2">
+              <p className="text-[14px] text-ink-2">
                 You can keep filling it in. Link it to a job before sending it for review; approval,
                 sending and invoicing need the job.
               </p>
@@ -320,7 +320,7 @@ export default async function ReportReviewPage({
               <Status tone="bad">
                 Mandatory field readings are incomplete — approval is blocked
               </Status>
-              <ul className="list-disc pl-5 text-[13px] text-ink-2">
+              <ul className="list-disc pl-5 text-[14px] text-ink-2">
                 {readiness.blockers.map((b) => (
                   <li key={b}>{b}</li>
                 ))}
@@ -342,7 +342,7 @@ export default async function ReportReviewPage({
                 <Status tone="ok">All booked equipment in calibration</Status>
               )}
             </div>
-            <p className="text-xs text-ink-2">
+            <p className="text-[13px] text-ink-2">
               Equipment booked on the calendar automatically fills into the report readings when blank. If any booked instrument had expired calibration on the job date, approval requires an override note.
             </p>
             <List>
@@ -379,7 +379,7 @@ export default async function ReportReviewPage({
           {["draft", "returned"].includes(report.status) && (
             <Card className="space-y-4">
               <SectionTitle>1. Draft & review submission</SectionTitle>
-              <p className="text-[13px] text-ink-2">
+              <p className="text-[14px] text-ink-2">
                 Verify the readings below. When all mandatory readings are present, send this report to the technical reviewer queue.
               </p>
               <div className="flex flex-wrap gap-2.5">
@@ -402,7 +402,7 @@ export default async function ReportReviewPage({
           {["in_review", "draft"].includes(report.status) && (
             <Card className="space-y-4">
               <SectionTitle>Technical reviewer approval</SectionTitle>
-              <p className="text-[13px] text-ink-2">
+              <p className="text-[14px] text-ink-2">
                 Approving attaches the signatory&apos;s signature and company seal and generates the signed PDF in <Mono>reports/{report.job_id}/</Mono>.
               </p>
               <form action={approveReport.bind(null, report.id)} className="space-y-3">
@@ -424,7 +424,7 @@ export default async function ReportReviewPage({
                 </Field>
                 {expiredBookedEquipment.length > 0 && (
                   <div className="rounded-lg border border-bad/30 bg-bad/5 p-3 space-y-2">
-                    <div className="text-xs font-semibold text-bad">
+                    <div className="text-[13px] font-semibold text-bad">
                       Expired calibration guard: Booked equipment{" "}
                       {expiredBookedEquipment
                         .map((e) =>
@@ -448,7 +448,7 @@ export default async function ReportReviewPage({
                 )}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   {!isReviewer && (
-                    <span className="text-xs text-bad">
+                    <span className="text-[13px] text-bad">
                       Reviewer role required to approve.
                     </span>
                   )}
@@ -483,7 +483,7 @@ export default async function ReportReviewPage({
           {isApproved && (
             <Card className="space-y-4">
               <SectionTitle>Approval & delivery status</SectionTitle>
-              <div className="space-y-1.5 text-[13px] text-ink-2">
+              <div className="space-y-1.5 text-[14px] text-ink-2">
                 <p>
                   Approved by <strong className="text-ink">{approverName ?? "Technical Reviewer"}</strong> on{" "}
                   <strong className="text-ink">
@@ -536,7 +536,7 @@ export default async function ReportReviewPage({
 
               {canBill && (
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-                  <p className="text-[12.5px] text-ink-2">
+                  <p className="text-[14px] text-ink-2">
                     {activeInvoiceLink ? (
                       <>
                         This report is linked to invoice{" "}
@@ -575,7 +575,7 @@ export default async function ReportReviewPage({
             {report.job_id && !isApproved && (
               <form action={fillReportFromJob.bind(null, report.id)} className="flex flex-wrap items-center gap-2">
                 <SecondaryButton type="submit">Fill from job</SecondaryButton>
-                <span className="text-[12.5px] text-ink-3">
+                <span className="text-[14px] text-ink-3">
                   Fills empty fields with the client, site, date, technicians with their certificates, and the booked
                   equipment with serial number and calibration. Anything already typed is kept.
                 </span>
@@ -597,11 +597,11 @@ export default async function ReportReviewPage({
         {/* Photos & Attachments Selection */}
         <Card className="space-y-4">
           <SectionTitle>Report photos & attachments</SectionTitle>
-          <p className="text-[13px] text-ink-2">
+          <p className="text-[14px] text-ink-2">
             Tick which inspection photos and drawing attachments to include in the final report PDF and Word download.
           </p>
           {attachments.length === 0 ? (
-            <p className="text-sm text-ink-3">No photos or drawings uploaded for this job yet.</p>
+            <p className="text-[15px] text-ink-3">No photos or drawings uploaded for this job yet.</p>
           ) : (
             <div className="space-y-2">
               {attachments.map((att) => (
@@ -611,14 +611,14 @@ export default async function ReportReviewPage({
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold uppercase text-ink-3">
+                      <span className="text-[13px] font-semibold uppercase text-ink-3">
                         {att.kind.replace("_", " ")}
                       </span>
-                      <span className="text-xs">
+                      <span className="text-[13px]">
                         <Mono>{att.storage_path.split("/").pop()}</Mono>
                       </span>
                     </div>
-                    {att.caption && <p className="text-xs text-ink-2">{att.caption}</p>}
+                    {att.caption && <p className="text-[13px] text-ink-2">{att.caption}</p>}
                   </div>
                   <form
                     action={toggleAttachmentInclude.bind(
@@ -653,7 +653,7 @@ export default async function ReportReviewPage({
         </div>
       ) : (
         <Card className="my-5">
-          <p className="text-sm text-ink-2">
+          <p className="text-[15px] text-ink-2">
             Paper layout template for <Mono>{report.method}</Mono> uses the structured field table below.
           </p>
         </Card>
@@ -683,7 +683,7 @@ export default async function ReportReviewPage({
                     isMissing ? (
                       <Status tone="bad">Missing</Status>
                     ) : (
-                      <span className="text-[13.5px] font-medium text-ink">{displayVal(val)}</span>
+                      <span className="text-[15px] font-medium text-ink">{displayVal(val)}</span>
                     )
                   }
                 />

@@ -107,7 +107,7 @@ export default async function RegisterDetail({
     <>
       <Link
         href={`/registers?tab=${register}`}
-        className="mb-4 inline-block text-sm font-semibold text-ink"
+        className="mb-4 inline-block text-[15px] font-semibold text-ink"
       >
         ← {TITLES[register]} register
       </Link>
@@ -120,20 +120,20 @@ export default async function RegisterDetail({
       />
       <ErrorNote message={formError ?? loadError} />
       {saved && (
-        <p role="status" className="mb-4 rounded-md bg-ok/5 p-3 text-sm text-ok">
+        <p role="status" className="mb-4 rounded-md bg-ok/5 p-3 text-[15px] text-ok">
           Saved.
         </p>
       )}
 
       {pairingCode && (
         <div className="mb-6 rounded-xl border border-ok/30 bg-ok/5 p-5">
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-3">
+          <div className="text-[13px] font-semibold uppercase tracking-wider text-ink-3">
             New Phone Pairing Code
           </div>
           <div className="my-2 font-mono text-3xl font-bold tracking-widest text-ink">
             {pairingCode}
           </div>
-          <p className="text-xs text-ink-2">
+          <p className="text-[13px] text-ink-2">
             Valid for 15 minutes
             {expiresAt ? ` (until ${new Date(expiresAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })})` : ""}.
             Have the technician open the Android app and enter these 6 digits. The code can be used once.
@@ -142,7 +142,7 @@ export default async function RegisterDetail({
       )}
 
       {!canEdit && (
-        <p className="mb-4 text-sm text-ink-2">
+        <p className="mb-4 text-[15px] text-ink-2">
           Only management can edit this record.
         </p>
       )}
@@ -161,18 +161,18 @@ export default async function RegisterDetail({
                     href={`/registers/${register}/${id}/certificate`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-semibold text-ink underline"
+                    className="text-[15px] font-semibold text-ink underline"
                   >
                     Open certificate copy
                   </a>
                 ) : (
-                  <p className="text-sm text-ink-3">No certificate copy uploaded.</p>
+                  <p className="text-[15px] text-ink-3">No certificate copy uploaded.</p>
                 )
               )}
             </div>
 
             {register === "qualifications" && !people?.length ? (
-              <p className="text-sm">
+              <p className="text-[15px]">
                 Add a person in the{" "}
                 <Link href="/registers?tab=people" className="text-ink underline">
                   people register
@@ -223,7 +223,7 @@ export default async function RegisterDetail({
                   <h2 className="text-base font-semibold text-ink">
                     Linked phones (Android app)
                   </h2>
-                  <p className="mt-0.5 text-xs text-ink-3">
+                  <p className="mt-0.5 text-[13px] text-ink-3">
                     Technicians link their phone once with a 6-digit code to access jobs and enter readings.
                   </p>
                 </div>

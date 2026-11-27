@@ -29,19 +29,19 @@ export default async function RegistersPage({ searchParams }: {
 
   return <>
     <PageHeader title="Registers" action={canEdit ? <ButtonLink href={`/registers/${register}/new`}>Add {register === "people" ? "person" : register === "qualifications" ? "qualification" : "equipment"}</ButtonLink> : undefined} />
-    <p className="mb-4 text-sm text-ink-2">People, qualifications and equipment. {canEdit ? "Management can add and update records." : "Only management can change these records."}</p>
+    <p className="mb-4 text-[15px] text-ink-2">People, qualifications and equipment. {canEdit ? "Management can add and update records." : "Only management can change these records."}</p>
     <ErrorNote message={formError ?? error?.message} />
     <nav aria-label="Registers" className="mb-4 flex flex-wrap gap-2">
       {REGISTERS.map((r) => <Link key={r} href={`/registers?tab=${r}`} aria-current={register === r ? "page" : undefined}
-        className={`rounded-lg border px-3 py-1.5 text-[13.5px] font-medium ${register === r ? "border-ink bg-ink text-white" : "border-line bg-white"}`}>
+        className={`rounded-lg border px-3 py-1.5 text-[15px] font-medium ${register === r ? "border-ink bg-ink text-white" : "border-line bg-white"}`}>
         {TITLES[r]} ({counts[r]})
       </Link>)}
     </nav>
-    {!error && <p className="mb-4 text-sm text-ink-2">
+    {!error && <p className="mb-4 text-[15px] text-ink-2">
       {qualifications.filter((item) => item.is_expired).length} expired qualifications · {equipment.filter((item) => item.active && calibrationStatus(item.calibration_due) === "Overdue").length} active equipment overdue · {equipment.filter((item) => item.active && calibrationStatus(item.calibration_due) === "Due within 30 days").length} active equipment due within 30 days
     </p>}
     {register === "equipment" && (
-      <Card className="mb-4 border-neutral-300 bg-neutral-50 p-4 text-xs text-neutral-800 flex flex-wrap items-center justify-between gap-3">
+      <Card className="mb-4 border-neutral-300 bg-neutral-50 p-4 text-[13px] text-neutral-800 flex flex-wrap items-center justify-between gap-3">
         <div>
           <strong>Equipment register v2 is now live!</strong> Manage equipment categories, calibration certificates, site locations, and delivery challans.
         </div>
@@ -64,27 +64,27 @@ export default async function RegistersPage({ searchParams }: {
       {register === "people" && people.filter((p) => matches(p.full_name, p.initials, p.position, p.mobile, ...p.roles) && (status === "active" ? p.active : status === "inactive" ? !p.active : true)).map((p) => <li key={p.id}>
         <Card><Link href={`/registers/people/${p.id}`} className="block break-words">
           <div className="flex flex-wrap items-center gap-2"><span className="font-semibold underline decoration-line underline-offset-4">{p.full_name}</span>{p.initials && <Badge>{p.initials}</Badge>}{!p.active && <Badge>Inactive</Badge>}</div>
-          <p className="mt-2 text-sm text-ink-2">{[p.position, p.mobile, p.email].filter(Boolean).join(" · ") || "Contact details not recorded"}</p>
-          <p className="mt-1 text-sm">Roles: {p.roles.join(", ") || "None"}</p>
+          <p className="mt-2 text-[15px] text-ink-2">{[p.position, p.mobile, p.email].filter(Boolean).join(" · ") || "Contact details not recorded"}</p>
+          <p className="mt-1 text-[15px]">Roles: {p.roles.join(", ") || "None"}</p>
         </Link></Card>
       </li>)}
       {register === "qualifications" && qualifications.filter((item) => matches(names.get(item.person_id ?? ""), item.method, item.level, item.scheme, item.certifying_body, item.certificate_no) && (status === "expired" ? item.is_expired : status === "in_date" ? item.valid_until && !item.is_expired : status === "unknown" ? !item.valid_until : true)).map((item) => item.id && <li key={item.id}>
         <Card><Link href={`/registers/qualifications/${item.id}`} className="block break-words">
           <div className="flex flex-wrap items-center gap-2"><span className="font-semibold underline decoration-line underline-offset-4">{names.get(item.person_id ?? "") ?? "Person unavailable"} · {item.method} · {item.level}</span><StatusBadge label={item.is_expired ? "Expired" : item.valid_until ? "In date" : "Expiry not recorded"} /></div>
-          <p className="mt-2 text-sm text-ink-2">{[item.scheme, item.certifying_body, item.certificate_no].filter(Boolean).join(" · ") || "Certificate details not recorded"}</p>
-          <p className="mt-1 text-sm">Issued: {displayDate(item.issued_on)} · Valid until: {displayDate(item.valid_until)}</p>
-          <p className="mt-1 text-xs text-ink-3">{item.certificate_path ? "Certificate copy available" : "No certificate copy"}</p>
+          <p className="mt-2 text-[15px] text-ink-2">{[item.scheme, item.certifying_body, item.certificate_no].filter(Boolean).join(" · ") || "Certificate details not recorded"}</p>
+          <p className="mt-1 text-[15px]">Issued: {displayDate(item.issued_on)} · Valid until: {displayDate(item.valid_until)}</p>
+          <p className="mt-1 text-[13px] text-ink-3">{item.certificate_path ? "Certificate copy available" : "No certificate copy"}</p>
         </Link></Card>
       </li>)}
       {register === "equipment" && equipment.filter((item) => matches(item.kind ? KINDS[item.kind] : "Equipment", item.make, item.model, item.serial_no) && (status === "active" ? item.active : status === "inactive" ? !item.active : status === "overdue" ? calibrationStatus(item.calibration_due) === "Overdue" : status === "due" ? calibrationStatus(item.calibration_due) === "Due within 30 days" : status === "unknown" ? !item.calibration_due : true)).map((item) => <li key={item.id}>
         <Card><Link href={`/equipment/${item.id}`} className="block break-words">
           <div className="flex flex-wrap items-center gap-2"><span className="font-semibold underline decoration-line underline-offset-4">{(item.kind && KINDS[item.kind]) || "Equipment"} · {[item.make, item.model].filter(Boolean).join(" ") || "Make / model not recorded"}</span><StatusBadge label={calibrationStatus(item.calibration_due)} />{!item.active && <Badge>Inactive</Badge>}</div>
-          <p className="mt-2 text-sm text-ink-2">Serial: {item.serial_no || "Not recorded"}</p>
-          <p className="mt-1 text-sm">Calibrated: {displayDate(item.calibrated_on)} · Due: {displayDate(item.calibration_due)}</p>
-          <p className="mt-1 text-xs text-ink-3">{item.certificate_path ? "Certificate copy available" : "No certificate copy"}</p>
+          <p className="mt-2 text-[15px] text-ink-2">Serial: {item.serial_no || "Not recorded"}</p>
+          <p className="mt-1 text-[15px]">Calibrated: {displayDate(item.calibrated_on)} · Due: {displayDate(item.calibration_due)}</p>
+          <p className="mt-1 text-[13px] text-ink-3">{item.certificate_path ? "Certificate copy available" : "No certificate copy"}</p>
         </Link></Card>
       </li>)}
-      <li className="hidden first:block rounded-lg border border-line bg-white p-6 text-sm text-ink-3">No matching records. {canEdit ? "Add a record or change the search." : "Ask management to add records, or change the search."}</li>
+      <li className="hidden first:block rounded-lg border border-line bg-white p-6 text-[15px] text-ink-3">No matching records. {canEdit ? "Add a record or change the search." : "Ask management to add records, or change the search."}</li>
     </ul>}
   </>;
 }

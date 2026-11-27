@@ -51,11 +51,11 @@ export default async function EnquiriesPage({
             </option>
           ))}
         </Select>
-        <button className="col-span-2 rounded-md border border-line py-2 text-sm font-semibold hover:bg-side">
+        <button className="col-span-2 rounded-md border border-line py-2 text-[15px] font-semibold hover:bg-side">
           Filter
         </button>
       </form>
-      {error && <p className="text-sm text-ink">{error.message}</p>}
+      {error && <p className="text-[15px] text-ink">{error.message}</p>}
       <ul className="divide-y divide-line rounded-xl border border-line bg-white">
         {enquiries?.map((e) => (
           <li key={e.id} className="flex flex-col justify-between sm:flex-row sm:items-center px-4 py-3 hover:bg-side">
@@ -65,20 +65,20 @@ export default async function EnquiriesPage({
                 <Badge>{SOURCE_LABEL[e.source]}</Badge>
                 <Badge>{STATUS_LABEL[e.status]}</Badge>
               </div>
-              <div className="mt-1 text-xs text-ink-3">
+              <div className="mt-1 text-[13px] text-ink-3">
                 {e.customers?.name ?? e.from_name ?? e.from_address ?? "Unknown sender"} · {formatIST(e.received_at)}
               </div>
             </Link>
             {canDelete && (
-              <details className="mt-2 sm:mt-0 text-xs">
+              <details className="mt-2 sm:mt-0 text-[13px]">
                 <summary className="cursor-pointer font-medium text-bad hover:underline">
                   Delete…
                 </summary>
                 <form action={deleteEnquiry.bind(null, e.id)} className="mt-1.5 flex items-center gap-2 rounded border border-line bg-surface-2 p-2">
-                  <span className="text-xs text-ink-2">Move to recycle bin?</span>
+                  <span className="text-[13px] text-ink-2">Move to recycle bin?</span>
                   <button
                     type="submit"
-                    className="rounded border border-bad bg-bad/10 px-2 py-0.5 text-xs font-semibold text-bad hover:bg-bad/20"
+                    className="rounded border border-bad bg-bad/10 px-2 py-0.5 text-[13px] font-semibold text-bad hover:bg-bad/20"
                   >
                     Confirm delete
                   </button>
@@ -87,7 +87,7 @@ export default async function EnquiriesPage({
             )}
           </li>
         ))}
-        {enquiries?.length === 0 && <li className="px-4 py-6 text-sm text-ink-3">No enquiries found.</li>}
+        {enquiries?.length === 0 && <li className="px-4 py-6 text-[15px] text-ink-3">No enquiries found.</li>}
       </ul>
     </>
   );

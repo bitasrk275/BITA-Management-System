@@ -1,33 +1,96 @@
 @import "tailwindcss";
 
-/* BITA visual system (DESIGN.md): clean black and white, colour only for status. */
+/*
+ * BITA visual system: "Plant Safety Signboard" (DESIGN.md).
+ * White ground, black type, and the four plant safety-sign colours, each with one meaning:
+ * blue = you must act, yellow = caution / waiting, green = done, red = overdue / stop.
+ */
 :root {
   --background: #ffffff;
-  --foreground: #0a0a0a;
+  --foreground: #111418;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist), system-ui, "Segoe UI", sans-serif;
+  --font-sans: var(--font-barlow), system-ui, "Segoe UI", sans-serif;
+  --font-sign: var(--font-barlow-condensed), var(--font-barlow), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, Consolas, monospace;
 
-  --color-ink: #0a0a0a;
-  --color-ink-2: #4d4d4d;
-  --color-ink-3: #8f8f8f;
-  --color-line: #ebebeb;
-  --color-line-2: #f2f2f2;
-  --color-side: #fafafa;
-  --color-ok: #16a34a;
-  --color-wait: #d97706;
-  --color-bad: #dc2626;
-  --color-info: #2563eb;
+  /* Ink and structure */
+  --color-ink: #111418;
+  --color-ink-2: #3d4450;
+  --color-ink-3: #646b76;
+  --color-line: #d6dae0;
+  --color-line-2: #eceef1;
+  --color-side: #f3f4f6;
+  --color-surface: #ffffff;
+  --color-surface-2: #f5f6f8;
+
+  /* Safety-sign colours */
+  --color-sign: #0055a4; /* mandatory blue: the one primary action */
+  --color-sign-deep: #003f7d;
+  --color-caution: #f5b400; /* sign plate fill, always with black text */
+  --color-ok: #17803d;
+  --color-wait: #b45309;
+  --color-bad: #c81e1e;
+  --color-info: #0055a4;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Screens never scroll sideways: wide tables scroll inside themselves on small screens. */
+@media (max-width: 767px) {
+  main table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  main img,
+  main video {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Thumb-sized form controls on touch screens. */
+@media (pointer: coarse) {
+  main input:not([type="checkbox"]):not([type="radio"]),
+  main select,
+  main textarea {
+    font-size: 16px; /* stops iOS zooming into fields */
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-sign);
+  outline-offset: 2px;
+}
+
+/* Page-change bar at the top of the screen. */
+@keyframes bita-load {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+.bita-loadbar { animation: bita-load 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .bita-loadbar { animation: none; width: 100%; }
+}
+
+/* Grid columns may shrink below their content, so long names and tables never push the screen sideways. */
+main .grid > * {
+  min-width: 0;
 }

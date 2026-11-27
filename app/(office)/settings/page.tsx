@@ -235,11 +235,11 @@ export default async function SettingsPage({
       {saved && <SavedNote />}
 
       {tg_webhook && (
-        <div className="mb-5 rounded-lg border border-ok-line bg-ok-bg px-4 py-3 text-sm text-ink">
+        <div className="mb-5 rounded-lg border border-ok-line bg-ok-bg px-4 py-3 text-[15px] text-ink">
           <p className="font-semibold">
             Telegram Webhook Connected Successfully!
           </p>
-          <p className="mt-1 text-xs text-ink-2">
+          <p className="mt-1 text-[13px] text-ink-2">
             Your bot is now live and connected to{" "}
             <Mono>https://bita-management-system.vercel.app/api/telegram/webhook</Mono>. Click{" "}
             <strong>Generate 6-Digit Link Code</strong> below and send{" "}
@@ -249,11 +249,11 @@ export default async function SettingsPage({
       )}
 
       {tg_code && (
-        <div className="mb-5 rounded-lg border border-ok-line bg-ok-bg px-4 py-3 text-sm text-ink">
+        <div className="mb-5 rounded-lg border border-ok-line bg-ok-bg px-4 py-3 text-[15px] text-ink">
           <p className="font-semibold">
             Telegram Executive Bot Pairing Code: <Mono>{tg_code}</Mono> (valid for 15 minutes)
           </p>
-          <p className="mt-1 text-xs text-ink-2">
+          <p className="mt-1 text-[13px] text-ink-2">
             Open your BITA Telegram Bot on your phone and send:{" "}
             <Mono>/start {tg_code}</Mono>
           </p>
@@ -274,7 +274,7 @@ export default async function SettingsPage({
           {/* 1. Company Profile & Invoice Sheet Details */}
           <Card>
             <SectionTitle>1. Company Profile & Invoice Header / Bank Details</SectionTitle>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Printed on every BITA tax invoice, proforma invoice, and downloadable Word (.docx) invoice.
             </p>
             <form action={saveCompanyProfileAction} encType="multipart/form-data" className="space-y-3">
@@ -323,7 +323,7 @@ export default async function SettingsPage({
               {/* Branding Section */}
               <div className="border-t border-line pt-3 mt-3 space-y-3">
                 <SectionTitle>Branding: Logo, Seal & Default Signatory</SectionTitle>
-                <p className="text-xs text-ink-3">
+                <p className="text-[13px] text-ink-3">
                   Logos, seals, and signatures are stored in private storage and embedded in reports and invoices only upon technical approval.
                 </p>
 
@@ -351,10 +351,10 @@ export default async function SettingsPage({
                       type="file"
                       name="logo_file"
                       accept="image/png,image/jpeg,image/jpg"
-                      className="w-full text-xs text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-xs file:text-ink"
+                      className="w-full text-[13px] text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-[13px] file:text-ink"
                     />
                     {companyProfile.logoPath && (
-                      <label className="mt-1 flex items-center gap-1.5 text-xs text-bad cursor-pointer">
+                      <label className="mt-1 flex items-center gap-1.5 text-[13px] text-bad cursor-pointer">
                         <input type="checkbox" name="remove_logo" value="1" />
                         <span>Remove uploaded logo (revert to emblem)</span>
                       </label>
@@ -373,10 +373,10 @@ export default async function SettingsPage({
                       type="file"
                       name="seal_file"
                       accept="image/png,image/jpeg,image/jpg"
-                      className="w-full text-xs text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-xs file:text-ink"
+                      className="w-full text-[13px] text-ink-2 file:mr-2 file:rounded file:border file:border-line file:bg-side file:px-2.5 file:py-1 file:text-[13px] file:text-ink"
                     />
                     {companyProfile.sealPath && (
-                      <label className="mt-1 flex items-center gap-1.5 text-xs text-bad cursor-pointer">
+                      <label className="mt-1 flex items-center gap-1.5 text-[13px] text-bad cursor-pointer">
                         <input type="checkbox" name="remove_seal" value="1" />
                         <span>Remove uploaded seal (revert to placeholder)</span>
                       </label>
@@ -409,7 +409,7 @@ export default async function SettingsPage({
           {/* 2. Invoice & Credit Note Numbering */}
           <Card>
             <SectionTitle>2. Invoice & Credit Note Numbering</SectionTitle>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Reference invoice 5387 was dated 05.11.2026; default next tax invoice counter starts at 5388.
             </p>
             <form action={saveInvoiceNumberingAction} className="space-y-3">
@@ -472,12 +472,12 @@ export default async function SettingsPage({
           {/* 3. Test Methods (NDT Services) */}
           <Card>
             <SectionTitle>3. Test Methods (NDT Services)</SectionTitle>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Standard methods (UT, MPT, DPT, RT, VT, etc.) and custom NDT methods configured for jobs, scheduling, and field reporting.
             </p>
             {testMethods.length > 0 ? (
               <div className="overflow-x-auto mb-4">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-[13px]">
                   <thead>
                     <tr className="border-b border-line text-ink-3">
                       <th className="py-2 pr-2 w-8">#</th>
@@ -501,12 +501,12 @@ export default async function SettingsPage({
                         <td className="py-2 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <form action={toggleTestMethodAction.bind(null, m.id, !m.active)}>
-                              <SecondaryButton type="submit" className="px-2.5 py-1 text-xs">
+                              <SecondaryButton type="submit" className="px-2.5 py-1 text-[13px]">
                                 {m.active ? "Disable" : "Enable"}
                               </SecondaryButton>
                             </form>
                             <form action={removeTestMethodAction.bind(null, m.id)}>
-                              <SecondaryButton type="submit" className="px-2.5 py-1 text-xs">
+                              <SecondaryButton type="submit" className="px-2.5 py-1 text-[13px]">
                                 Remove
                               </SecondaryButton>
                             </form>
@@ -518,11 +518,11 @@ export default async function SettingsPage({
                 </table>
               </div>
             ) : (
-              <p className="text-xs text-ink-3 mb-3">No test methods configured.</p>
+              <p className="text-[13px] text-ink-3 mb-3">No test methods configured.</p>
             )}
 
             <form action={addTestMethodAction} className="border-t border-line-2 pt-3 space-y-3">
-              <span className="text-xs font-semibold text-ink">Add New Test Method</span>
+              <span className="text-[13px] font-semibold text-ink">Add New Test Method</span>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Method Code" hint="e.g. ET, UT, ECT">
                   <Input name="code" placeholder="e.g. ET" required />
@@ -531,14 +531,14 @@ export default async function SettingsPage({
                   <Input name="label" placeholder="e.g. Eddy Current Testing" required />
                 </Field>
               </div>
-              <Button type="submit" className="px-3 py-1.5 text-xs">Add test method</Button>
+              <Button type="submit" className="px-3 py-1.5 text-[13px]">Add test method</Button>
             </form>
           </Card>
 
           {/* 4. Payment Reminders & Calibration Alert Timings */}
           <Card>
             <SectionTitle>4. Payment Reminders & Calibration Alert Timings</SectionTitle>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Controls when automated email payment reminders and equipment calibration warnings fire.
             </p>
             <form action={saveReminderTimingsAction} className="space-y-3">
@@ -568,7 +568,7 @@ export default async function SettingsPage({
                   />
                 </Field>
               </div>
-              <label className="flex items-center gap-2 text-xs text-ink-2">
+              <label className="flex items-center gap-2 text-[13px] text-ink-2">
                 <input
                   type="checkbox"
                   name="on_due"
@@ -586,17 +586,17 @@ export default async function SettingsPage({
             <SectionTitle link={{ href: "/settings/users", label: "Manage users" }}>
               5. Role Permissions Matrix
             </SectionTitle>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Enforced in both database triggers/RLS and application services.
             </p>
             <form action={savePermissionsMatrixAction} className="space-y-3">
-              <div className="divide-y divide-line-2 text-sm">
+              <div className="divide-y divide-line-2 text-[15px]">
                 {PERMISSION_ACTIONS.map((action) => (
                   <div key={action} className="py-2.5">
                     <div className="mb-1.5 font-medium text-ink">{PERMISSION_LABELS[action]}</div>
                     <div className="flex flex-wrap gap-4">
                       {ALL_ROLES.map((role) => (
-                        <label key={role} className="flex items-center gap-1.5 text-xs text-ink-2">
+                        <label key={role} className="flex items-center gap-1.5 text-[13px] text-ink-2">
                           <input
                             type="checkbox"
                             name={`perm_${action}`}
@@ -621,7 +621,7 @@ export default async function SettingsPage({
           {/* 6. Telegram Executive Bot */}
           <Card>
             <SectionTitle>6. Telegram Executive Bot & Real-Time Alerts</SectionTitle>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Allows BITA directors & office leads to ask live dashboard questions (<Mono>/status</Mono>,{" "}
               <Mono>/jobs</Mono>, <Mono>/invoices</Mono>, <Mono>/overdue</Mono>, <Mono>/reports</Mono>,{" "}
               <Mono>/equipment</Mono>, <Mono>/schedule</Mono>) and receive instant notifications on Telegram.
@@ -644,7 +644,7 @@ export default async function SettingsPage({
                   />
                 </Field>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 text-xs text-ink-2">
+              <div className="grid gap-2 sm:grid-cols-2 text-[13px] text-ink-2">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -696,7 +696,7 @@ export default async function SettingsPage({
 
             <div className="mt-4 border-t border-line-2 pt-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-ink">
+                <span className="text-[13px] font-semibold text-ink">
                   Linked Executive Chats ({telegramLinks.chats.length})
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -714,7 +714,7 @@ export default async function SettingsPage({
                 </div>
               </div>
               {telegramLinks.chats.length > 0 && (
-                <ul className="mt-2 divide-y divide-line-2 text-xs">
+                <ul className="mt-2 divide-y divide-line-2 text-[13px]">
                   {telegramLinks.chats.map((c) => (
                     <li
                       key={c.chat_id}
@@ -747,7 +747,7 @@ export default async function SettingsPage({
                 Preview {selectedMethod} Report ↗
               </ButtonLink>
             </div>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Configured per NDT method. Dynamic ordered field list is loaded by the technician phone app (
               <Mono>/api/field/report-template/[method]</Mono>) and paper layout preview.
             </p>
@@ -760,7 +760,7 @@ export default async function SettingsPage({
                   <Link
                     key={code}
                     href={`/settings?tab_method=${encodeURIComponent(code)}`}
-                    className={`rounded px-2.5 py-1 text-xs font-medium transition ${
+                    className={`rounded px-2.5 py-1 text-[13px] font-medium transition ${
                       isSelected
                         ? "bg-ink text-white"
                         : "border border-line bg-surface text-ink-2 hover:text-ink hover:bg-side"
@@ -775,11 +775,11 @@ export default async function SettingsPage({
             {/* Fields Table */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-ink">
+                <span className="text-[13px] font-semibold text-ink">
                   {selectedMethod} Fields ({currentMethodFields.length})
                 </span>
                 <form action={resetReportTemplateAction.bind(null, selectedMethod)}>
-                  <SecondaryButton type="submit" className="px-2.5 py-1 text-xs">
+                  <SecondaryButton type="submit" className="px-2.5 py-1 text-[13px]">
                     Reset to default seed
                   </SecondaryButton>
                 </form>
@@ -787,7 +787,7 @@ export default async function SettingsPage({
 
               {currentMethodFields.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-[13px]">
                     <thead>
                       <tr className="border-b border-line text-ink-3">
                         <th className="py-2 pr-2 w-7">#</th>
@@ -827,7 +827,7 @@ export default async function SettingsPage({
                                   type="submit"
                                   disabled={i === 0}
                                   title="Move up"
-                                  className="rounded border border-line px-1.5 py-0.5 text-[10px] text-ink-2 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                                  className="rounded border border-line px-1.5 py-0.5 text-[13px] text-ink-2 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
                                   ↑
                                 </button>
@@ -837,7 +837,7 @@ export default async function SettingsPage({
                                   type="submit"
                                   disabled={i === currentMethodFields.length - 1}
                                   title="Move down"
-                                  className="rounded border border-line px-1.5 py-0.5 text-[10px] text-ink-2 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                                  className="rounded border border-line px-1.5 py-0.5 text-[13px] text-ink-2 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
                                   ↓
                                 </button>
@@ -846,7 +846,7 @@ export default async function SettingsPage({
                                 <button
                                   type="submit"
                                   title="Remove field"
-                                  className="rounded border border-line px-1.5 py-0.5 text-[10px] text-bad hover:bg-bad-bg"
+                                  className="rounded border border-line px-1.5 py-0.5 text-[13px] text-bad hover:bg-bad-bg"
                                 >
                                   ✕
                                 </button>
@@ -859,13 +859,13 @@ export default async function SettingsPage({
                   </table>
                 </div>
               ) : (
-                <p className="text-xs text-ink-3 py-2">No fields configured for {selectedMethod}.</p>
+                <p className="text-[13px] text-ink-3 py-2">No fields configured for {selectedMethod}.</p>
               )}
             </div>
 
             {/* Add Field Form */}
             <form action={addReportTemplateFieldAction} className="border-t border-line-2 pt-3 space-y-3">
-              <span className="text-xs font-semibold text-ink">Add Field to {selectedMethod}</span>
+              <span className="text-[13px] font-semibold text-ink">Add Field to {selectedMethod}</span>
               <input type="hidden" name="method" value={selectedMethod} />
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -903,7 +903,7 @@ export default async function SettingsPage({
               </Field>
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <label className="flex items-center gap-2 text-xs text-ink-2 cursor-pointer">
+                <label className="flex items-center gap-2 text-[13px] text-ink-2 cursor-pointer">
                   <input
                     type="checkbox"
                     name="field_required"
@@ -911,7 +911,7 @@ export default async function SettingsPage({
                   />
                   <span>Required field (must be filled before inspection submission)</span>
                 </label>
-                <Button type="submit" className="px-3 py-1.5 text-xs">Add field to {selectedMethod}</Button>
+                <Button type="submit" className="px-3 py-1.5 text-[13px]">Add field to {selectedMethod}</Button>
               </div>
             </form>
           </Card>
@@ -919,7 +919,7 @@ export default async function SettingsPage({
           {/* 8. Company Holidays */}
           <Card>
             <SectionTitle>8. Company Holidays ({holidays.length})</SectionTitle>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Holidays are highlighted on the scheduling calendar and warn before scheduling technicians.
             </p>
             <form action={addHolidayAction} className="flex flex-wrap items-end gap-3">
@@ -936,7 +936,7 @@ export default async function SettingsPage({
               <Button type="submit">Add holiday</Button>
             </form>
             {holidays.length > 0 && (
-              <ul className="mt-3 divide-y divide-line-2 text-xs">
+              <ul className="mt-3 divide-y divide-line-2 text-[13px]">
                 {holidays.map((h) => (
                   <li key={h.date} className="flex items-center justify-between py-2">
                     <span>
@@ -954,12 +954,12 @@ export default async function SettingsPage({
           {/* 9. Dropdown Options */}
           <Card>
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold text-ink">9. Add Dropdown Option</h2>
-              <Link href="/equipment/types" className="text-xs text-ink-2 hover:text-ink underline">
+              <h2 className="text-[15px] font-semibold text-ink">9. Add Dropdown Option</h2>
+              <Link href="/equipment/types" className="text-[13px] text-ink-2 hover:text-ink underline">
                 Equipment categories →
               </Link>
             </div>
-            <p className="mb-3 text-xs text-ink-3">
+            <p className="mb-3 text-[13px] text-ink-3">
               Dropdown options are used across report templates, equipment types, and forms.
             </p>
             <form action={addDropdownOption} className="space-y-3">

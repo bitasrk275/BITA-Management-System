@@ -89,7 +89,7 @@ export function JobMoneyActions({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold">Reports, invoices &amp; payments</h2>
-          <p className="text-xs text-ink-3">
+          <p className="text-[13px] text-ink-3">
             Generate or open the inspection report and invoice for {job.job_no}.
           </p>
         </div>
@@ -103,14 +103,14 @@ export function JobMoneyActions({
       {/* 1. Report actions (Generate report / Open report) */}
       <div className="space-y-2.5 rounded-lg border border-line bg-surface-2/40 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">
+          <span className="text-[13px] font-semibold uppercase tracking-wider text-ink-3">
             Inspection report
           </span>
           <form
             action={generateReportFromJob.bind(null, job.id)}
             className="flex flex-wrap items-center gap-2"
           >
-            <Select name="method" defaultValue={defaultMethod} className="w-40 text-xs">
+            <Select name="method" defaultValue={defaultMethod} className="w-40 text-[13px]">
               {(job.test_methods.length > 0
                 ? job.test_methods
                 : (["UT", "MPT", "DPT", "RT", "VT"] as Enums<"test_method">[])
@@ -123,7 +123,7 @@ export function JobMoneyActions({
             <Input
               name="report_no"
               placeholder={`${job.job_no}/R-0${reports.length + 1}`}
-              className="w-40 text-xs"
+              className="w-40 text-[13px]"
             />
             <SecondaryButton type="submit">
               {reports.length === 0 ? "Generate report" : "+ New report"}
@@ -141,7 +141,7 @@ export function JobMoneyActions({
               return (
                 <li
                   key={r.id}
-                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[15px]"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
@@ -163,7 +163,7 @@ export function JobMoneyActions({
             })}
           </ul>
         ) : (
-          <p className="text-xs text-ink-3">
+          <p className="text-[13px] text-ink-3">
             No report created for this job yet. Click <strong>Generate report</strong> above to prepare one.
           </p>
         )}
@@ -173,7 +173,7 @@ export function JobMoneyActions({
       <div className="space-y-2.5 rounded-lg border border-line bg-surface-2/40 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">
+            <span className="text-[13px] font-semibold uppercase tracking-wider text-ink-3">
               Invoice ({customer?.uses_proforma ? "Customer prefers Proforma first" : "Tax or Proforma"})
             </span>
           </div>
@@ -181,7 +181,7 @@ export function JobMoneyActions({
             action={generateInvoiceFromJob.bind(null, job.id)}
             className="flex flex-wrap items-center gap-2"
           >
-            <Select name="kind" defaultValue={defaultInvoiceKind} className="w-48 text-xs">
+            <Select name="kind" defaultValue={defaultInvoiceKind} className="w-48 text-[13px]">
               <option value="tax_invoice">Tax invoice (INV)</option>
               <option value="proforma">Proforma invoice (PI)</option>
             </Select>
@@ -190,7 +190,7 @@ export function JobMoneyActions({
         </div>
 
         {!hasApprovedReport && (
-          <div className="rounded-md border border-line bg-white p-2.5 text-xs text-ink-2">
+          <div className="rounded-md border border-line bg-white p-2.5 text-[13px] text-ink-2">
             {reports.length > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
@@ -223,7 +223,7 @@ export function JobMoneyActions({
               return (
                 <li
                   key={i.id}
-                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[15px]"
                 >
                   <div className="space-y-0.5">
                     <div className="flex flex-wrap items-center gap-2">
@@ -249,7 +249,7 @@ export function JobMoneyActions({
                       </Status>
                       {unpaidAge && <Badge>{unpaidAge}</Badge>}
                     </div>
-                    <div className="text-xs text-ink-3">
+                    <div className="text-[13px] text-ink-3">
                       Total {formatINR(Number(i.total) || 0)} · Balance{" "}
                       {formatINR(Number(i.balance) || 0)}
                       {i.invoice_date ? ` · Dated ${shortDate(i.invoice_date)}` : ""}
@@ -264,13 +264,13 @@ export function JobMoneyActions({
             })}
           </ul>
         ) : (
-          <p className="text-xs text-ink-3">
+          <p className="text-[13px] text-ink-3">
             No invoices yet. Choose Tax invoice or Proforma above and click <strong>Generate invoice</strong>.
           </p>
         )}
 
         {invoices.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between pt-1 text-xs">
+          <div className="flex flex-wrap items-center justify-between pt-1 text-[13px]">
             <span className="font-semibold text-ink">
               Outstanding balance: {formatINR(outstanding)}
             </span>

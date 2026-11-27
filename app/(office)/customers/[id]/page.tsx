@@ -59,10 +59,10 @@ export default async function CustomerPage({
           {canDelete && (
             <Card>
               <details>
-                <summary className="cursor-pointer text-sm font-medium text-bad">
+                <summary className="cursor-pointer text-[15px] font-medium text-bad">
                   Delete customer
                 </summary>
-                <p className="mt-2 text-xs text-ink-3">
+                <p className="mt-2 text-[13px] text-ink-3">
                   Deleting moves <strong>{customer.name}</strong> to the{" "}
                   <Link href="/recycle-bin" className="underline">
                     recycle bin
@@ -87,7 +87,7 @@ export default async function CustomerPage({
                     <summary className="cursor-pointer">
                       <span className="font-medium">{c.name}</span>{" "}
                       {c.receives_reports && <Badge>Reports</Badge>} {c.receives_invoices && <Badge>Invoices</Badge>}
-                      <div className="text-xs text-ink-3 break-words">
+                      <div className="text-[13px] text-ink-3 break-words">
                         {[c.mobile, c.email].filter(Boolean).join(" · ") || "No phone or email"}
                       </div>
                     </summary>
@@ -101,10 +101,10 @@ export default async function CustomerPage({
                   </details>
                 </li>
               ))}
-              {contacts.length === 0 && <li className="text-sm text-ink-3">No contacts yet.</li>}
+              {contacts.length === 0 && <li className="text-[15px] text-ink-3">No contacts yet.</li>}
             </ul>
             <details className="mt-4">
-              <summary className="cursor-pointer text-sm font-semibold text-ink">Add a contact</summary>
+              <summary className="cursor-pointer text-[15px] font-semibold text-ink">Add a contact</summary>
               <form action={addContact.bind(null, id)} className="mt-3 space-y-3">
                 <ContactFields />
                 <Button type="submit">Add contact</Button>
@@ -114,13 +114,13 @@ export default async function CustomerPage({
 
           <Card>
             <h2 className="mb-3 font-semibold">Recent enquiries</h2>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2 text-[15px]">
               {enquiries.map((e) => (
                 <li key={e.id} className="break-words">
                   <Link href={`/enquiries/${e.id}`} className="hover:text-ink">
                     {e.subject || "(no subject)"}
                   </Link>{" "}
-                  <span className="text-xs text-ink-3">
+                  <span className="text-[13px] text-ink-3">
                     {e.source} · {e.status}
                   </span>
                 </li>

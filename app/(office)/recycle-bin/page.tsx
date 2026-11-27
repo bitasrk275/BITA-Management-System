@@ -90,7 +90,7 @@ export default async function RecycleBinPage({
       <div className="mb-4 flex flex-wrap gap-2">
         <Link
           href="/recycle-bin"
-          className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+          className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium ${
             !selectedTable
               ? "border-ink bg-ink text-white"
               : "border-line bg-white text-ink-2 hover:bg-side"
@@ -102,7 +102,7 @@ export default async function RecycleBinPage({
           <Link
             key={t}
             href={`/recycle-bin?table=${t}`}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+            className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium ${
               selectedTable === t
                 ? "border-ink bg-ink text-white"
                 : "border-line bg-white text-ink-2 hover:bg-side"
@@ -127,7 +127,7 @@ export default async function RecycleBinPage({
                   <Badge>{TABLE_LABELS[item.table_name]}</Badge>
                   <span className="font-medium text-ink break-words">{item.label}</span>
                 </div>
-                <div className="mt-1 text-xs text-ink-3 break-words">
+                <div className="mt-1 text-[13px] text-ink-3 break-words">
                   {item.detail} · Deleted {formatIst(item.deleted_at)}
                   {item.deleted_by_name ? ` by ${item.deleted_by_name}` : ""}
                 </div>

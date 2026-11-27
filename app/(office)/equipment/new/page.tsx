@@ -49,7 +49,7 @@ export default async function NewEquipmentPage(props: {
                 </option>
               ))}
             </Select>
-            <div className="mt-1 text-xs text-neutral-500">
+            <div className="mt-1 text-[13px] text-neutral-500">
               Need a new type?{" "}
               <Link href="/equipment/types" className="underline hover:text-neutral-800">
                 Add an equipment type
@@ -86,7 +86,7 @@ export default async function NewEquipmentPage(props: {
               type="file"
               name="certificate_file"
               accept=".pdf,image/*"
-              className="w-full text-xs text-neutral-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-neutral-300 file:text-xs file:bg-neutral-50 file:text-neutral-800 hover:file:bg-neutral-100"
+              className="w-full text-[13px] text-neutral-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-neutral-300 file:text-[13px] file:bg-neutral-50 file:text-neutral-800 hover:file:bg-neutral-100"
             />
           </Field>
 

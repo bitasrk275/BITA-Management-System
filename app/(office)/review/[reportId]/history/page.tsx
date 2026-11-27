@@ -162,10 +162,10 @@ export default async function ReportHistoryPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <span>{tableLabel}</span>
                     <Badge>{entry.action}</Badge>
-                    <span className="text-[13px] font-normal text-ink-2">
+                    <span className="text-[14px] font-normal text-ink-2">
                       by <strong className="font-medium text-ink">{actorName(entry)}</strong>
                     </span>
-                    <span className="text-xs font-normal text-ink-3">
+                    <span className="text-[13px] font-normal text-ink-3">
                       · {formatISTDateTime(entry.changed_at)} IST
                     </span>
                   </div>
@@ -177,7 +177,7 @@ export default async function ReportHistoryPage({
                         {diffs.map((d) => (
                           <div
                             key={d.field}
-                            className="flex flex-wrap items-baseline gap-1.5 text-[12.5px]"
+                            className="flex flex-wrap items-baseline gap-1.5 text-[14px]"
                           >
                             <Mono>{d.field}</Mono>
                             <span className="text-ink-3">:</span>

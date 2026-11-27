@@ -228,12 +228,12 @@ export function CalendarInteractiveView({
   return (
     <div className="space-y-4">
       {bannerMessage && (
-        <div className="flex items-center justify-between rounded-lg border border-ok/25 bg-ok/5 px-3.5 py-2.5 text-[13px] text-ok">
+        <div className="flex items-center justify-between rounded-lg border border-ok/25 bg-ok/5 px-3.5 py-2.5 text-[14px] text-ok">
           <span>✓ {bannerMessage}</span>
           <button
             type="button"
             onClick={() => setBannerMessage(null)}
-            className="text-xs text-ink-3 hover:text-ink"
+            className="text-[13px] text-ink-3 hover:text-ink"
           >
             ✕
           </button>
@@ -241,8 +241,8 @@ export function CalendarInteractiveView({
       )}
 
       {/* Calendar Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white p-3.5">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-white p-3.5">
+        <div className="flex flex-wrap items-center gap-2">
           <SecondaryButton type="button" onClick={() => handleNav(viewMode === "week" ? -7 : -30)}>
             ← Previous
           </SecondaryButton>
@@ -252,7 +252,7 @@ export function CalendarInteractiveView({
           <SecondaryButton type="button" onClick={() => handleNav(viewMode === "week" ? 7 : 30)}>
             Next →
           </SecondaryButton>
-          <span className="ml-2 font-semibold text-ink text-sm">
+          <span className="order-first w-full font-sign text-[19px] font-bold text-ink sm:order-none sm:ml-2 sm:w-auto">
             {data.startDate} to {data.endDate}
           </span>
         </div>
@@ -263,7 +263,7 @@ export function CalendarInteractiveView({
             <button
               type="button"
               onClick={() => handleViewChange("week")}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-md px-3 py-1 text-[13px] font-medium transition-colors ${
                 viewMode === "week" ? "bg-white text-ink shadow-sm" : "text-ink-2 hover:text-ink"
               }`}
             >
@@ -272,7 +272,7 @@ export function CalendarInteractiveView({
             <button
               type="button"
               onClick={() => handleViewChange("month")}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-md px-3 py-1 text-[13px] font-medium transition-colors ${
                 viewMode === "month" ? "bg-white text-ink shadow-sm" : "text-ink-2 hover:text-ink"
               }`}
             >
@@ -298,7 +298,7 @@ export function CalendarInteractiveView({
 
       {/* Main Grid View */}
       <div className="overflow-x-auto rounded-xl border border-line bg-white">
-        <table className="w-full min-w-[700px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[700px] border-collapse text-left text-[13px]">
           <thead>
             <tr className="border-b border-line bg-[#fcfcfc]">
               <th className="sticky left-0 z-10 w-48 border-r border-line bg-[#fcfcfc] p-3 font-semibold text-ink">
@@ -317,7 +317,7 @@ export function CalendarInteractiveView({
                     }`}
                   >
                     <div>{dayName}</div>
-                    <div className="text-[11px] opacity-80">{d.slice(5)}</div>
+                    <div className="text-[13px] opacity-80">{d.slice(5)}</div>
                   </th>
                 );
               })}
@@ -353,7 +353,7 @@ export function CalendarInteractiveView({
                           key={d}
                           className="border-r border-line p-2 align-top bg-amber-50/50"
                         >
-                          <div className="rounded border border-amber-200 bg-amber-100/70 p-1.5 text-[11px] text-amber-900">
+                          <div className="rounded border border-amber-200 bg-amber-100/70 p-1.5 text-[13px] text-amber-900">
                             <div className="flex items-center justify-between">
                               <span className="font-semibold">On Leave</span>
                               {canDelete && (
@@ -362,7 +362,7 @@ export function CalendarInteractiveView({
                                   <button
                                     type="submit"
                                     title="Cancel Leave"
-                                    className="text-amber-700 hover:text-amber-950 ml-1 text-xs"
+                                    className="text-amber-700 hover:text-amber-950 ml-1 text-[13px]"
                                   >
                                     ×
                                   </button>
@@ -370,7 +370,7 @@ export function CalendarInteractiveView({
                               )}
                             </div>
                             {cell.leave.reason && (
-                              <div className="mt-0.5 text-[10px] text-amber-800 line-clamp-2">
+                              <div className="mt-0.5 text-[13px] text-amber-800 line-clamp-2">
                                 {cell.leave.reason}
                               </div>
                             )}
@@ -404,11 +404,11 @@ export function CalendarInteractiveView({
                                     {""}
                                   </Status>
                                 </div>
-                                <div className="text-[11px] font-medium text-neutral-800 truncate">
+                                <div className="text-[13px] font-medium text-neutral-800 truncate">
                                   {a.customerName}
                                 </div>
                                 {a.site && (
-                                  <div className="text-[10px] text-ink-3 truncate">
+                                  <div className="text-[13px] text-ink-3 truncate">
                                     {a.site}
                                   </div>
                                 )}
@@ -433,7 +433,7 @@ export function CalendarInteractiveView({
                             <button
                               type="button"
                               onClick={() => openAssignModal(tech.personId, d)}
-                              className="w-full rounded border border-dashed border-line py-0.5 text-[10px] text-ink-3 hover:border-ink hover:text-ink"
+                              className="w-full rounded border border-dashed border-line py-0.5 text-[13px] text-ink-3 hover:border-ink hover:text-ink"
                             >
                               + Add job
                             </button>
@@ -453,7 +453,7 @@ export function CalendarInteractiveView({
                         <button
                           type="button"
                           onClick={() => openAssignModal(tech.personId, d)}
-                          className="opacity-0 group-hover:opacity-100 transition rounded border border-dashed border-line px-2 py-1 text-[11px] text-ink-3 hover:border-ink hover:text-ink"
+                          className="opacity-0 group-hover:opacity-100 transition rounded border border-dashed border-line px-2 py-1 text-[13px] text-ink-3 hover:border-ink hover:text-ink"
                         >
                           + Assign
                         </button>
@@ -476,7 +476,7 @@ export function CalendarInteractiveView({
                 <h3 className="text-base font-semibold text-ink">
                   Job Assignment · <Mono>{activeAssignment.jobNo}</Mono>
                 </h3>
-                <p className="text-xs text-ink-2 mt-0.5">
+                <p className="text-[13px] text-ink-2 mt-0.5">
                   {activeAssignment.customerName} {activeAssignment.site ? `· ${activeAssignment.site}` : ""}
                 </p>
               </div>
@@ -495,7 +495,7 @@ export function CalendarInteractiveView({
 
             {modalError && <ErrorNote message={modalError} />}
 
-            <div className="rounded-lg bg-side p-3 text-xs space-y-1">
+            <div className="rounded-lg bg-side p-3 text-[13px] space-y-1">
               <div>
                 <span className="text-ink-3">Technician:</span>{" "}
                 <strong>{activeAssignment.technicianName}</strong>
@@ -533,7 +533,7 @@ export function CalendarInteractiveView({
             {/* Move Form */}
             <form onSubmit={handleMoveSubmit} className="space-y-3 border-t border-line pt-3">
               <input type="hidden" name="assignment_id" value={activeAssignment.id} />
-              <div className="font-semibold text-xs text-ink">Move or Reassign Job</div>
+              <div className="font-semibold text-[13px] text-ink">Move or Reassign Job</div>
 
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Start Date">
@@ -566,10 +566,10 @@ export function CalendarInteractiveView({
               {equipmentList.length > 0 && (
                 <div>
                   <input type="hidden" name="equipment_edit" value="1" />
-                  <div className="mb-1 text-[13px] font-medium text-ink-2">Equipment</div>
+                  <div className="mb-1 text-[14px] font-medium text-ink-2">Equipment</div>
                   <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-line bg-side/30 p-2">
                     {equipmentList.map((eq) => (
-                      <label key={eq.id} className="flex items-center gap-2 text-xs">
+                      <label key={eq.id} className="flex items-center gap-2 text-[13px]">
                         <input
                           type="checkbox"
                           name="equipment_ids"
@@ -587,7 +587,7 @@ export function CalendarInteractiveView({
               )}
 
               {modalError && (
-                <label className="flex items-center gap-2 text-xs text-ink-2">
+                <label className="flex items-center gap-2 text-[13px] text-ink-2">
                   <input type="checkbox" name="force" value="1" className="h-3.5 w-3.5 accent-ink" />
                   <span>Override conflict and force move</span>
                 </label>
@@ -598,7 +598,7 @@ export function CalendarInteractiveView({
                   !confirmUnassign ? (
                     <button
                       type="button"
-                      className="text-xs text-bad hover:underline font-medium"
+                      className="text-[13px] text-bad hover:underline font-medium"
                       onClick={() => setConfirmUnassign(true)}
                     >
                       Unassign Job
@@ -609,14 +609,14 @@ export function CalendarInteractiveView({
                         type="button"
                         disabled={submitting}
                         onClick={handleUnassignConfirm}
-                        className="rounded bg-bad px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
+                        className="rounded bg-bad px-2.5 py-1 text-[13px] font-medium text-white hover:opacity-90"
                       >
                         {submitting ? "Removing…" : "Confirm Unassign"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmUnassign(false)}
-                        className="text-xs text-ink-3 hover:text-ink"
+                        className="text-[13px] text-ink-3 hover:text-ink"
                       >
                         Cancel
                       </button>
@@ -647,7 +647,7 @@ export function CalendarInteractiveView({
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-base font-semibold text-ink">Schedule Job on Calendar</h3>
-                <p className="text-xs text-ink-2 mt-0.5">
+                <p className="text-[13px] text-ink-2 mt-0.5">
                   Pick date, technician, and equipment. Conflicts are automatically detected.
                 </p>
               </div>
@@ -689,7 +689,7 @@ export function CalendarInteractiveView({
                 </Select>
               </Field>
 
-              <p className="-mt-1 text-[12.5px] text-ink-3">
+              <p className="-mt-1 text-[14px] text-ink-3">
                 Job not created yet?{" "}
                 <a href={newJobHref} className="font-medium text-info hover:underline">
                   + New job
@@ -734,19 +734,19 @@ export function CalendarInteractiveView({
 
               {/* Equipment Multi-select */}
               <div>
-                <label className="text-[13px] font-medium text-ink-2 block mb-1">
+                <label className="text-[14px] font-medium text-ink-2 block mb-1">
                   Book Equipment (One item cannot be on two jobs same day)
                 </label>
                 <div className="max-h-36 overflow-y-auto rounded-lg border border-line p-2 space-y-1 bg-side/30">
                   {equipmentList.length === 0 ? (
-                    <div className="text-xs text-ink-3 p-2">No active equipment found.</div>
+                    <div className="text-[13px] text-ink-3 p-2">No active equipment found.</div>
                   ) : (
                     equipmentList.map((eq) => {
                       const isChecked = assignEquipIds.includes(eq.id);
                       return (
                         <label
                           key={eq.id}
-                          className="flex items-center justify-between text-xs p-1.5 rounded hover:bg-white cursor-pointer"
+                          className="flex items-center justify-between text-[13px] p-1.5 rounded hover:bg-white cursor-pointer"
                         >
                           <div className="flex items-center gap-2">
                             <input
@@ -762,7 +762,7 @@ export function CalendarInteractiveView({
                             </span>
                             {eq.typeName && <Badge>{eq.typeName}</Badge>}
                           </div>
-                          <span className="text-[11px] text-ink-3">
+                          <span className="text-[13px] text-ink-3">
                             {eq.status === "in_office" ? "In office" : eq.status}
                           </span>
                         </label>
@@ -782,7 +782,7 @@ export function CalendarInteractiveView({
               </Field>
 
               {modalError && (
-                <label className="flex items-center gap-2 text-xs text-ink-2">
+                <label className="flex items-center gap-2 text-[13px] text-ink-2">
                   <input
                     type="checkbox"
                     name="force"
@@ -822,7 +822,7 @@ export function CalendarInteractiveView({
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-base font-semibold text-ink">Record Technician Leave</h3>
-                <p className="text-xs text-ink-2 mt-0.5">
+                <p className="text-[13px] text-ink-2 mt-0.5">
                   Mark days when technician is unavailable for scheduling.
                 </p>
               </div>

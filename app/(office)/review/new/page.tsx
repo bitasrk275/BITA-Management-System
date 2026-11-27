@@ -86,7 +86,7 @@ export default async function CreateReportPage({
         <SectionTitle>From the technician&apos;s field data ({inspections.length})</SectionTitle>
         <Card>
           {inspections.length === 0 ? (
-            <p className="text-sm text-ink-3">
+            <p className="text-[15px] text-ink-3">
               No field data waiting. When a technician submits a job from the phone, it appears here.
             </p>
           ) : (
@@ -146,7 +146,7 @@ export default async function CreateReportPage({
               </Field>
             </div>
             {commonFields}
-            <p className="text-[12.5px] text-ink-3">
+            <p className="text-[14px] text-ink-3">
               You fill in the readings on the next screen. A report must be linked to a job before it is sent for review.
             </p>
             <div className="flex justify-end">

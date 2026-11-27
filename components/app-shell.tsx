@@ -9,139 +9,132 @@ import { roleLabel } from "@/lib/roles";
 import { moveSearchIndex, type SearchResponse } from "@/lib/search";
 import { Avatar, Mono } from "./ui";
 
-// The sidebar layout for office screens. Each role gets its own menu (D-015).
+/*
+ * Office navigation (DESIGN.md). Five places instead of a long menu:
+ * Today, Jobs, Reports, Money, Records. Each place lists its own pages,
+ * so every existing screen stays one tap away. Each role gets its own set (D-015).
+ * Desktop and tablet: a left rail. Phone: a bottom bar for the thumb, plus the
+ * current place's pages as large tabs at the top of the screen.
+ */
 
-type NavItem = { href: string; label: string; icon: keyof typeof ICONS; count?: number };
+type NavItem = { href: string; label: string; count?: number };
+type Section = { key: string; label: string; icon: keyof typeof ICONS; items: NavItem[] };
 export type NavCounts = Partial<Record<"enquiries" | "quotations" | "jobs" | "reports", number>>;
 
 const ICONS = {
-  home: "M3 12l9-8 9 8M5 10v10h14V10",
-  enquiries: "M4 4h16v12H5l-1 4z",
-  quotations: "M6 3h9l4 4v14H6zM14 3v5h5",
-  jobs: "M3 7h18v13H3zM8 7V4h8v3",
-  reports: "M7 3h10v18l-5-3-5 3z",
-  money: "M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v10M9 10h4.5a2 2 0 010 4H9",
-  customers: "M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3 3-5 6-5s6 2 6 5M16 11a3 3 0 100-6M21 20c0-2-1-4-4-5",
-  people: "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6",
-  equipment: "M4 7h16v10H4zM8 17v3M16 17v3",
-  schedule: "M3 5h18v16H3zM3 10h18M8 3v4M16 3v4",
-  chart: "M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6",
+  today: "M4 11.5 12 4l8 7.5M6.5 10v10h11V10M10 20v-5h4v5",
+  jobs: "M3.5 7.5h17v12h-17zM8.5 7.5V4.5h7v3M3.5 12.5h17",
+  reports: "M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 15.5h5",
+  money: "M3.5 6.5h17v11h-17zM12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM6.5 9.5v5M17.5 9.5v5",
+  records: "M4 5h6v14H4zM10 5h6v14h-6zM16 6l4 1-3 13-4-1",
   search: "M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35",
 } as const;
 
-function menuFor(roles: readonly string[], c: NavCounts): { main: NavItem[]; records: NavItem[] } {
+function sectionsFor(roles: readonly string[], c: NavCounts): Section[] {
   const management = roles.includes("management");
   const office = roles.includes("office");
   const reviewer = roles.includes("reviewer");
 
-  if (management) {
-    return {
-      main: [
-        { href: "/dashboard", label: "Home", icon: "home" },
-        { href: "/enquiries", label: "Enquiries", icon: "enquiries", count: c.enquiries },
-        { href: "/quotations", label: "Quotations", icon: "quotations", count: c.quotations },
-        { href: "/calendar", label: "Calendar", icon: "schedule" },
-        { href: "/jobs", label: "Jobs", icon: "jobs", count: c.jobs },
-        { href: "/review", label: "Reports", icon: "reports", count: c.reports },
-        { href: "/invoices", label: "Invoices & payments", icon: "money" },
-        { href: "/finance", label: "Finance", icon: "chart" },
-        { href: "/log-book", label: "Log book", icon: "reports" },
-      ],
-      records: [
-        { href: "/price-list", label: "Price list", icon: "money" },
-        { href: "/employees", label: "Employees", icon: "people" },
-        { href: "/customers", label: "Customers", icon: "customers" },
-        { href: "/equipment", label: "Equipment", icon: "equipment" },
-        { href: "/registers", label: "People & qualifications", icon: "people" },
-        { href: "/field-app", label: "Technician phone app", icon: "equipment" },
-        { href: "/invoices/export", label: "CA GST files", icon: "chart" },
-        { href: "/settings", label: "Settings", icon: "jobs" },
-        { href: "/settings/users", label: "Users & logins", icon: "people" },
-        { href: "/recycle-bin", label: "Recycle bin", icon: "reports" },
-      ],
-    };
-  }
-  if (office) {
-    return {
-      main: [
-        { href: "/office", label: "Home", icon: "home" },
-        { href: "/enquiries", label: "Enquiries", icon: "enquiries", count: c.enquiries },
-        { href: "/quotations", label: "Quotations", icon: "quotations" },
-        { href: "/calendar", label: "Calendar", icon: "schedule" },
-        { href: "/jobs", label: "Jobs", icon: "jobs", count: c.jobs },
-        { href: "/review", label: "Reports", icon: "reports" as const, count: c.reports },
-        { href: "/invoices", label: "Invoices & payments", icon: "money" },
-        { href: "/log-book", label: "Log book", icon: "reports" },
-      ],
-      records: [
-        { href: "/price-list", label: "Price list", icon: "money" },
-        { href: "/employees", label: "Employees", icon: "people" },
-        { href: "/customers", label: "Customers", icon: "customers" },
-        { href: "/equipment", label: "Equipment", icon: "equipment" },
-        { href: "/registers", label: "People & qualifications", icon: "people" },
-        { href: "/field-app", label: "Technician phone app", icon: "equipment" },
-        { href: "/invoices/export", label: "CA GST files", icon: "chart" },
-        { href: "/settings", label: "Settings", icon: "jobs" },
-      ],
-    };
+  if (management || office) {
+    return [
+      {
+        key: "today",
+        label: "Today",
+        icon: "today",
+        items: management
+          ? [
+              { href: "/dashboard", label: "Today" },
+              { href: "/office", label: "Office day" },
+            ]
+          : [{ href: "/office", label: "Today" }],
+      },
+      {
+        key: "jobs",
+        label: "Jobs",
+        icon: "jobs",
+        items: [
+          { href: "/jobs", label: "Jobs" },
+          { href: "/calendar", label: "Calendar" },
+          { href: "/enquiries", label: "Enquiries", count: c.enquiries },
+          { href: "/quotations", label: "Quotations", count: management ? c.quotations : undefined },
+          { href: "/log-book", label: "Log book" },
+        ],
+      },
+      { key: "reports", label: "Reports", icon: "reports", items: [{ href: "/review", label: "Reports", count: c.reports }] },
+      {
+        key: "money",
+        label: "Money",
+        icon: "money",
+        items: [
+          { href: "/invoices", label: "Invoices & payments" },
+          ...(management ? [{ href: "/finance", label: "Finance" }] : []),
+          { href: "/invoices/export", label: "CA GST files" },
+          { href: "/price-list", label: "Price list" },
+        ],
+      },
+      {
+        key: "records",
+        label: "Records",
+        icon: "records",
+        items: [
+          { href: "/customers", label: "Customers" },
+          { href: "/employees", label: "Employees" },
+          { href: "/registers", label: "Certificates & qualifications" },
+          { href: "/equipment", label: "Equipment" },
+          { href: "/field-app", label: "Technician phone app" },
+          { href: "/settings", label: "Settings" },
+          ...(management
+            ? [
+                { href: "/settings/users", label: "Users & logins" },
+                { href: "/recycle-bin", label: "Recycle bin" },
+              ]
+            : []),
+        ],
+      },
+    ];
   }
   if (reviewer) {
-    return {
-      main: [
-        { href: "/review", label: "Reports to review", icon: "reports", count: c.reports },
-        { href: "/jobs", label: "Jobs", icon: "jobs" },
-      ],
-      records: [
-        { href: "/employees", label: "Employees", icon: "people" },
-        { href: "/equipment", label: "Equipment", icon: "equipment" },
-        { href: "/registers", label: "People & qualifications", icon: "people" },
-      ],
-    };
+    return [
+      { key: "reports", label: "Reports", icon: "reports", items: [{ href: "/review", label: "Reports to review", count: c.reports }] },
+      { key: "jobs", label: "Jobs", icon: "jobs", items: [{ href: "/jobs", label: "Jobs" }] },
+      {
+        key: "records",
+        label: "Records",
+        icon: "records",
+        items: [
+          { href: "/employees", label: "Employees" },
+          { href: "/equipment", label: "Equipment" },
+          { href: "/registers", label: "Certificates & qualifications" },
+        ],
+      },
+    ];
   }
-  return { main: [], records: [] };
+  return [];
 }
 
-function Icon({ name }: { name: keyof typeof ICONS }) {
+// The page the user is on: the longest menu link that the current path starts with.
+function activeHref(sections: Section[], pathname: string): string | null {
+  let best: string | null = null;
+  for (const s of sections)
+    for (const i of s.items)
+      if ((pathname === i.href || pathname.startsWith(i.href + "/")) && (!best || i.href.length > best.length)) best = i.href;
+  return best;
+}
+
+function Icon({ name, className = "h-5 w-5" }: { name: keyof typeof ICONS; className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className="h-4 w-4 shrink-0 fill-none stroke-current" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" aria-hidden className={`${className} shrink-0 fill-none stroke-current`} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d={ICONS[name]} />
     </svg>
   );
 }
 
-function NavLink({
-  item,
-  active,
-  pending,
-  onSelect,
-}: {
-  item: NavItem;
-  active: boolean;
-  pending?: boolean;
-  onSelect?: (href: string) => void;
-}) {
+function Count({ n, inverse }: { n?: number; inverse?: boolean }) {
+  if (!n) return null;
   return (
-    <Link
-      href={item.href}
-      onClick={() => onSelect?.(item.href)}
-      aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[13.5px] ${
-        active || pending
-          ? "bg-white font-medium text-ink shadow-[0_0_0_1px_var(--color-line)]"
-          : "text-ink-2 hover:bg-white hover:text-ink"
-      }`}
-    >
-      {pending ? (
-        <span
-          aria-hidden
-          className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-ink-3 border-t-ink"
-        />
-      ) : (
-        <Icon name={item.icon} />
-      )}
-      {item.label}
-      {!!item.count && <span className="ml-auto pl-2 font-mono text-[11.5px] text-ink-3">{item.count}</span>}
-    </Link>
+    <span className={`ml-auto min-w-6 rounded px-1.5 text-center font-sign text-[13px] font-bold leading-6 ${inverse ? "bg-white text-sign" : "bg-sign text-white"}`}>
+      {n}
+    </span>
   );
 }
 
@@ -247,7 +240,7 @@ function GlobalSearchBox() {
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex items-center gap-2 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[13px] text-ink focus-within:border-ink">
+      <div className="flex min-h-11 items-center gap-2 rounded-md border border-line bg-white px-3 text-[15px] text-ink focus-within:border-sign focus-within:ring-2 focus-within:ring-sign/15">
         <span className="text-ink-3">
           <Icon name="search" />
         </span>
@@ -261,11 +254,11 @@ function GlobalSearchBox() {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onInputKeyDown}
-          placeholder="Search…"
+          placeholder="Search jobs, customers, reports…"
           aria-label="Global search"
-          className="min-w-0 flex-1 bg-transparent text-[13px] text-ink placeholder:text-ink-3 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-ink-3 focus:outline-none"
         />
-        <kbd className="shrink-0 rounded border border-line bg-side px-1.5 py-0.5 font-mono text-[10.5px] text-ink-3">
+        <kbd className="hidden shrink-0 rounded lg:inline border border-line bg-side px-1.5 py-0.5 font-mono text-[13px] text-ink-3">
           Ctrl K
         </kbd>
       </div>
@@ -274,18 +267,18 @@ function GlobalSearchBox() {
         <div
           role="listbox"
           aria-label="Search results"
-          className="absolute left-0 right-0 z-30 mt-1.5 max-h-[420px] min-w-[280px] overflow-y-auto rounded-xl border border-line bg-white p-1.5 md:w-[360px]"
+          className="absolute left-0 right-0 z-40 mt-1.5 max-h-[60vh] overflow-y-auto rounded-lg border border-line bg-white p-1.5 shadow-[0_8px_24px_rgba(17,20,24,0.12)] md:w-[380px]"
         >
           {loading && results.flat.length === 0 ? (
-            <div className="px-3 py-4 text-[12.5px] text-ink-3">Searching…</div>
+            <div className="px-3 py-4 text-[14px] text-ink-3">Searching…</div>
           ) : results.groups.length === 0 ? (
-            <div className="px-3 py-4 text-[12.5px] text-ink-3">
+            <div className="px-3 py-4 text-[14px] text-ink-3">
               No matching jobs, customers, reports, enquiries or quotations.
             </div>
           ) : (
             results.groups.map((grp) => (
               <div key={grp.group} className="mb-1.5 last:mb-0">
-                <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+                <div className="px-2.5 py-1 font-sign text-[13px] font-bold uppercase tracking-[0.06em] text-ink-3">
                   {grp.group}
                 </div>
                 <ul>
@@ -300,7 +293,7 @@ function GlobalSearchBox() {
                           href={item.href}
                           onClick={() => setOpen(false)}
                           onMouseEnter={() => setActiveIndex(flatIdx)}
-                          className={`block rounded-lg px-2.5 py-1.5 text-[13px] ${
+                          className={`block rounded-md px-2.5 py-2 text-[14px] ${
                             selected ? "bg-side text-ink" : "text-ink-2 hover:bg-side hover:text-ink"
                           }`}
                         >
@@ -315,7 +308,7 @@ function GlobalSearchBox() {
                             </span>
                           </div>
                           {item.subtitle && (
-                            <div className="truncate text-[11.5px] text-ink-3">{item.subtitle}</div>
+                            <div className="truncate text-[13px] text-ink-3">{item.subtitle}</div>
                           )}
                         </Link>
                       </li>
@@ -342,94 +335,124 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const { main, records } = menuFor(person.roles, counts);
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const sections = sectionsFor(person.roles, counts);
+  const current = activeHref(sections, pathname);
+  const currentSection = sections.find((s) => s.items.some((i) => i.href === current)) ?? null;
+  const sectionCount = (s: Section) => s.items.reduce((t, i) => t + (i.count ?? 0), 0);
 
   useEffect(() => {
     setPendingHref(null);
   }, [pathname]);
 
-  const handleSelectNav = (href: string) => {
-    if (href !== pathname) {
-      setPendingHref(href);
-    }
+  const select = (href: string) => {
+    if (href !== pathname) setPendingHref(href);
   };
 
   return (
-    <div className="min-h-screen bg-white md:grid md:grid-cols-[232px_1fr]">
+    <div className="min-h-screen bg-white md:grid md:grid-cols-[248px_minmax(0,1fr)]">
       {pendingHref && (
-        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center bg-ink px-3 py-1 text-xs font-medium text-white shadow-sm">
-          <span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-          Loading…
+        <div role="status" className="fixed inset-x-0 top-0 z-50 h-1 overflow-hidden bg-sign/20">
+          <div className="bita-loadbar h-full w-1/3 bg-sign" />
+          <span className="sr-only">Loading…</span>
         </div>
       )}
 
-      {/* Phone: a top bar with the menu as a scrolling row. */}
-      <div className="sticky top-0 z-10 border-b border-line bg-side md:hidden">
-        <div className="flex items-center justify-between px-4 py-2.5">
+      {/* Phone: top bar with search, then the current place's pages as tabs. */}
+      <header className="relative z-20 border-b border-line bg-white md:hidden">
+        <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-3">
           <Org subtitle={roleLabel(person.roles)} />
           <form action={signOut}>
-            <button className="text-[13px] text-ink-2">Log out</button>
+            <button className="min-h-10 rounded-md px-2 text-[14px] font-semibold text-ink-2 hover:text-ink">Log out</button>
           </form>
         </div>
-        <div className="px-3 pb-2">
+        <div className="px-4 pb-3">
           <GlobalSearchBox />
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-2 pb-2">
-          {[...main, ...records].map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href)}
-              pending={pendingHref === item.href}
-              onSelect={handleSelectNav}
-            />
-          ))}
-        </nav>
-      </div>
+        {currentSection && currentSection.items.length > 1 && (
+          <nav aria-label={`${currentSection.label} pages`} className="flex gap-1.5 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
+            {currentSection.items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => select(item.href)}
+                aria-current={item.href === current ? "page" : undefined}
+                className={`flex min-h-10 shrink-0 items-center gap-2 rounded-md border px-3 text-[14px] font-semibold ${
+                  item.href === current ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2"
+                }`}
+              >
+                {item.label}
+                {!!item.count && <span className="font-sign text-[13px] font-bold">{item.count}</span>}
+              </Link>
+            ))}
+          </nav>
+        )}
+      </header>
 
-      {/* Desktop and tablet: the sidebar. */}
-      <aside className="sticky top-0 hidden h-screen flex-col gap-0.5 border-r border-line bg-side px-2.5 py-3.5 md:flex">
-        <div className="px-2 pb-3">
+      {/* Desktop and tablet: the left rail. */}
+      <aside className="sticky top-0 hidden h-screen flex-col border-r border-line bg-side md:flex">
+        <div className="px-4 pb-3 pt-4">
           <Org subtitle={roleLabel(person.roles)} />
         </div>
-        <div className="px-1 pb-2.5">
+        <div className="px-3 pb-3">
           <GlobalSearchBox />
         </div>
-        <nav className="flex flex-col gap-0.5 overflow-y-auto">
-          {main.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href)}
-              pending={pendingHref === item.href}
-              onSelect={handleSelectNav}
-            />
-          ))}
-          {records.length > 0 && <div className="px-2.5 pb-1.5 pt-4 text-[11.5px] text-ink-3">Records</div>}
-          {records.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href)}
-              pending={pendingHref === item.href}
-              onSelect={handleSelectNav}
-            />
-          ))}
+        <nav aria-label="Main" className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-3">
+          {sections.map((s) => {
+            const open = s === currentSection;
+            return (
+              <div key={s.key}>
+                <Link
+                  href={s.items[0]!.href}
+                  onClick={() => select(s.items[0]!.href)}
+                  aria-current={open && s.items.length === 1 ? "page" : undefined}
+                  className={`flex min-h-12 items-center gap-3 rounded-md px-3 font-sign text-[19px] font-bold ${
+                    open ? "bg-ink text-white" : "text-ink hover:bg-white"
+                  }`}
+                >
+                  <Icon name={s.icon} />
+                  {s.label}
+                  <Count n={sectionCount(s)} inverse={open} />
+                </Link>
+                {open && s.items.length > 1 && (
+                  <ul className="mb-2 mt-1 space-y-0.5 pl-11 pr-1">
+                    {s.items.map((item) => {
+                      const here = item.href === current;
+                      const pending = pendingHref === item.href;
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            onClick={() => select(item.href)}
+                            aria-current={here ? "page" : undefined}
+                            className={`flex min-h-9 items-center gap-2 rounded-md px-2.5 text-[15px] ${
+                              here || pending ? "bg-white font-semibold text-ink shadow-[inset_0_0_0_1px_var(--color-line)]" : "text-ink-2 hover:bg-white hover:text-ink"
+                            }`}
+                          >
+                            {item.label}
+                            <Count n={item.count} />
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </nav>
-        <div className="mt-auto flex items-center gap-2.5 border-t border-line px-2 pt-3">
+        <div className="flex items-center gap-3 border-t border-line px-4 py-3">
           <Avatar name={person.full_name} />
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-[13px] font-medium text-ink">{person.full_name}</div>
+            <div className="truncate text-[15px] font-semibold text-ink">{person.full_name}</div>
             <form action={signOut}>
-              <button className="text-[12px] text-ink-3 hover:text-ink">Log out</button>
+              <button className="text-[14px] text-ink-3 hover:text-ink">Log out</button>
             </form>
           </div>
         </div>
       </aside>
 
       <main
-        className="min-w-0 px-4 py-6 md:px-9 md:py-7"
+        className="min-w-0 px-4 pb-28 pt-5 sm:px-6 md:px-10 md:pb-12 md:pt-8"
         onClick={(e) => {
           const anchor = (e.target as HTMLElement | null)?.closest("a");
           const href = anchor?.getAttribute("href");
@@ -445,19 +468,49 @@ export function AppShell({
           }
         }}
       >
-        {children}
+        <div className="mx-auto w-full max-w-[1200px]">{children}</div>
       </main>
+
+      {/* Phone: the five places, at thumb height. */}
+      <nav
+        aria-label="Main"
+        className="fixed inset-x-0 bottom-0 z-30 grid border-t border-line bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
+        style={{ gridTemplateColumns: `repeat(${sections.length}, minmax(0, 1fr))` }}
+      >
+        {sections.map((s) => {
+          const open = s === currentSection;
+          const n = sectionCount(s);
+          return (
+            <Link
+              key={s.key}
+              href={s.items[0]!.href}
+              onClick={() => select(s.items[0]!.href)}
+              aria-current={open ? "page" : undefined}
+              className={`relative flex min-h-16 flex-col items-center justify-center gap-1 font-sign text-[14px] font-bold ${open ? "text-sign" : "text-ink-2"}`}
+            >
+              {open && <span aria-hidden className="absolute inset-x-3 top-0 h-[3px] rounded-b bg-sign" />}
+              <span className="relative">
+                <Icon name={s.icon} className="h-6 w-6" />
+                {!!n && (
+                  <span className="absolute -right-3.5 -top-2 min-w-6 rounded bg-sign px-1 text-center text-[13px] leading-6 text-white">{n}</span>
+                )}
+              </span>
+              {s.label}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
 
 function Org({ subtitle }: { subtitle: string }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-ink text-[12px] font-bold tracking-[-0.02em] text-white">BI</span>
-      <div className="leading-tight">
-        <div className="text-[13.5px] font-semibold text-ink">BITA</div>
-        <div className="text-[12px] text-ink-3">{subtitle}</div>
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-sign font-sign text-[15px] font-bold tracking-[0.02em] text-white">BITA</span>
+      <div className="min-w-0 leading-tight">
+        <div className="truncate font-sign text-[17px] font-bold text-ink">Bangalore Inspection</div>
+        <div className="truncate text-[13px] text-ink-3">{subtitle}</div>
       </div>
     </div>
   );

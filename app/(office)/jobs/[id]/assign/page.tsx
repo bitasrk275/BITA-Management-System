@@ -115,7 +115,7 @@ export default async function AssignTechnicianPage({
         }
       />
       <ErrorNote message={error} />
-      {saved && <p className="mb-4 text-sm font-medium">Saved.</p>}
+      {saved && <p className="mb-4 text-[15px] font-medium">Saved.</p>}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Badge>{JOB_STATUS_LABEL[job.status]}</Badge>
@@ -123,11 +123,11 @@ export default async function AssignTechnicianPage({
           <Badge key={m}>{METHOD_LABEL[m]}</Badge>
         ))}
         {job.customers && (
-          <Link href={`/customers/${job.customers.id}`} className="text-sm underline">
+          <Link href={`/customers/${job.customers.id}`} className="text-[15px] underline">
             {job.customers.name}
           </Link>
         )}
-        {job.site && <span className="text-sm">· {job.site}</span>}
+        {job.site && <span className="text-[15px]">· {job.site}</span>}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -135,7 +135,7 @@ export default async function AssignTechnicianPage({
           <Card>
             <h2 className="mb-3 font-semibold">Current assignments</h2>
             {(assignmentsRes.data ?? []).length === 0 ? (
-              <p className="text-sm">No technician assigned to this job yet.</p>
+              <p className="text-[15px]">No technician assigned to this job yet.</p>
             ) : (
               <div className="space-y-4">
                 {(assignmentsRes.data ?? []).map((a) => {
@@ -155,7 +155,7 @@ export default async function AssignTechnicianPage({
                           <p className="font-semibold">
                             {a.work_date} · {a.people?.full_name ?? "Technician"}
                           </p>
-                          <p className="text-xs">
+                          <p className="text-[13px]">
                             {[a.people?.mobile, statusLabel].filter(Boolean).join(" · ")}
                           </p>
                         </div>
@@ -174,8 +174,8 @@ export default async function AssignTechnicianPage({
 
                       {a.assignment_equipment.length > 0 && (
                         <div className="mt-2">
-                          <p className="text-xs font-medium">Assigned equipment:</p>
-                          <ul className="mt-1 list-disc pl-5 text-xs">
+                          <p className="text-[13px] font-medium">Assigned equipment:</p>
+                          <ul className="mt-1 list-disc pl-5 text-[13px]">
                             {a.assignment_equipment.map((ae) => {
                               const eq = ae.equipment;
                               if (!eq) return null;
@@ -195,8 +195,8 @@ export default async function AssignTechnicianPage({
                         </div>
                       )}
 
-                      <details className="mt-3 text-sm">
-                        <summary className="cursor-pointer text-xs underline">
+                      <details className="mt-3 text-[15px]">
+                        <summary className="cursor-pointer text-[13px] underline">
                           Edit work date, notes or equipment
                         </summary>
                         <form
@@ -207,7 +207,7 @@ export default async function AssignTechnicianPage({
                             <Input type="date" name="work_date" required defaultValue={a.work_date} />
                           </Field>
                           <div>
-                            <span className="text-sm font-medium">Equipment</span>
+                            <span className="text-[15px] font-medium">Equipment</span>
                             <div className="mt-1 space-y-1">
                               {equipmentList.map((eq) => {
                                 const overdue = isCalibrationOverdue(eq.calibration_due, refDate);
@@ -245,18 +245,18 @@ export default async function AssignTechnicianPage({
           <Card>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">Qualification matrix for this job</h2>
-              <Link href="/registers" className="text-xs underline">
+              <Link href="/registers" className="text-[13px] underline">
                 Open registers
               </Link>
             </div>
             {job.test_methods.length === 0 ? (
-              <p className="text-sm">
+              <p className="text-[15px]">
                 This job has no test methods selected yet. Edit the job to add test methods.
               </p>
             ) : technicians.length === 0 ? (
-              <p className="text-sm">No active technicians in the register.</p>
+              <p className="text-[15px]">No active technicians in the register.</p>
             ) : (
-              <div className="space-y-3 text-sm">
+              <div className="space-y-3 text-[15px]">
                 {technicians.map((t) => {
                   const techQuals = qualifications.filter((q) => q.person_id === t.id);
                   const evalResult = evaluateTechnicianForJob(job.test_methods, techQuals);

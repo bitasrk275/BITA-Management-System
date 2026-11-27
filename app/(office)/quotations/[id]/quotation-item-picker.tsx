@@ -161,13 +161,13 @@ export function QuotationItemFields({
       {showAddPriceItem && (
         <div className="space-y-3 rounded-lg border border-line bg-surface-2 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-ink">
+            <span className="text-[13px] font-semibold text-ink">
               Add new service / charge to Price list
             </span>
             <button
               type="button"
               onClick={() => setShowAddPriceItem(false)}
-              className="text-xs text-ink-3 underline"
+              className="text-[13px] text-ink-3 underline"
             >
               Cancel
             </button>
